@@ -1,0 +1,160 @@
+package rules
+
+import (
+	"go/ast"
+	"path/filepath"
+	"strings"
+	"unicode"
+
+	"golang.org/x/tools/go/packages"
+)
+
+func CheckNaming(pkgs []*packages.Package, opts ...Option) []Violation {
+	cfg := NewConfig(opts...)
+	var violations []Violation
+	for _, pkg := range pkgs {
+		violations = append(violations, checkStutter(pkg, cfg)...)
+		violations = append(violations, checkImplSuffix(pkg, cfg)...)
+		violations = append(violations, checkSnakeCaseFiles(pkg, cfg)...)
+	}
+	return violations
+}
+
+func checkStutter(pkg *packages.Package, cfg Config) []Violation {
+	var violations []Violation
+	pkgName := pkg.Name
+	for _, file := range pkg.Syntax {
+		filePath := pkg.Fset.Position(file.Pos()).Filename
+		if cfg.IsExcluded(filePath) {
+			continue
+		}
+		for _, decl := range file.Decls {
+			gd, ok := decl.(*ast.GenDecl)
+			if !ok {
+				continue
+			}
+			for _, spec := range gd.Specs {
+				ts, ok := spec.(*ast.TypeSpec)
+				if !ok || !ts.Name.IsExported() {
+					continue
+				}
+				name := ts.Name.Name
+				if stutters(pkgName, name) {
+					suggested := strings.TrimPrefix(strings.ToLower(name), strings.ToLower(pkgName))
+					if len(suggested) > 0 {
+						suggested = strings.ToUpper(suggested[:1]) + suggested[1:]
+					}
+					pos := pkg.Fset.Position(ts.Name.Pos())
+					violations = append(violations, Violation{
+						File:     pos.Filename,
+						Line:     pos.Line,
+						Rule:     "naming.no-stutter",
+						Message:  `type "` + name + `" stutters with package "` + pkgName + `"`,
+						Fix:      `rename to "` + suggested + `"`,
+						Severity: cfg.Sev,
+					})
+				}
+			}
+		}
+	}
+	return violations
+}
+
+func stutters(pkgName, typeName string) bool {
+	if len(typeName) <= len(pkgName) {
+		return false
+	}
+	prefix := strings.ToLower(typeName[:len(pkgName)])
+	if prefix != strings.ToLower(pkgName) {
+		return false
+	}
+	next := rune(typeName[len(pkgName)])
+	return unicode.IsUpper(next)
+}
+
+func checkImplSuffix(pkg *packages.Package, cfg Config) []Violation {
+	var violations []Violation
+	for _, file := range pkg.Syntax {
+		filePath := pkg.Fset.Position(file.Pos()).Filename
+		if cfg.IsExcluded(filePath) {
+			continue
+		}
+		for _, decl := range file.Decls {
+			gd, ok := decl.(*ast.GenDecl)
+			if !ok {
+				continue
+			}
+			for _, spec := range gd.Specs {
+				ts, ok := spec.(*ast.TypeSpec)
+				if !ok || !ts.Name.IsExported() {
+					continue
+				}
+				if strings.HasSuffix(ts.Name.Name, "Impl") {
+					pos := pkg.Fset.Position(ts.Name.Pos())
+					violations = append(violations, Violation{
+						File:     pos.Filename,
+						Line:     pos.Line,
+						Rule:     "naming.no-impl-suffix",
+						Message:  `type "` + ts.Name.Name + `" uses banned suffix "Impl"`,
+						Fix:      "rename without Impl suffix",
+						Severity: cfg.Sev,
+					})
+				}
+			}
+		}
+	}
+	return violations
+}
+
+func checkSnakeCaseFiles(pkg *packages.Package, cfg Config) []Violation {
+	var violations []Violation
+	seen := make(map[string]bool)
+	for _, f := range pkg.GoFiles {
+		if seen[f] {
+			continue
+		}
+		seen[f] = true
+		if cfg.IsExcluded(f) {
+			continue
+		}
+		base := filepath.Base(f)
+		if !isSnakeCase(base) {
+			violations = append(violations, Violation{
+				File:     f,
+				Rule:     "naming.snake-case-file",
+				Message:  `filename "` + base + `" must be snake_case`,
+				Fix:      `rename to "` + toSnakeCase(base) + `"`,
+				Severity: cfg.Sev,
+			})
+		}
+	}
+	return violations
+}
+
+func isSnakeCase(filename string) bool {
+	name := strings.TrimSuffix(filename, ".go")
+	name = strings.TrimSuffix(name, "_test")
+	for _, r := range name {
+		if !unicode.IsLower(r) && !unicode.IsDigit(r) && r != '_' {
+			return false
+		}
+	}
+	return len(name) > 0
+}
+
+func toSnakeCase(filename string) string {
+	ext := filepath.Ext(filename)
+	name := strings.TrimSuffix(filename, ext)
+	var result []rune
+	for i, r := range name {
+		if unicode.IsUpper(r) {
+			if i > 0 {
+				result = append(result, '_')
+			}
+			result = append(result, unicode.ToLower(r))
+		} else {
+			result = append(result, r)
+		}
+	}
+	return string(result) + ext
+}
