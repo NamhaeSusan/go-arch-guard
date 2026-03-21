@@ -1,0 +1,68 @@
+package rules_test
+
+import (
+	"testing"
+
+	"github.com/kimtaeyun/go-arch-guard/rules"
+)
+
+func TestViolation_String(t *testing.T) {
+	tests := []struct {
+		name string
+		v    rules.Violation
+		want string
+	}{
+		{
+			name: "error with line",
+			v: rules.Violation{
+				File:     "internal/domain/user/service.go",
+				Line:     10,
+				Rule:     "naming.no-stutter",
+				Message:  `type "UserService" stutters with package "user"`,
+				Fix:      `rename to "Service"`,
+				Severity: rules.Error,
+			},
+			want: `[ERROR] violation: type "UserService" stutters with package "user" (file: internal/domain/user/service.go:10, rule: naming.no-stutter, fix: rename to "Service")`,
+		},
+		{
+			name: "warning without line",
+			v: rules.Violation{
+				File:     "internal/util/",
+				Line:     0,
+				Rule:     "structure.banned-package",
+				Message:  `package "util" is banned`,
+				Fix:      "move to specific domain or pkg/",
+				Severity: rules.Warning,
+			},
+			want: `[WARNING] violation: package "util" is banned (file: internal/util/, rule: structure.banned-package, fix: move to specific domain or pkg/)`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.v.String(); got != tt.want {
+				t.Errorf("got:\n%s\nwant:\n%s", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestOptions(t *testing.T) {
+	t.Run("default severity is Error", func(t *testing.T) {
+		cfg := rules.NewConfig()
+		if cfg.Sev != rules.Error {
+			t.Errorf("got %v, want Error", cfg.Sev)
+		}
+	})
+	t.Run("WithSeverity sets level", func(t *testing.T) {
+		cfg := rules.NewConfig(rules.WithSeverity(rules.Warning))
+		if cfg.Sev != rules.Warning {
+			t.Errorf("got %v, want Warning", cfg.Sev)
+		}
+	})
+	t.Run("WithExclude sets patterns", func(t *testing.T) {
+		cfg := rules.NewConfig(rules.WithExclude("internal/legacy/..."))
+		if len(cfg.ExcludePatterns) != 1 || cfg.ExcludePatterns[0] != "internal/legacy/..." {
+			t.Errorf("got %v", cfg.ExcludePatterns)
+		}
+	})
+}
