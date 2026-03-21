@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"golang.org/x/tools/go/packages"
 )
@@ -33,10 +34,18 @@ func Load(dir string, patterns ...string) ([]*packages.Package, error) {
 	}
 
 	var result []*packages.Package
+	var loadErrs []string
 	for _, pkg := range pkgs {
-		if len(pkg.Errors) == 0 {
-			result = append(result, pkg)
+		if len(pkg.Errors) > 0 {
+			for _, e := range pkg.Errors {
+				loadErrs = append(loadErrs, e.Error())
+			}
+			continue
 		}
+		result = append(result, pkg)
+	}
+	if len(loadErrs) > 0 {
+		return result, fmt.Errorf("packages with errors were skipped: %s", strings.Join(loadErrs, "; "))
 	}
 	return result, nil
 }

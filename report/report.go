@@ -1,7 +1,6 @@
 package report
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/kimtaeyun/go-arch-guard/rules"
@@ -13,7 +12,7 @@ func AssertNoViolations(t testing.TB, violations []rules.Violation) {
 	t.Helper()
 	hasErrors := false
 	for _, v := range violations {
-		fmt.Println(v.String())
+		t.Log(v.String())
 		if v.Severity == rules.Error {
 			hasErrors = true
 		}

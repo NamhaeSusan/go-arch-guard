@@ -21,6 +21,8 @@ func (f *fakeTB) Errorf(format string, args ...interface{}) {
 
 func (f *fakeTB) Helper() {}
 
+func (f *fakeTB) Log(args ...interface{}) {}
+
 func TestAssertNoViolations(t *testing.T) {
 	t.Run("no violations passes", func(t *testing.T) {
 		tb := &fakeTB{}
