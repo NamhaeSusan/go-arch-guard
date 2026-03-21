@@ -82,6 +82,12 @@ func CheckDependency(pkgs []*packages.Package, projectModule string, projectRoot
 				continue
 			}
 
+			// Same-layer sub-package imports are allowed (except domain,
+			// which is handled above with cross-domain isolation).
+			if srcLayer == dstLayer {
+				continue
+			}
+
 			if !isAllowed(srcLayer, dstLayer) {
 				violations = append(violations, Violation{
 					File:     findImportFile(pkg, importPath, projectRoot),
