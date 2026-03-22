@@ -56,6 +56,20 @@ Also detects cross-domain imports within the domain layer.
 - **No `Impl` suffix** — `ServiceImpl` is banned
 - **Snake case files** — `userService.go` → `user_service.go`
 
+### Vertical Slice (`rules.CheckVerticalSlice`)
+
+Enforces cross-domain isolation for vertical slice architecture under `internal/`:
+
+- Same domain imports → always allowed
+- Import `shared/` → always allowed
+- `shared/` importing a domain → violation (`vertical.shared-imports-domain`)
+- Cross-domain import from `app/usecase/` to other domain's root (alias) or `port/` → allowed
+- Any other cross-domain import → violation (`vertical.cross-domain-isolation`)
+
+```go
+rules.CheckVerticalSlice(pkgs, "github.com/yourmodule", ".")
+```
+
 ### Structure (`rules.CheckStructure`)
 
 - **Banned packages** — `util`, `common`, `misc`, `helper`, `shared`
