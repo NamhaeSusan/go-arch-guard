@@ -47,3 +47,31 @@ func TestCheckVerticalSlice(t *testing.T) {
 		}
 	})
 }
+
+func TestCheckVerticalSliceInternal(t *testing.T) {
+	t.Run("valid project has no violations", func(t *testing.T) {
+		pkgs, err := analyzer.Load("../testdata/vertical-valid", "internal/...")
+		if err != nil {
+			t.Fatal(err)
+		}
+		violations := rules.CheckVerticalSliceInternal(pkgs, "github.com/kimtaeyun/testproject-vertical", "../testdata/vertical-valid")
+		if len(violations) > 0 {
+			for _, v := range violations {
+				t.Log(v.String())
+			}
+			t.Errorf("expected no violations, got %d", len(violations))
+		}
+	})
+
+	t.Run("detects infra importing app", func(t *testing.T) {
+		pkgs, err := analyzer.Load("../testdata/vertical-invalid", "internal/...")
+		if err != nil {
+			t.Fatal(err)
+		}
+		violations := rules.CheckVerticalSliceInternal(pkgs, "github.com/kimtaeyun/testproject-vertical-invalid", "../testdata/vertical-invalid")
+		found := findViolation(violations, "vertical.internal-layer-direction")
+		if found == nil {
+			t.Error("expected internal-layer-direction violation")
+		}
+	})
+}

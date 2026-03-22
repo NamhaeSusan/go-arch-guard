@@ -70,6 +70,30 @@ Enforces cross-domain isolation for vertical slice architecture under `internal/
 rules.CheckVerticalSlice(pkgs, "github.com/yourmodule", ".")
 ```
 
+### Vertical Slice Internal (`rules.CheckVerticalSliceInternal`)
+
+Enforces intra-domain layer direction within a vertical slice. Cross-domain and `shared/` imports are skipped (handled by `CheckVerticalSlice`).
+
+Allowed imports per sublayer:
+
+| from | allowed to import |
+|------|-------------------|
+| handler | app, port |
+| app | domain, policy, model, repo, event, port |
+| domain | model, event |
+| policy | model, event |
+| infra | model, repo, event, port |
+| model | event |
+| repo | model |
+| event | (nothing) |
+| port | model |
+
+Same-sublayer imports are always allowed. Violation rule: `vertical.internal-layer-direction`.
+
+```go
+rules.CheckVerticalSliceInternal(pkgs, "github.com/yourmodule", ".")
+```
+
 ### Structure (`rules.CheckStructure`)
 
 - **Banned packages** — `util`, `common`, `misc`, `helper`, `shared`
