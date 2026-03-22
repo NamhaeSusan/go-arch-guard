@@ -71,3 +71,37 @@ func TestIntegration_WarningMode(t *testing.T) {
 	// AssertNoViolations should pass with warnings only
 	report.AssertNoViolations(t, violations)
 }
+
+func TestIntegration_VerticalValid(t *testing.T) {
+	pkgs, err := analyzer.Load("testdata/vertical-valid", "internal/...")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("cross-domain", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckVerticalSlice(pkgs, "github.com/kimtaeyun/testproject-vertical", "testdata/vertical-valid"))
+	})
+	t.Run("internal-direction", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckVerticalSliceInternal(pkgs, "github.com/kimtaeyun/testproject-vertical", "testdata/vertical-valid"))
+	})
+}
+
+func TestIntegration_VerticalInvalid(t *testing.T) {
+	pkgs, err := analyzer.Load("testdata/vertical-invalid", "internal/...")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("cross-domain violations found", func(t *testing.T) {
+		violations := rules.CheckVerticalSlice(pkgs, "github.com/kimtaeyun/testproject-vertical-invalid", "testdata/vertical-invalid")
+		if len(violations) == 0 {
+			t.Error("expected cross-domain violations")
+		}
+	})
+	t.Run("internal-direction violations found", func(t *testing.T) {
+		violations := rules.CheckVerticalSliceInternal(pkgs, "github.com/kimtaeyun/testproject-vertical-invalid", "testdata/vertical-invalid")
+		if len(violations) == 0 {
+			t.Error("expected internal-direction violations")
+		}
+	})
+}
