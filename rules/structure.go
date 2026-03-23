@@ -9,16 +9,6 @@ import (
 	"strings"
 )
 
-var bannedPackageNames = []string{"util", "common", "misc", "helper", "shared", "services"}
-
-var legacyPackageNames = []string{"router", "bootstrap"}
-
-var allowedInternalTopLevelPackages = map[string]bool{
-	"domain":        true,
-	"orchestration": true,
-	"pkg":           true,
-}
-
 func CheckStructure(projectRoot string, opts ...Option) []Violation {
 	cfg := NewConfig(opts...)
 	var violations []Violation
@@ -55,7 +45,7 @@ func checkInternalTopLevelPackages(internalDir string, cfg Config) []Violation {
 			if cfg.IsExcluded(relPath + "/") {
 				continue
 			}
-			if allowedInternalTopLevelPackages[entry.Name()] {
+			if allowedInternalTopLevel[entry.Name()] {
 				continue
 			}
 			violations = append(violations, Violation{
@@ -206,6 +196,9 @@ func checkPackageNames(internalDir string, cfg Config) []Violation {
 		if cfg.IsExcluded(rel + "/") {
 			return filepath.SkipDir
 		}
+		if !hasNonTestGoFiles(path) {
+			return nil
+		}
 
 		name := d.Name()
 		for _, banned := range bannedPackageNames {
@@ -253,6 +246,9 @@ func checkMiddlewarePlacement(internalDir string, cfg Config) []Violation {
 			return nil
 		}
 		if d.Name() != "middleware" {
+			return nil
+		}
+		if !hasNonTestGoFiles(path) {
 			return nil
 		}
 		rel, _ := filepath.Rel(filepath.Dir(internalDir), path)

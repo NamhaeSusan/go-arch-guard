@@ -405,6 +405,38 @@ func TestCheckStructure(t *testing.T) {
 		}
 	})
 
+	t.Run("ignores empty directory with banned name", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"), "package order\n")
+		writeFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"), "package model\n")
+		if err := os.MkdirAll(filepath.Join(root, "internal", "domain", "order", "shared"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+
+		violations := rules.CheckStructure(root)
+		for _, v := range violations {
+			if v.Rule == "structure.banned-package" && strings.Contains(v.File, "shared") {
+				t.Errorf("empty directory should not trigger banned-package: %s", v.String())
+			}
+		}
+	})
+
+	t.Run("ignores empty middleware directory", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"), "package order\n")
+		writeFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"), "package model\n")
+		if err := os.MkdirAll(filepath.Join(root, "internal", "domain", "order", "middleware"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+
+		violations := rules.CheckStructure(root)
+		for _, v := range violations {
+			if v.Rule == "structure.middleware-placement" && strings.Contains(v.File, "middleware") {
+				t.Errorf("empty middleware directory should not trigger violation: %s", v.String())
+			}
+		}
+	})
+
 	t.Run("project-relative exclude skips matching directory tree", func(t *testing.T) {
 		violations := rules.CheckStructure("../testdata/invalid", rules.WithExclude("internal/platform/..."))
 		for _, v := range violations {

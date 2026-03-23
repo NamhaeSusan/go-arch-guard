@@ -241,13 +241,6 @@ var bannedLayerSuffixes = []string{
 	"_store", "_persistence",
 }
 
-var layerDirs = map[string]bool{
-	"svc": true, "service": true, "repo": true,
-	"handler": true, "controller": true,
-	"model": true, "entity": true,
-	"store": true, "persistence": true,
-	"infra": true, "app": true, "domain": true, "policy": true,
-}
 
 func checkNoLayerSuffix(pkg *packages.Package, cfg Config) []Violation {
 	var violations []Violation
@@ -266,7 +259,7 @@ func checkNoLayerSuffix(pkg *packages.Package, cfg Config) []Violation {
 			continue
 		}
 		dir := filepath.Base(filepath.Dir(f))
-		if !layerDirs[dir] {
+		if !layerDirNames[dir] {
 			continue
 		}
 		name := strings.TrimSuffix(base, ".go")

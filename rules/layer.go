@@ -8,39 +8,6 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-var allowedLayerImports = map[string][]string{
-	// Domain root ("") is a facade (alias.go) that re-exports from all sublayers.
-	// It is exempt from layer direction checks; cross-domain isolation is enforced
-	// separately by CheckDomainIsolation.
-	"handler":    {"app"},
-	"app":        {"core/model", "core/repo", "core/svc", "event"},
-	"core/svc":   {"core/model"},
-	"core/repo":  {"core/model"},
-	"infra":      {"core/repo", "core/model", "event"},
-	"event":      {"core/model"},
-	"core/model": {},
-	"core":       {"core/model"},
-}
-
-var knownSublayers = map[string]bool{
-	"handler":    true,
-	"app":        true,
-	"core/svc":   true,
-	"core/repo":  true,
-	"infra":      true,
-	"event":      true,
-	"core/model": true,
-	"core":       true,
-}
-
-var pkgRestrictedSublayers = map[string]bool{
-	"core":       true,
-	"core/model": true,
-	"core/repo":  true,
-	"core/svc":   true,
-	"event":      true,
-}
-
 func CheckLayerDirection(pkgs []*packages.Package, projectModule string, projectRoot string, opts ...Option) []Violation {
 	cfg := NewConfig(opts...)
 	internalPrefix := projectModule + "/internal/"
@@ -60,12 +27,12 @@ func CheckLayerDirection(pkgs []*packages.Package, projectModule string, project
 		}
 
 		srcSublayer := identifySublayer(pkg.PkgPath, internalPrefix, srcDomain)
-		if srcSublayer != "" && !knownSublayers[srcSublayer] {
+		if srcSublayer != "" && !isKnownSublayer(srcSublayer) {
 			violations = append(violations, Violation{
 				File:     relativePackageFile(pkg),
 				Rule:     "layer.unknown-sublayer",
 				Message:  fmt.Sprintf("unknown sublayer %q in domain %q", srcSublayer, srcDomain),
-				Fix:      fmt.Sprintf("use one of the supported sublayers: %v", knownSublayerList()),
+				Fix:      fmt.Sprintf("use one of the supported sublayers: %v", knownDomainSublayers),
 				Severity: cfg.Sev,
 			})
 			continue
@@ -109,13 +76,13 @@ func CheckLayerDirection(pkgs []*packages.Package, projectModule string, project
 				continue
 			}
 
-			if impSublayer != "" && !knownSublayers[impSublayer] {
+			if impSublayer != "" && !isKnownSublayer(impSublayer) {
 				violations = append(violations, Violation{
 					File:     findImportFile(pkg, impPath, projectRoot),
 					Line:     findImportLine(pkg, impPath),
 					Rule:     "layer.unknown-sublayer",
 					Message:  fmt.Sprintf("unknown sublayer %q in domain %q", impSublayer, srcDomain),
-					Fix:      fmt.Sprintf("use one of the supported sublayers: %v", knownSublayerList()),
+					Fix:      fmt.Sprintf("use one of the supported sublayers: %v", knownDomainSublayers),
 					Severity: cfg.Sev,
 				})
 				continue
@@ -162,10 +129,6 @@ func identifySublayer(pkgPath, internalPrefix, domain string) string {
 		return "core/" + parts[1]
 	}
 	return parts[0]
-}
-
-func knownSublayerList() []string {
-	return []string{"handler", "app", "core", "core/model", "core/repo", "core/svc", "event", "infra"}
 }
 
 func relativePackageFile(pkg *packages.Package) string {
