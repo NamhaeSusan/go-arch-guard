@@ -54,4 +54,28 @@ func TestCheckNaming(t *testing.T) {
 			t.Error("expected snake-case-file violation for userService.go")
 		}
 	})
+
+	t.Run("detects repo file without matching interface", func(t *testing.T) {
+		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
+		if err != nil {
+			t.Fatal(err)
+		}
+		violations := rules.CheckNaming(pkgs)
+		found := findViolation(violations, "naming.repo-file-interface")
+		if found == nil {
+			t.Error("expected repo-file-interface violation for repo/user.go")
+		}
+	})
+
+	t.Run("detects layer suffix in filename", func(t *testing.T) {
+		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
+		if err != nil {
+			t.Fatal(err)
+		}
+		violations := rules.CheckNaming(pkgs)
+		found := findViolation(violations, "naming.no-layer-suffix")
+		if found == nil {
+			t.Error("expected no-layer-suffix violation for order_svc.go")
+		}
+	})
 }

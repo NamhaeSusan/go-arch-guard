@@ -55,6 +55,8 @@ Also detects cross-domain imports within the domain layer.
 - **No stutter** — `user.UserService` → rename to `user.Service`
 - **No `Impl` suffix** — `ServiceImpl` is banned
 - **Snake case files** — `userService.go` → `user_service.go`
+- **Repo file interface** — `repo/user.go` must contain `type User interface`
+- **No layer suffix** — `svc/install_svc.go` → rename to `svc/install.go`
 
 ### Vertical Slice (`rules.CheckVerticalSlice`)
 

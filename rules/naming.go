@@ -16,6 +16,8 @@ func CheckNaming(pkgs []*packages.Package, opts ...Option) []Violation {
 		violations = append(violations, checkStutter(pkg, cfg)...)
 		violations = append(violations, checkImplSuffix(pkg, cfg)...)
 		violations = append(violations, checkSnakeCaseFiles(pkg, cfg)...)
+		violations = append(violations, checkRepoFileInterface(pkg, cfg)...)
+		violations = append(violations, checkNoLayerSuffix(pkg, cfg)...)
 	}
 	return violations
 }
@@ -157,4 +159,126 @@ func toSnakeCase(filename string) string {
 		}
 	}
 	return string(result) + ext
+}
+
+func checkRepoFileInterface(pkg *packages.Package, cfg Config) []Violation {
+	if !isRepoPackage(pkg.PkgPath) {
+		return nil
+	}
+	var violations []Violation
+	seen := make(map[string]bool)
+	for i, f := range pkg.GoFiles {
+		if seen[f] {
+			continue
+		}
+		seen[f] = true
+		base := filepath.Base(f)
+		if strings.HasSuffix(base, "_test.go") {
+			continue
+		}
+		if cfg.IsExcluded(f) {
+			continue
+		}
+		expected := snakeToPascal(strings.TrimSuffix(base, ".go"))
+		if hasInterface(pkg.Syntax[i], expected) {
+			continue
+		}
+		violations = append(violations, Violation{
+			File:     f,
+			Rule:     "naming.repo-file-interface",
+			Message:  `file "` + base + `" in repo/ must contain interface "` + expected + `"`,
+			Fix:      `add "type ` + expected + ` interface { ... }" or rename the file`,
+			Severity: cfg.Sev,
+		})
+	}
+	return violations
+}
+
+func isRepoPackage(pkgPath string) bool {
+	return strings.HasSuffix(pkgPath, "/repo") || strings.Contains(pkgPath, "/repo/")
+}
+
+func snakeToPascal(s string) string {
+	parts := strings.Split(s, "_")
+	var b strings.Builder
+	for _, p := range parts {
+		if len(p) == 0 {
+			continue
+		}
+		b.WriteString(strings.ToUpper(p[:1]))
+		b.WriteString(p[1:])
+	}
+	return b.String()
+}
+
+func hasInterface(file *ast.File, name string) bool {
+	for _, decl := range file.Decls {
+		gd, ok := decl.(*ast.GenDecl)
+		if !ok {
+			continue
+		}
+		for _, spec := range gd.Specs {
+			ts, ok := spec.(*ast.TypeSpec)
+			if !ok {
+				continue
+			}
+			if ts.Name.Name == name {
+				if _, isIface := ts.Type.(*ast.InterfaceType); isIface {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+var bannedLayerSuffixes = []string{
+	"_svc", "_service", "_repo", "_repository",
+	"_handler", "_controller", "_model", "_entity",
+	"_store", "_persistence",
+}
+
+var layerDirs = map[string]bool{
+	"svc": true, "service": true, "repo": true,
+	"handler": true, "controller": true,
+	"model": true, "entity": true,
+	"store": true, "persistence": true,
+	"infra": true, "app": true, "domain": true, "policy": true,
+}
+
+func checkNoLayerSuffix(pkg *packages.Package, cfg Config) []Violation {
+	var violations []Violation
+	seen := make(map[string]bool)
+	for _, f := range pkg.GoFiles {
+		if seen[f] {
+			continue
+		}
+		seen[f] = true
+		base := filepath.Base(f)
+		if strings.HasSuffix(base, "_test.go") {
+			continue
+		}
+		if cfg.IsExcluded(f) {
+			continue
+		}
+		dir := filepath.Base(filepath.Dir(f))
+		if !layerDirs[dir] {
+			continue
+		}
+		name := strings.TrimSuffix(base, ".go")
+		for _, suffix := range bannedLayerSuffixes {
+			if strings.HasSuffix(name, suffix) {
+				suggested := strings.TrimSuffix(name, suffix) + ".go"
+				violations = append(violations, Violation{
+					File:     f,
+					Rule:     "naming.no-layer-suffix",
+					Message:  `filename "` + base + `" has redundant layer suffix "` + suffix + `"`,
+					Fix:      `rename to "` + suggested + `"`,
+					Severity: cfg.Sev,
+				})
+				break
+			}
+		}
+	}
+	return violations
 }
