@@ -72,6 +72,7 @@ func TestIntegration_Invalid(t *testing.T) {
 		assertHasRule(t, isolationViolations, "isolation.pkg-imports-domain")
 		assertHasRule(t, layerViolations, "layer.unknown-sublayer")
 		assertHasRule(t, layerViolations, "layer.inner-imports-pkg")
+		assertHasRule(t, structureViolations, "structure.internal-top-level")
 		assertHasRule(t, structureViolations, "structure.domain-root-alias-required")
 		assertHasRule(t, structureViolations, "structure.domain-model-required")
 		assertHasRule(t, structureViolations, "structure.dto-placement")
@@ -97,7 +98,7 @@ func TestIntegration_WarningMode(t *testing.T) {
 	report.AssertNoViolations(t, violations)
 }
 
-func TestIntegration_AllowsNeutralSupportPackagesOutsideCoreZones(t *testing.T) {
+func TestIntegration_RejectsUnexpectedInternalTopLevelPackages(t *testing.T) {
 	root := t.TempDir()
 	module := "example.com/supportzones"
 
@@ -129,7 +130,8 @@ func TestIntegration_AllowsNeutralSupportPackagesOutsideCoreZones(t *testing.T) 
 		report.AssertNoViolations(t, rules.CheckNaming(pkgs))
 	})
 	t.Run("structure", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckStructure(root))
+		violations := rules.CheckStructure(root)
+		assertHasRule(t, violations, "structure.internal-top-level")
 	})
 }
 

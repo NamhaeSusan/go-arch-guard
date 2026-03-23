@@ -330,6 +330,40 @@ func TestCheckStructure(t *testing.T) {
 		}
 	})
 
+	t.Run("rejects unexpected internal top-level package", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, filepath.Join(root, "internal", "config", "config.go"), "package config\n")
+
+		violations := rules.CheckStructure(root)
+		found := false
+		for _, v := range violations {
+			if v.Rule == "structure.internal-top-level" && v.File == "internal/config/" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected internal top-level package violation for internal/config/")
+		}
+	})
+
+	t.Run("rejects another unexpected internal top-level package", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, filepath.Join(root, "internal", "platform", "platform.go"), "package platform\n")
+
+		violations := rules.CheckStructure(root)
+		found := false
+		for _, v := range violations {
+			if v.Rule == "structure.internal-top-level" && v.File == "internal/platform/" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected internal top-level package violation for internal/platform/")
+		}
+	})
+
 	t.Run("project-relative exclude skips matching directory tree", func(t *testing.T) {
 		violations := rules.CheckStructure("../testdata/invalid", rules.WithExclude("internal/platform/..."))
 		for _, v := range violations {

@@ -85,6 +85,8 @@ Sample output when violations exist:
 
 `go-arch-guard` assumes a domain-centric vertical-slice layout.
 
+At the `internal/` top level, only `domain/`, `orchestration/`, and `pkg/` are allowed. Additional top-level support packages are rejected.
+
 ```text
 cmd/
 `-- api/
@@ -166,10 +168,10 @@ Unknown domain sublayers are rejected.
 `internal/orchestration` is the cross-domain coordination layer.
 
 - It may import domain roots only, not domain sub-packages.
-- It may import other non-domain internal support packages when needed.
+- It may import shared helpers in `internal/pkg/...` when needed.
 - It is still a protected layer from the outside: `cmd/...` and `internal/orchestration/...` may depend on orchestration, but domains, `pkg`, and other internal packages may not.
 
-In other words, orchestration is restricted on the domain boundary, not forced into total isolation from every internal helper package.
+In other words, orchestration may coordinate domain roots and shared helpers, but `internal/` does not allow arbitrary extra top-level support packages.
 
 ### Shared Packages
 
@@ -199,7 +201,7 @@ Import matrix:
 | anyone | `internal/pkg/...` | Yes |
 | `orchestration/...` | domain root | Yes |
 | `orchestration/...` | domain sub-package | No |
-| `orchestration/...` | other non-domain internal packages | Yes |
+| `orchestration/...` | `internal/pkg/...` | Yes |
 | `cmd/...` | `internal/orchestration/...` | Yes |
 | `cmd/...` | domain root | Yes |
 | `cmd/...` | domain sub-package | No |
@@ -265,6 +267,7 @@ import "mymodule/internal/pkg/clock" // layer.inner-imports-pkg
 
 | Rule | Meaning |
 |------|---------|
+| `structure.internal-top-level` | only `domain`, `orchestration`, and `pkg` are allowed directly under `internal/` |
 | `structure.banned-package` | `util`, `common`, `misc`, `helper`, `shared`, `services` are banned anywhere under `internal/` |
 | `structure.legacy-package` | `router`, `bootstrap`, or misplaced `app`/`handler`/`infra` directories under `internal/` |
 | `structure.middleware-placement` | `middleware/` must live at `internal/pkg/middleware/` |

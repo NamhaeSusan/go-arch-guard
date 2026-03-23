@@ -12,6 +12,12 @@ var bannedPackageNames = []string{"util", "common", "misc", "helper", "shared", 
 
 var legacyPackageNames = []string{"router", "bootstrap"}
 
+var allowedInternalTopLevelPackages = map[string]bool{
+	"domain":        true,
+	"orchestration": true,
+	"pkg":           true,
+}
+
 func CheckStructure(projectRoot string, opts ...Option) []Violation {
 	cfg := NewConfig(opts...)
 	var violations []Violation
@@ -21,6 +27,7 @@ func CheckStructure(projectRoot string, opts ...Option) []Violation {
 		return nil
 	}
 
+	violations = append(violations, checkInternalTopLevelPackages(internalDir, cfg)...)
 	violations = append(violations, checkPackageNames(internalDir, cfg)...)
 	violations = append(violations, checkMiddlewarePlacement(internalDir, cfg)...)
 
@@ -31,6 +38,49 @@ func CheckStructure(projectRoot string, opts ...Option) []Violation {
 	violations = append(violations, checkDomainModelRequired(domainDir, cfg)...)
 	violations = append(violations, checkDTOPlacement(internalDir, cfg)...)
 
+	return violations
+}
+
+func checkInternalTopLevelPackages(internalDir string, cfg Config) []Violation {
+	var violations []Violation
+	entries, err := os.ReadDir(internalDir)
+	if err != nil {
+		return nil
+	}
+	for _, entry := range entries {
+		relPath := filepath.ToSlash(filepath.Join("internal", entry.Name()))
+
+		if entry.IsDir() {
+			if cfg.IsExcluded(relPath + "/") {
+				continue
+			}
+			if allowedInternalTopLevelPackages[entry.Name()] {
+				continue
+			}
+			violations = append(violations, Violation{
+				File:     relPath + "/",
+				Rule:     "structure.internal-top-level",
+				Message:  `internal/ top-level package "` + entry.Name() + `" is not allowed`,
+				Fix:      "use only internal/domain/, internal/orchestration/, or internal/pkg/ at the internal/ top level",
+				Severity: cfg.Sev,
+			})
+			continue
+		}
+
+		if !strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") {
+			continue
+		}
+		if cfg.IsExcluded(relPath) {
+			continue
+		}
+		violations = append(violations, Violation{
+			File:     relPath,
+			Rule:     "structure.internal-top-level",
+			Message:  `internal/ top-level Go file "` + entry.Name() + `" is not allowed`,
+			Fix:      "move code under internal/domain/, internal/orchestration/, or internal/pkg/",
+			Severity: cfg.Sev,
+		})
+	}
 	return violations
 }
 
