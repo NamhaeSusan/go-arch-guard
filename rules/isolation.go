@@ -26,7 +26,7 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 				}
 				impDomain := identifyDomain(impPath, internalPrefix)
 				if impDomain == "" {
-					continue // not a domain import (pkg/, orchestration/, router/)
+					continue
 				}
 				if isDomainAlias(impPath, internalPrefix, impDomain) {
 					continue // alias import is allowed
@@ -49,8 +49,6 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 
 		srcDomain := identifyDomain(pkg.PkgPath, internalPrefix)
 		srcIsOrchestration := isOrchestrationPkg(pkg.PkgPath, internalPrefix)
-		srcIsRouter := isRouterPkg(pkg.PkgPath, internalPrefix)
-		srcIsBootstrap := isBootstrapPkg(pkg.PkgPath, internalPrefix)
 		srcIsPkg := isPkgPkg(pkg.PkgPath, internalPrefix)
 
 		for impPath := range pkg.Imports {
@@ -65,59 +63,8 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 				continue
 			}
 
-			// Rule 3: pkg/ importing a domain → violation
-			if srcIsPkg && impDomain != "" {
-				violations = append(violations, Violation{
-					File:     findImportFile(pkg, impPath, projectRoot),
-					Line:     findImportLine(pkg, impPath),
-					Rule:     "isolation.pkg-imports-domain",
-					Message:  fmt.Sprintf("pkg/ must not import domain %q", impDomain),
-					Fix:      "pkg/ should only contain shared utilities with no domain dependencies",
-					Severity: cfg.Sev,
-				})
-				continue
-			}
-
 			// Rule 1: same domain → always allowed
 			if srcDomain != "" && impDomain == srcDomain {
-				continue
-			}
-
-			// Bootstrap rules (same as orchestration: alias-only)
-			if srcIsBootstrap {
-				if impDomain == "" {
-					continue
-				}
-				if isDomainAlias(impPath, internalPrefix, impDomain) {
-					continue
-				}
-				violations = append(violations, Violation{
-					File:     findImportFile(pkg, impPath, projectRoot),
-					Line:     findImportLine(pkg, impPath),
-					Rule:     "isolation.bootstrap-deep-import",
-					Message:  fmt.Sprintf("bootstrap must only import domain alias, not sub-package %q", impPath),
-					Fix:      fmt.Sprintf("import the domain alias package instead: %sdomain/%s", internalPrefix, impDomain),
-					Severity: cfg.Sev,
-				})
-				continue
-			}
-
-			// Router rules (same as orchestration: alias-only)
-			if srcIsRouter {
-				if impDomain == "" {
-					continue
-				}
-				if isDomainAlias(impPath, internalPrefix, impDomain) {
-					continue
-				}
-				violations = append(violations, Violation{
-					File:     findImportFile(pkg, impPath, projectRoot),
-					Line:     findImportLine(pkg, impPath),
-					Rule:     "isolation.router-deep-import",
-					Message:  fmt.Sprintf("router must only import domain alias, not sub-package %q", impPath),
-					Fix:      fmt.Sprintf("import the domain alias package instead: %sdomain/%s", internalPrefix, impDomain),
-					Severity: cfg.Sev,
-				})
 				continue
 			}
 
@@ -159,6 +106,32 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 				continue
 			}
 
+			// pkg/ must stay domain-unaware and orchestration-unaware
+			if srcIsPkg {
+				if impDomain != "" {
+					violations = append(violations, Violation{
+						File:     findImportFile(pkg, impPath, projectRoot),
+						Line:     findImportLine(pkg, impPath),
+						Rule:     "isolation.pkg-imports-domain",
+						Message:  fmt.Sprintf("pkg/ must not import domain %q", impDomain),
+						Fix:      "pkg/ should only contain shared utilities with no domain or orchestration dependencies",
+						Severity: cfg.Sev,
+					})
+					continue
+				}
+				if isOrchestrationPkg(impPath, internalPrefix) {
+					violations = append(violations, Violation{
+						File:     findImportFile(pkg, impPath, projectRoot),
+						Line:     findImportLine(pkg, impPath),
+						Rule:     "isolation.pkg-imports-orchestration",
+						Message:  "pkg/ must not import orchestration",
+						Fix:      "move orchestration-aware code to internal/orchestration or cmd/",
+						Severity: cfg.Sev,
+					})
+					continue
+				}
+			}
+
 			// Rule 7: domain A importing domain B → violation
 			if srcDomain != "" && impDomain != "" && srcDomain != impDomain {
 				violations = append(violations, Violation{
@@ -172,14 +145,14 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 				continue
 			}
 
-			// Rule 8: non-domain internal packages must import domains via the root package only
-			if srcDomain == "" && impDomain != "" && !isDomainAlias(impPath, internalPrefix, impDomain) {
+			// Rule 8: non-domain internal packages other than orchestration/cmd/pkg must not import domains
+			if srcDomain == "" && impDomain != "" {
 				violations = append(violations, Violation{
 					File:     findImportFile(pkg, impPath, projectRoot),
 					Line:     findImportLine(pkg, impPath),
-					Rule:     "isolation.external-deep-import",
-					Message:  fmt.Sprintf("package %q must import domain %q via the root package, not sub-package %q", pkg.PkgPath, impDomain, impPath),
-					Fix:      fmt.Sprintf("import the domain root package instead: %sdomain/%s", internalPrefix, impDomain),
+					Rule:     "isolation.internal-imports-domain",
+					Message:  fmt.Sprintf("package %q must not import domain %q", pkg.PkgPath, impDomain),
+					Fix:      "move domain orchestration to internal/orchestration or app wiring to cmd/",
 					Severity: cfg.Sev,
 				})
 				continue
@@ -219,14 +192,4 @@ func isDomainAlias(importPath, internalPrefix, domain string) bool {
 func isOrchestrationHandler(pkgPath, internalPrefix string) bool {
 	rel := strings.TrimPrefix(pkgPath, internalPrefix)
 	return strings.HasPrefix(rel, "orchestration/handler")
-}
-
-func isRouterPkg(pkgPath, internalPrefix string) bool {
-	rel := strings.TrimPrefix(pkgPath, internalPrefix)
-	return rel == "router" || strings.HasPrefix(rel, "router/")
-}
-
-func isBootstrapPkg(pkgPath, internalPrefix string) bool {
-	rel := strings.TrimPrefix(pkgPath, internalPrefix)
-	return rel == "bootstrap" || strings.HasPrefix(rel, "bootstrap/")
 }

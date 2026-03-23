@@ -20,7 +20,7 @@ func findImportFile(pkg *packages.Package, importPath, projectRoot string) strin
 				if err != nil {
 					return pos.Filename
 				}
-				return rel
+				return filepath.ToSlash(rel)
 			}
 		}
 	}
@@ -29,7 +29,7 @@ func findImportFile(pkg *packages.Package, importPath, projectRoot string) strin
 		if err != nil {
 			return pkg.GoFiles[0]
 		}
-		return rel
+		return filepath.ToSlash(rel)
 	}
 	return pkg.PkgPath
 }
@@ -46,4 +46,14 @@ func findImportLine(pkg *packages.Package, importPath string) int {
 		}
 	}
 	return 0
+}
+
+func relativePathForPackage(pkg *packages.Package, path string) string {
+	if pkg != nil && pkg.Module != nil && pkg.Module.Dir != "" {
+		rel, err := filepath.Rel(pkg.Module.Dir, path)
+		if err == nil {
+			return filepath.ToSlash(rel)
+		}
+	}
+	return filepath.ToSlash(path)
 }

@@ -27,7 +27,7 @@ func checkStutter(pkg *packages.Package, cfg Config) []Violation {
 	var violations []Violation
 	pkgName := pkg.Name
 	for _, file := range pkg.Syntax {
-		filePath := pkg.Fset.Position(file.Pos()).Filename
+		filePath := relativePathForPackage(pkg, pkg.Fset.Position(file.Pos()).Filename)
 		if cfg.IsExcluded(filePath) {
 			continue
 		}
@@ -49,7 +49,7 @@ func checkStutter(pkg *packages.Package, cfg Config) []Violation {
 					}
 					pos := pkg.Fset.Position(ts.Name.Pos())
 					violations = append(violations, Violation{
-						File:     pos.Filename,
+						File:     relativePathForPackage(pkg, pos.Filename),
 						Line:     pos.Line,
 						Rule:     "naming.no-stutter",
 						Message:  `type "` + name + `" stutters with package "` + pkgName + `"`,
@@ -78,7 +78,7 @@ func stutters(pkgName, typeName string) bool {
 func checkImplSuffix(pkg *packages.Package, cfg Config) []Violation {
 	var violations []Violation
 	for _, file := range pkg.Syntax {
-		filePath := pkg.Fset.Position(file.Pos()).Filename
+		filePath := relativePathForPackage(pkg, pkg.Fset.Position(file.Pos()).Filename)
 		if cfg.IsExcluded(filePath) {
 			continue
 		}
@@ -95,7 +95,7 @@ func checkImplSuffix(pkg *packages.Package, cfg Config) []Violation {
 				if strings.HasSuffix(ts.Name.Name, "Impl") {
 					pos := pkg.Fset.Position(ts.Name.Pos())
 					violations = append(violations, Violation{
-						File:     pos.Filename,
+						File:     relativePathForPackage(pkg, pos.Filename),
 						Line:     pos.Line,
 						Rule:     "naming.no-impl-suffix",
 						Message:  `type "` + ts.Name.Name + `" uses banned suffix "Impl"`,
@@ -117,13 +117,14 @@ func checkSnakeCaseFiles(pkg *packages.Package, cfg Config) []Violation {
 			continue
 		}
 		seen[f] = true
-		if cfg.IsExcluded(f) {
+		relPath := relativePathForPackage(pkg, f)
+		if cfg.IsExcluded(relPath) {
 			continue
 		}
 		base := filepath.Base(f)
 		if !isSnakeCase(base) {
 			violations = append(violations, Violation{
-				File:     f,
+				File:     relPath,
 				Rule:     "naming.snake-case-file",
 				Message:  `filename "` + base + `" must be snake_case`,
 				Fix:      `rename to "` + toSnakeCase(base) + `"`,
@@ -177,7 +178,8 @@ func checkRepoFileInterface(pkg *packages.Package, cfg Config) []Violation {
 		if strings.HasSuffix(base, "_test.go") {
 			continue
 		}
-		if cfg.IsExcluded(f) {
+		relPath := relativePathForPackage(pkg, f)
+		if cfg.IsExcluded(relPath) {
 			continue
 		}
 		expected := snakeToPascal(strings.TrimSuffix(base, ".go"))
@@ -185,7 +187,7 @@ func checkRepoFileInterface(pkg *packages.Package, cfg Config) []Violation {
 			continue
 		}
 		violations = append(violations, Violation{
-			File:     f,
+			File:     relPath,
 			Rule:     "naming.repo-file-interface",
 			Message:  `file "` + base + `" in repo/ must contain interface "` + expected + `"`,
 			Fix:      `add "type ` + expected + ` interface { ... }" or rename the file`,
@@ -259,7 +261,8 @@ func checkNoLayerSuffix(pkg *packages.Package, cfg Config) []Violation {
 		if strings.HasSuffix(base, "_test.go") {
 			continue
 		}
-		if cfg.IsExcluded(f) {
+		relPath := relativePathForPackage(pkg, f)
+		if cfg.IsExcluded(relPath) {
 			continue
 		}
 		dir := filepath.Base(filepath.Dir(f))
@@ -271,7 +274,7 @@ func checkNoLayerSuffix(pkg *packages.Package, cfg Config) []Violation {
 			if strings.HasSuffix(name, suffix) {
 				suggested := strings.TrimSuffix(name, suffix) + ".go"
 				violations = append(violations, Violation{
-					File:     f,
+					File:     relPath,
 					Rule:     "naming.no-layer-suffix",
 					Message:  `filename "` + base + `" has redundant layer suffix "` + suffix + `"`,
 					Fix:      `rename to "` + suggested + `"`,
@@ -295,7 +298,7 @@ func checkHandlerNoExportedInterface(pkg *packages.Package, cfg Config) []Violat
 	}
 	var violations []Violation
 	for _, file := range pkg.Syntax {
-		filePath := pkg.Fset.Position(file.Pos()).Filename
+		filePath := relativePathForPackage(pkg, pkg.Fset.Position(file.Pos()).Filename)
 		if cfg.IsExcluded(filePath) {
 			continue
 		}
@@ -312,7 +315,7 @@ func checkHandlerNoExportedInterface(pkg *packages.Package, cfg Config) []Violat
 				if _, isIface := ts.Type.(*ast.InterfaceType); isIface {
 					pos := pkg.Fset.Position(ts.Name.Pos())
 					violations = append(violations, Violation{
-						File:     pos.Filename,
+						File:     relativePathForPackage(pkg, pos.Filename),
 						Line:     pos.Line,
 						Rule:     "naming.handler-no-exported-interface",
 						Message:  `handler package defines exported interface "` + ts.Name.Name + `"`,

@@ -46,6 +46,12 @@ func TestIntegration_Invalid(t *testing.T) {
 			t.Error("expected layer direction violations")
 		}
 	})
+	t.Run("naming violations found", func(t *testing.T) {
+		violations := rules.CheckNaming(pkgs)
+		if len(violations) == 0 {
+			t.Error("expected naming violations")
+		}
+	})
 	t.Run("structure violations found", func(t *testing.T) {
 		violations := rules.CheckStructure("testdata/invalid")
 		if len(violations) == 0 {

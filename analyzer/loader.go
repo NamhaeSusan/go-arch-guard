@@ -25,7 +25,7 @@ func Load(dir string, patterns ...string) ([]*packages.Package, error) {
 
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedImports | packages.NeedFiles |
-			packages.NeedSyntax | packages.NeedTypes,
+			packages.NeedSyntax | packages.NeedModule,
 		Dir: absDir,
 	}
 	pkgs, err := packages.Load(cfg, prefixed...)

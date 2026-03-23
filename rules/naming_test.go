@@ -1,6 +1,7 @@
 package rules_test
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/NamhaeSusan/go-arch-guard/analyzer"
@@ -37,6 +38,22 @@ func TestCheckNaming(t *testing.T) {
 		}
 		if !found {
 			t.Error("expected handler-no-exported-interface violation")
+		}
+	})
+
+	t.Run("reports relative file paths", func(t *testing.T) {
+		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
+		if err != nil {
+			t.Fatal(err)
+		}
+		violations := rules.CheckNaming(pkgs)
+		if len(violations) == 0 {
+			t.Fatal("expected naming violations")
+		}
+		for _, v := range violations {
+			if filepath.IsAbs(v.File) {
+				t.Fatalf("expected relative path, got %q", v.File)
+			}
 		}
 	})
 }

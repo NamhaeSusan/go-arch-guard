@@ -8,7 +8,7 @@ import (
 
 var bannedPackageNames = []string{"util", "common", "misc", "helper", "shared"}
 
-var legacyPackageNames = []string{"handler", "app", "infra"}
+var legacyPackageNames = []string{"handler", "app", "infra", "router", "bootstrap"}
 
 func CheckStructure(projectRoot string, opts ...Option) []Violation {
 	cfg := NewConfig(opts...)
@@ -119,7 +119,7 @@ func checkLegacyPackages(internalDir string, cfg Config) []Violation {
 					File:     relPath + "/",
 					Rule:     "structure.legacy-package",
 					Message:  `legacy package "` + e.Name() + `" should be migrated`,
-					Fix:      "move handlers to domain/*/handler/, middleware to pkg/, router to internal/router/",
+					Fix:      "move app-specific wiring to cmd/ and shared helpers to internal/pkg/",
 					Severity: cfg.Sev,
 				})
 			}

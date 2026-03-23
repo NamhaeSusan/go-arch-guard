@@ -17,6 +17,12 @@ go-arch-guard enforces a **domain-centric vertical slice** architecture. Each do
 ### Project Layout
 
 ```
+cmd/
+└── api/
+    ├── main.go                         ← process entry point
+    ├── wire.go                         ← app-specific dependency wiring
+    └── routes.go                       ← route registration via domain root APIs
+
 internal/
 ├── domain/
 │   ├── order/                          ← one domain = one vertical slice
@@ -53,12 +59,7 @@ internal/
 │   ├── create_order.go                  ← imports domain aliases ONLY
 │   └── draft_submit.go
 │
-├── router/                              ← HTTP route registration + DI wiring
-│   ├── router.go                        ← gin engine setup
-│   ├── routes.go                        ← route definitions
-│   └── error_handler.go                 ← domain error → HTTP status mapping
-│
-└── pkg/                                 ← shared utilities (anyone can import)
+└── pkg/                                 ← shared utilities (domain-unaware)
     ├── middleware/                       ← auth, rate limiting
     └── transport/http/                  ← shared response/error helpers
 ```
@@ -121,12 +122,18 @@ type DraftSubmit struct {
 
 **Rule:** Orchestration can only import domain **aliases** (root packages). Importing `domain/user/core/model` directly is a violation.
 
+### cmd/ — Composition Root
+
+`cmd/...` is the only place that should wire applications together: create services, build handlers through domain root APIs, register routes, and start processes.
+
+**Rule:** `cmd/...` can import domain root packages, but it must not import domain sub-packages directly.
+
 ### Dependency Direction (Full Picture)
 
 ```
                     ┌─────────────────────────────────┐
-                    │          router/                 │
-                    │   (DI wiring + route setup)      │
+                    │            cmd/                  │
+                    │  (entrypoint + wiring + routes)  │
                     └──────────┬──────────────────────┘
                                │ creates
                     ┌──────────▼──────────────────────┐
@@ -149,9 +156,10 @@ type DraftSubmit struct {
             └──────────────────────────────────────────┘
                                │
                     ┌──────────▼──────────────────────┐
-                    │           pkg/                   │
-                    │   (shared utilities — anyone     │
-                    │    can import, imports nothing)   │
+                    │        internal/pkg/             │
+                    │   (shared utilities, imports      │
+                    │    neither domains nor            │
+                    │    orchestration)                 │
                     └─────────────────────────────────┘
 ```
 
@@ -179,7 +187,7 @@ import (
 )
 
 func TestArchitecture(t *testing.T) {
-    pkgs, err := analyzer.Load(".", "internal/...")
+    pkgs, err := analyzer.Load(".", "internal/...", "cmd/...")
     if err != nil {
         t.Fatal(err)
     }
@@ -214,18 +222,14 @@ Run: `go test -run TestArchitecture -v`
 | from | to | allowed? |
 |------|----|----------|
 | same domain | same domain | Yes |
-| anyone | `pkg/` | Yes |
-| `pkg/` | any domain | **No** — `isolation.pkg-imports-domain` |
-| other internal package | domain alias (root package) | Yes |
-| other internal package | domain sub-package | **No** — `isolation.external-deep-import` |
+| anyone | `internal/pkg/` | Yes |
+| `internal/pkg/` | any domain | **No** — `isolation.pkg-imports-domain` |
+| `internal/pkg/` | `orchestration/` | **No** — `isolation.pkg-imports-orchestration` |
 | `orchestration/` | domain alias (root package) | Yes |
 | `orchestration/` | domain sub-package | **No** — `isolation.orchestration-deep-import` |
-| `router/` | domain alias (root package) | Yes |
-| `router/` | domain sub-package | **No** — `isolation.router-deep-import` |
-| `bootstrap/` | domain alias (root package) | Yes |
-| `bootstrap/` | domain sub-package | **No** — `isolation.bootstrap-deep-import` |
 | `cmd/` | domain alias (root package) | Yes |
 | `cmd/` | domain sub-package | **No** — `isolation.cmd-deep-import` |
+| other internal package | any domain | **No** — `isolation.internal-imports-domain` |
 | domain A | domain B | **No** — `isolation.cross-domain` |
 
 #### Examples
@@ -241,8 +245,11 @@ import "mymodule/internal/domain/user/core/model"   // isolation.orchestration-d
 // ❌ order handler imports user domain
 import "mymodule/internal/domain/user/app"          // isolation.cross-domain
 
-// ❌ config imports a domain sub-package
-import "mymodule/internal/domain/user/handler/http" // isolation.external-deep-import
+// ❌ config imports a domain directly
+import "mymodule/internal/domain/user"              // isolation.internal-imports-domain
+
+// ❌ shared package imports orchestration
+import "mymodule/internal/orchestration"            // isolation.pkg-imports-orchestration
 
 // ✅ anyone imports shared utilities
 import "mymodule/internal/pkg/db"
@@ -306,7 +313,7 @@ import "mymodule/internal/domain/order/infra/persistence"  // layer.direction
 | Rule | Description | Violation |
 |------|-------------|-----------|
 | Banned packages | `util`, `common`, `misc`, `helper`, `shared` under `internal/` | `structure.banned-package` |
-| Legacy packages | `handler`, `app`, `infra` at `internal/` top level | `structure.legacy-package` |
+| Legacy packages | `handler`, `app`, `infra`, `router`, `bootstrap` at `internal/` top level | `structure.legacy-package` |
 | Middleware placement | `middleware/` must be under `pkg/` | `structure.middleware-placement` |
 | Domain root alias only | each domain root may contain only `alias.go` as a non-test Go file | `structure.domain-root-alias-only` |
 | Domain model required | each domain must have `model.go` or `core/model/` | `structure.domain-model-required` |
@@ -329,9 +336,9 @@ rules.CheckDomainIsolation(pkgs, module, root)
 ### Exclude Paths
 
 ```go
-// Exclude DI wiring layer from isolation checks
+// Exclude a legacy subtree from isolation checks
 rules.CheckDomainIsolation(pkgs, module, root,
-    rules.WithExclude("mymodule/internal/router", "mymodule/internal/router/..."))
+    rules.WithExclude("mymodule/internal/legacy", "mymodule/internal/legacy/..."))
 
 // Exclude specific domains from naming checks
 rules.CheckNaming(pkgs, rules.WithExclude("internal/domain/auth/..."))
@@ -412,12 +419,11 @@ internal/domain/audit/
 | Rule | Function | Description |
 |------|----------|-------------|
 | `isolation.cross-domain` | CheckDomainIsolation | Domain A imports domain B |
-| `isolation.external-deep-import` | CheckDomainIsolation | Non-domain internal package imports a domain sub-package |
+| `isolation.internal-imports-domain` | CheckDomainIsolation | Unauthorized internal package imports a domain |
 | `isolation.orchestration-deep-import` | CheckDomainIsolation | Orchestration imports domain sub-package |
-| `isolation.router-deep-import` | CheckDomainIsolation | Router imports domain sub-package |
-| `isolation.bootstrap-deep-import` | CheckDomainIsolation | Bootstrap imports domain sub-package |
 | `isolation.cmd-deep-import` | CheckDomainIsolation | cmd/ imports domain sub-package |
 | `isolation.pkg-imports-domain` | CheckDomainIsolation | pkg/ imports a domain |
+| `isolation.pkg-imports-orchestration` | CheckDomainIsolation | pkg/ imports orchestration |
 | `layer.direction` | CheckLayerDirection | Wrong layer direction within domain |
 | `naming.no-stutter` | CheckNaming | Type name repeats package name |
 | `naming.no-impl-suffix` | CheckNaming | Type ends with "Impl" |
@@ -426,7 +432,7 @@ internal/domain/audit/
 | `naming.no-layer-suffix` | CheckNaming | Filename has redundant layer suffix |
 | `naming.handler-no-exported-interface` | CheckNaming | handler package defines exported interface |
 | `structure.banned-package` | CheckStructure | Package is util/common/misc/helper/shared |
-| `structure.legacy-package` | CheckStructure | Legacy handler/app/infra at top level |
+| `structure.legacy-package` | CheckStructure | Legacy handler/app/infra/router/bootstrap at top level |
 | `structure.middleware-placement` | CheckStructure | Middleware not in pkg/ |
 | `structure.domain-root-alias-only` | CheckStructure | Domain root contains files other than alias.go |
 | `structure.domain-model-required` | CheckStructure | Domain missing model.go or core/model/ |

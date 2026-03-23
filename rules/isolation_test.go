@@ -40,7 +40,7 @@ func TestCheckDomainIsolation(t *testing.T) {
 		}
 	})
 
-	t.Run("detects router deep import", func(t *testing.T) {
+	t.Run("detects unauthorized internal package importing domain root", func(t *testing.T) {
 		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
 		if err != nil {
 			t.Fatal(err)
@@ -48,13 +48,13 @@ func TestCheckDomainIsolation(t *testing.T) {
 		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
 		found := false
 		for _, v := range violations {
-			if v.Rule == "isolation.router-deep-import" {
+			if v.Rule == "isolation.internal-imports-domain" {
 				found = true
 				break
 			}
 		}
 		if !found {
-			t.Error("expected router-deep-import violation")
+			t.Error("expected internal-imports-domain violation")
 		}
 	})
 
@@ -94,7 +94,7 @@ func TestCheckDomainIsolation(t *testing.T) {
 		}
 	})
 
-	t.Run("detects external deep import from non-domain package", func(t *testing.T) {
+	t.Run("detects pkg importing orchestration", func(t *testing.T) {
 		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
 		if err != nil {
 			t.Fatal(err)
@@ -102,13 +102,31 @@ func TestCheckDomainIsolation(t *testing.T) {
 		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
 		found := false
 		for _, v := range violations {
-			if v.Rule == "isolation.external-deep-import" {
+			if v.Rule == "isolation.pkg-imports-orchestration" {
 				found = true
 				break
 			}
 		}
 		if !found {
-			t.Error("expected external-deep-import violation")
+			t.Error("expected pkg-imports-orchestration violation")
+		}
+	})
+
+	t.Run("detects unauthorized internal package importing domain sub-package", func(t *testing.T) {
+		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
+		if err != nil {
+			t.Fatal(err)
+		}
+		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
+		found := false
+		for _, v := range violations {
+			if v.Rule == "isolation.internal-imports-domain" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected internal-imports-domain violation")
 		}
 	})
 }

@@ -31,6 +31,26 @@ func TestCheckStructure(t *testing.T) {
 		}
 	})
 
+	t.Run("detects router and bootstrap as legacy packages", func(t *testing.T) {
+		violations := rules.CheckStructure("../testdata/invalid")
+		foundRouter := false
+		foundBootstrap := false
+		for _, v := range violations {
+			if v.Rule != "structure.legacy-package" {
+				continue
+			}
+			if v.File == "internal/router/" {
+				foundRouter = true
+			}
+			if v.File == "internal/bootstrap/" {
+				foundBootstrap = true
+			}
+		}
+		if !foundRouter || !foundBootstrap {
+			t.Errorf("expected legacy-package violations for router and bootstrap, got router=%v bootstrap=%v", foundRouter, foundBootstrap)
+		}
+	})
+
 	t.Run("detects middleware outside pkg", func(t *testing.T) {
 		violations := rules.CheckStructure("../testdata/invalid")
 		found := false

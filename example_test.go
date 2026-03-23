@@ -8,7 +8,7 @@ import (
 )
 
 func Example() {
-	pkgs, err := analyzer.Load("testdata/valid", "internal/...")
+	pkgs, err := analyzer.Load("testdata/valid", "internal/...", "cmd/...")
 	if err != nil {
 		fmt.Println(err)
 		return
