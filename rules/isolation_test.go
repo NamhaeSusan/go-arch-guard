@@ -93,4 +93,22 @@ func TestCheckDomainIsolation(t *testing.T) {
 			t.Error("expected cmd-deep-import violation")
 		}
 	})
+
+	t.Run("detects external deep import from non-domain package", func(t *testing.T) {
+		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
+		if err != nil {
+			t.Fatal(err)
+		}
+		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
+		found := false
+		for _, v := range violations {
+			if v.Rule == "isolation.external-deep-import" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected external-deep-import violation")
+		}
+	})
 }

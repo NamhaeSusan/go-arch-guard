@@ -20,7 +20,7 @@ go-arch-guard enforces a **domain-centric vertical slice** architecture. Each do
 internal/
 ├── domain/
 │   ├── order/                          ← one domain = one vertical slice
-│   │   ├── alias.go                    ← the ONLY external entry point
+│   │   ├── alias.go                    ← public API surface for the domain root package
 │   │   │
 │   │   ├── app/                        ← application service (facade)
 │   │   │   └── service.go              ← coordinates core/* layers
@@ -63,22 +63,27 @@ internal/
     └── transport/http/                  ← shared response/error helpers
 ```
 
-### alias.go — The Domain's Public API
+### alias.go — The Domain Root's Public Surface
 
-Each domain exposes exactly **one entry point**: `alias.go` at the domain root. It uses Go type aliases to re-export only what external consumers need:
+Each domain exposes exactly **one package** to the outside: the domain root package. `alias.go` defines the public surface for that root package by re-exporting only what external consumers need:
 
 ```go
 // internal/domain/order/alias.go
 package order
 
-import "mymodule/internal/domain/order/app"
+import (
+    "mymodule/internal/domain/order/app"
+    orderhttp "mymodule/internal/domain/order/handler/http"
+)
 
 type Service = app.Service
+
+type Handler = orderhttp.Handler
 ```
 
-**Why:** Outside code imports `order.Service`, never `order/app.Service` or `order/core/model.Order`. If you refactor the internals, the alias stays stable.
+**Why:** Outside code imports `order.Service` or `order.Handler`, never `order/app.Service` or `order/handler/http.Handler`. If you refactor the internals, the root package stays stable.
 
-**Rule:** `alias.go` can only import `app/`. Direct imports of `core/model/`, `core/repo/`, etc. are violations.
+**Rule:** Outside code can import only the domain root package. Deep imports such as `domain/order/handler/http` or `domain/order/core/model` are violations. `alias.go` itself is the publication file, not a layer-direction target.
 
 ### core/ — The Dependency-Free Center
 
@@ -140,7 +145,7 @@ type DraftSubmit struct {
             │                                          │
             │   event/ ──→ core/model/                 │
             │                                          │
-            │   alias.go ──→ app/                      │
+            │   alias.go ──→ selected internal APIs    │
             └──────────────────────────────────────────┘
                                │
                     ┌──────────▼──────────────────────┐
@@ -155,7 +160,7 @@ type DraftSubmit struct {
 ## Install
 
 ```bash
-go get github.com/kimtaeyun/go-arch-guard
+go get github.com/NamhaeSusan/go-arch-guard
 ```
 
 ## Quick Start
@@ -168,9 +173,9 @@ package myproject_test
 import (
     "testing"
 
-    "github.com/kimtaeyun/go-arch-guard/analyzer"
-    "github.com/kimtaeyun/go-arch-guard/report"
-    "github.com/kimtaeyun/go-arch-guard/rules"
+    "github.com/NamhaeSusan/go-arch-guard/analyzer"
+    "github.com/NamhaeSusan/go-arch-guard/report"
+    "github.com/NamhaeSusan/go-arch-guard/rules"
 )
 
 func TestArchitecture(t *testing.T) {
@@ -202,7 +207,7 @@ Run: `go test -run TestArchitecture -v`
 
 ### Domain Isolation (`rules.CheckDomainIsolation`)
 
-**Purpose:** Domains must not know about each other. Cross-domain coordination goes through `orchestration/` only.
+**Purpose:** Domains must not know about each other, and external packages must depend on a domain through its root package only.
 
 #### Import Matrix
 
@@ -211,10 +216,16 @@ Run: `go test -run TestArchitecture -v`
 | same domain | same domain | Yes |
 | anyone | `pkg/` | Yes |
 | `pkg/` | any domain | **No** — `isolation.pkg-imports-domain` |
+| other internal package | domain alias (root package) | Yes |
+| other internal package | domain sub-package | **No** — `isolation.external-deep-import` |
 | `orchestration/` | domain alias (root package) | Yes |
 | `orchestration/` | domain sub-package | **No** — `isolation.orchestration-deep-import` |
 | `router/` | domain alias (root package) | Yes |
 | `router/` | domain sub-package | **No** — `isolation.router-deep-import` |
+| `bootstrap/` | domain alias (root package) | Yes |
+| `bootstrap/` | domain sub-package | **No** — `isolation.bootstrap-deep-import` |
+| `cmd/` | domain alias (root package) | Yes |
+| `cmd/` | domain sub-package | **No** — `isolation.cmd-deep-import` |
 | domain A | domain B | **No** — `isolation.cross-domain` |
 
 #### Examples
@@ -230,6 +241,9 @@ import "mymodule/internal/domain/user/core/model"   // isolation.orchestration-d
 // ❌ order handler imports user domain
 import "mymodule/internal/domain/user/app"          // isolation.cross-domain
 
+// ❌ config imports a domain sub-package
+import "mymodule/internal/domain/user/handler/http" // isolation.external-deep-import
+
 // ✅ anyone imports shared utilities
 import "mymodule/internal/pkg/db"
 ```
@@ -244,7 +258,6 @@ import "mymodule/internal/pkg/db"
 
 | from | allowed to import |
 |------|-------------------|
-| `""` (alias.go) | `app` |
 | `handler` | `app` |
 | `app` | `core/model`, `core/repo`, `core/svc` |
 | `core/svc` | `core/model` |
@@ -253,6 +266,8 @@ import "mymodule/internal/pkg/db"
 | `infra` | `core/repo`, `core/model` |
 | `event` | `core/model` |
 | `core/model` | (nothing) |
+
+`alias.go` is the root package's publication file and is not checked by `CheckLayerDirection`.
 
 Same-sublayer imports (e.g., `handler/http` → `handler/grpc`) are always allowed.
 
@@ -270,8 +285,6 @@ import "mymodule/internal/domain/order/core/repo"    // layer.direction
 // ❌ handler imports infra directly
 import "mymodule/internal/domain/order/infra/persistence"  // layer.direction
 
-// ❌ alias.go imports core/model directly (should only import app)
-import "mymodule/internal/domain/order/core/model"   // layer.direction
 ```
 
 ---
@@ -295,6 +308,7 @@ import "mymodule/internal/domain/order/core/model"   // layer.direction
 | Banned packages | `util`, `common`, `misc`, `helper`, `shared` under `internal/` | `structure.banned-package` |
 | Legacy packages | `handler`, `app`, `infra` at `internal/` top level | `structure.legacy-package` |
 | Middleware placement | `middleware/` must be under `pkg/` | `structure.middleware-placement` |
+| Domain root alias only | each domain root may contain only `alias.go` as a non-test Go file | `structure.domain-root-alias-only` |
 | Domain model required | each domain must have `model.go` or `core/model/` | `structure.domain-model-required` |
 | DTO placement | `dto.go` must not be in `domain/` or `infra/` | `structure.dto-placement` |
 
@@ -378,16 +392,6 @@ internal/domain/audit/
 └── infra/persistence/repository.go
 ```
 
-### Handler-Only Domain
-
-```
-internal/domain/dashboard/
-├── alias.go
-└── handler/http/handler.go
-```
-
----
-
 ## API Reference
 
 | Function | Description |
@@ -408,8 +412,11 @@ internal/domain/dashboard/
 | Rule | Function | Description |
 |------|----------|-------------|
 | `isolation.cross-domain` | CheckDomainIsolation | Domain A imports domain B |
+| `isolation.external-deep-import` | CheckDomainIsolation | Non-domain internal package imports a domain sub-package |
 | `isolation.orchestration-deep-import` | CheckDomainIsolation | Orchestration imports domain sub-package |
 | `isolation.router-deep-import` | CheckDomainIsolation | Router imports domain sub-package |
+| `isolation.bootstrap-deep-import` | CheckDomainIsolation | Bootstrap imports domain sub-package |
+| `isolation.cmd-deep-import` | CheckDomainIsolation | cmd/ imports domain sub-package |
 | `isolation.pkg-imports-domain` | CheckDomainIsolation | pkg/ imports a domain |
 | `layer.direction` | CheckLayerDirection | Wrong layer direction within domain |
 | `naming.no-stutter` | CheckNaming | Type name repeats package name |
@@ -417,9 +424,11 @@ internal/domain/dashboard/
 | `naming.snake-case-file` | CheckNaming | Filename not snake_case |
 | `naming.repo-file-interface` | CheckNaming | repo/ file missing matching interface |
 | `naming.no-layer-suffix` | CheckNaming | Filename has redundant layer suffix |
+| `naming.handler-no-exported-interface` | CheckNaming | handler package defines exported interface |
 | `structure.banned-package` | CheckStructure | Package is util/common/misc/helper/shared |
 | `structure.legacy-package` | CheckStructure | Legacy handler/app/infra at top level |
 | `structure.middleware-placement` | CheckStructure | Middleware not in pkg/ |
+| `structure.domain-root-alias-only` | CheckStructure | Domain root contains files other than alias.go |
 | `structure.domain-model-required` | CheckStructure | Domain missing model.go or core/model/ |
 | `structure.dto-placement` | CheckStructure | dto.go in domain/ or infra/ |
 

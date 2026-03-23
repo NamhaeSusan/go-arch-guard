@@ -23,6 +23,9 @@ func TestIntegration_Valid(t *testing.T) {
 	t.Run("naming", func(t *testing.T) {
 		report.AssertNoViolations(t, rules.CheckNaming(pkgs))
 	})
+	t.Run("structure", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckStructure("testdata/valid"))
+	})
 }
 
 func TestIntegration_Invalid(t *testing.T) {
@@ -41,6 +44,12 @@ func TestIntegration_Invalid(t *testing.T) {
 		violations := rules.CheckLayerDirection(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "testdata/invalid")
 		if len(violations) == 0 {
 			t.Error("expected layer direction violations")
+		}
+	})
+	t.Run("structure violations found", func(t *testing.T) {
+		violations := rules.CheckStructure("testdata/invalid")
+		if len(violations) == 0 {
+			t.Error("expected structure violations")
 		}
 	})
 }

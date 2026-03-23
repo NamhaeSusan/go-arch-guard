@@ -44,4 +44,18 @@ func TestCheckStructure(t *testing.T) {
 			t.Error("expected middleware-placement violation")
 		}
 	})
+
+	t.Run("detects extra domain root files beyond alias.go", func(t *testing.T) {
+		violations := rules.CheckStructure("../testdata/invalid")
+		found := false
+		for _, v := range violations {
+			if v.Rule == "structure.domain-root-alias-only" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected domain-root-alias-only violation")
+		}
+	})
 }

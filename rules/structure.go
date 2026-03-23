@@ -24,9 +24,49 @@ func CheckStructure(projectRoot string, opts ...Option) []Violation {
 	violations = append(violations, checkMiddlewarePlacement(internalDir, cfg)...)
 
 	domainDir := filepath.Join(internalDir, "domain")
+	violations = append(violations, checkDomainRootAliasOnly(domainDir, cfg)...)
 	violations = append(violations, checkDomainModelRequired(domainDir, cfg)...)
 	violations = append(violations, checkDTOPlacement(internalDir, cfg)...)
 
+	return violations
+}
+
+func checkDomainRootAliasOnly(domainDir string, cfg Config) []Violation {
+	var violations []Violation
+	entries, err := os.ReadDir(domainDir)
+	if err != nil {
+		return nil
+	}
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		rootDir := filepath.Join(domainDir, e.Name())
+		rootEntries, err := os.ReadDir(rootDir)
+		if err != nil {
+			continue
+		}
+		for _, rootEntry := range rootEntries {
+			if rootEntry.IsDir() {
+				continue
+			}
+			name := rootEntry.Name()
+			if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") || name == "alias.go" {
+				continue
+			}
+			relPath := filepath.Join("internal", "domain", e.Name(), name)
+			if cfg.IsExcluded(relPath) {
+				continue
+			}
+			violations = append(violations, Violation{
+				File:     relPath,
+				Rule:     "structure.domain-root-alias-only",
+				Message:  `domain root "` + e.Name() + `" must expose its public API from alias.go only`,
+				Fix:      `move "` + name + `" into a sub-package or merge the public API into alias.go`,
+				Severity: cfg.Sev,
+			})
+		}
+	}
 	return violations
 }
 

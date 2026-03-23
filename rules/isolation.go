@@ -171,6 +171,19 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 				})
 				continue
 			}
+
+			// Rule 8: non-domain internal packages must import domains via the root package only
+			if srcDomain == "" && impDomain != "" && !isDomainAlias(impPath, internalPrefix, impDomain) {
+				violations = append(violations, Violation{
+					File:     findImportFile(pkg, impPath, projectRoot),
+					Line:     findImportLine(pkg, impPath),
+					Rule:     "isolation.external-deep-import",
+					Message:  fmt.Sprintf("package %q must import domain %q via the root package, not sub-package %q", pkg.PkgPath, impDomain, impPath),
+					Fix:      fmt.Sprintf("import the domain root package instead: %sdomain/%s", internalPrefix, impDomain),
+					Severity: cfg.Sev,
+				})
+				continue
+			}
 		}
 	}
 	return violations
