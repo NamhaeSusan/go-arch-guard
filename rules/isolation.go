@@ -190,7 +190,7 @@ func identifyDomain(pkgPath, internalPrefix string) string {
 	}
 	after := strings.TrimPrefix(rel, "domain/")
 	parts := strings.SplitN(after, "/", 2)
-	if len(parts) == 0 || parts[0] == "" {
+	if parts[0] == "" {
 		return ""
 	}
 	return parts[0]

@@ -241,7 +241,6 @@ var bannedLayerSuffixes = []string{
 	"_store", "_persistence",
 }
 
-
 func checkNoLayerSuffix(pkg *packages.Package, cfg Config) []Violation {
 	var violations []Violation
 	seen := make(map[string]bool)
