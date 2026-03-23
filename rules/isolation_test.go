@@ -9,10 +9,7 @@ import (
 
 func TestCheckDomainIsolation(t *testing.T) {
 	t.Run("valid project has no violations", func(t *testing.T) {
-		pkgs, err := analyzer.Load("../testdata/valid", "internal/...", "cmd/...")
-		if err != nil {
-			t.Fatal(err)
-		}
+		pkgs := loadValid(t)
 		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc", "../testdata/valid")
 		if len(violations) > 0 {
 			for _, v := range violations {
@@ -23,10 +20,7 @@ func TestCheckDomainIsolation(t *testing.T) {
 	})
 
 	t.Run("detects cross-domain violation", func(t *testing.T) {
-		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
-		if err != nil {
-			t.Fatal(err)
-		}
+		pkgs := loadInvalid(t)
 		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
 		found := false
 		for _, v := range violations {
@@ -41,10 +35,7 @@ func TestCheckDomainIsolation(t *testing.T) {
 	})
 
 	t.Run("detects unauthorized internal package importing domain root", func(t *testing.T) {
-		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
-		if err != nil {
-			t.Fatal(err)
-		}
+		pkgs := loadInvalid(t)
 		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
 		found := false
 		for _, v := range violations {
@@ -59,10 +50,7 @@ func TestCheckDomainIsolation(t *testing.T) {
 	})
 
 	t.Run("detects orchestration deep import", func(t *testing.T) {
-		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
-		if err != nil {
-			t.Fatal(err)
-		}
+		pkgs := loadInvalid(t)
 		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
 		found := false
 		for _, v := range violations {
@@ -77,10 +65,7 @@ func TestCheckDomainIsolation(t *testing.T) {
 	})
 
 	t.Run("detects cmd deep import", func(t *testing.T) {
-		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...", "cmd/...")
-		if err != nil {
-			t.Fatal(err)
-		}
+		pkgs := loadInvalid(t)
 		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
 		found := false
 		for _, v := range violations {
@@ -95,10 +80,7 @@ func TestCheckDomainIsolation(t *testing.T) {
 	})
 
 	t.Run("detects pkg importing orchestration", func(t *testing.T) {
-		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
-		if err != nil {
-			t.Fatal(err)
-		}
+		pkgs := loadInvalid(t)
 		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
 		found := false
 		for _, v := range violations {
@@ -113,10 +95,7 @@ func TestCheckDomainIsolation(t *testing.T) {
 	})
 
 	t.Run("detects unauthorized internal package importing orchestration", func(t *testing.T) {
-		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
-		if err != nil {
-			t.Fatal(err)
-		}
+		pkgs := loadInvalid(t)
 		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
 		found := false
 		for _, v := range violations {
@@ -131,10 +110,7 @@ func TestCheckDomainIsolation(t *testing.T) {
 	})
 
 	t.Run("detects pkg importing domain", func(t *testing.T) {
-		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
-		if err != nil {
-			t.Fatal(err)
-		}
+		pkgs := loadInvalid(t)
 		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
 		found := false
 		for _, v := range violations {
@@ -149,10 +125,7 @@ func TestCheckDomainIsolation(t *testing.T) {
 	})
 
 	t.Run("detects unauthorized internal package importing domain sub-package", func(t *testing.T) {
-		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
-		if err != nil {
-			t.Fatal(err)
-		}
+		pkgs := loadInvalid(t)
 		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
 		found := false
 		for _, v := range violations {
@@ -167,10 +140,7 @@ func TestCheckDomainIsolation(t *testing.T) {
 	})
 
 	t.Run("detects domain importing orchestration", func(t *testing.T) {
-		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
-		if err != nil {
-			t.Fatal(err)
-		}
+		pkgs := loadInvalid(t)
 		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
 		found := false
 		for _, v := range violations {
@@ -185,10 +155,7 @@ func TestCheckDomainIsolation(t *testing.T) {
 	})
 
 	t.Run("project-relative exclude skips matching package", func(t *testing.T) {
-		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
-		if err != nil {
-			t.Fatal(err)
-		}
+		pkgs := loadInvalid(t)
 		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid",
 			rules.WithExclude("internal/config/..."))
 		for _, v := range violations {
@@ -199,10 +166,7 @@ func TestCheckDomainIsolation(t *testing.T) {
 	})
 
 	t.Run("module-qualified exclude does not skip matching package", func(t *testing.T) {
-		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
-		if err != nil {
-			t.Fatal(err)
-		}
+		pkgs := loadInvalid(t)
 		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid",
 			rules.WithExclude("github.com/kimtaeyun/testproject-dc-invalid/internal/config/..."))
 		found := false
@@ -216,4 +180,36 @@ func TestCheckDomainIsolation(t *testing.T) {
 			t.Fatal("expected module-qualified exclude to be ignored")
 		}
 	})
+	t.Run("warns when module path matches no packages", func(t *testing.T) {
+		pkgs, err := analyzer.Load("../testdata/valid", "internal/...")
+		if err != nil {
+			t.Fatal(err)
+		}
+		violations := rules.CheckDomainIsolation(pkgs, "github.com/wrong/module", "../testdata/valid")
+		found := false
+		for _, v := range violations {
+			if v.Rule == "meta.no-matching-packages" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected meta.no-matching-packages warning for wrong module path")
+		}
+	})
+
+	t.Run("auto-extracts module when empty string passed", func(t *testing.T) {
+		pkgs, err := analyzer.Load("../testdata/valid", "internal/...", "cmd/...")
+		if err != nil {
+			t.Fatal(err)
+		}
+		violations := rules.CheckDomainIsolation(pkgs, "", "")
+		if len(violations) > 0 {
+			for _, v := range violations {
+				t.Log(v.String())
+			}
+			t.Errorf("expected no violations with auto-extracted module, got %d", len(violations))
+		}
+	})
+
 }

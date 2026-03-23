@@ -10,10 +10,7 @@ import (
 
 func TestCheckLayerDirection(t *testing.T) {
 	t.Run("valid project has no violations", func(t *testing.T) {
-		pkgs, err := analyzer.Load("../testdata/valid", "internal/...")
-		if err != nil {
-			t.Fatal(err)
-		}
+		pkgs := loadValid(t)
 		violations := rules.CheckLayerDirection(pkgs, "github.com/kimtaeyun/testproject-dc", "../testdata/valid")
 		if len(violations) > 0 {
 			for _, v := range violations {
@@ -24,10 +21,7 @@ func TestCheckLayerDirection(t *testing.T) {
 	})
 
 	t.Run("detects core importing app (reverse dependency)", func(t *testing.T) {
-		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
-		if err != nil {
-			t.Fatal(err)
-		}
+		pkgs := loadInvalid(t)
 		violations := rules.CheckLayerDirection(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
 		found := false
 		for _, v := range violations {
@@ -42,10 +36,7 @@ func TestCheckLayerDirection(t *testing.T) {
 	})
 
 	t.Run("detects core/svc importing core/repo", func(t *testing.T) {
-		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
-		if err != nil {
-			t.Fatal(err)
-		}
+		pkgs := loadInvalid(t)
 		violations := rules.CheckLayerDirection(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
 		found := false
 		for _, v := range violations {
@@ -60,10 +51,7 @@ func TestCheckLayerDirection(t *testing.T) {
 	})
 
 	t.Run("detects unknown domain sublayer", func(t *testing.T) {
-		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
-		if err != nil {
-			t.Fatal(err)
-		}
+		pkgs := loadInvalid(t)
 		violations := rules.CheckLayerDirection(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
 		found := false
 		for _, v := range violations {
@@ -78,10 +66,7 @@ func TestCheckLayerDirection(t *testing.T) {
 	})
 
 	t.Run("detects inner layer importing pkg", func(t *testing.T) {
-		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
-		if err != nil {
-			t.Fatal(err)
-		}
+		pkgs := loadInvalid(t)
 		violations := rules.CheckLayerDirection(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
 		found := false
 		for _, v := range violations {
@@ -96,10 +81,7 @@ func TestCheckLayerDirection(t *testing.T) {
 	})
 
 	t.Run("detects handler importing event directly", func(t *testing.T) {
-		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
-		if err != nil {
-			t.Fatal(err)
-		}
+		pkgs := loadInvalid(t)
 		violations := rules.CheckLayerDirection(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
 		found := false
 		for _, v := range violations {
@@ -114,10 +96,7 @@ func TestCheckLayerDirection(t *testing.T) {
 	})
 
 	t.Run("project-relative exclude skips matching package", func(t *testing.T) {
-		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
-		if err != nil {
-			t.Fatal(err)
-		}
+		pkgs := loadInvalid(t)
 		violations := rules.CheckLayerDirection(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid",
 			rules.WithExclude("internal/domain/payment/core/model/..."))
 		for _, v := range violations {
@@ -128,10 +107,7 @@ func TestCheckLayerDirection(t *testing.T) {
 	})
 
 	t.Run("module-qualified exclude does not skip matching package", func(t *testing.T) {
-		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
-		if err != nil {
-			t.Fatal(err)
-		}
+		pkgs := loadInvalid(t)
 		violations := rules.CheckLayerDirection(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid",
 			rules.WithExclude("github.com/kimtaeyun/testproject-dc-invalid/internal/domain/payment/core/model/..."))
 		found := false
@@ -145,4 +121,22 @@ func TestCheckLayerDirection(t *testing.T) {
 			t.Fatal("expected module-qualified exclude to be ignored")
 		}
 	})
+	t.Run("warns when module path matches no packages", func(t *testing.T) {
+		pkgs, err := analyzer.Load("../testdata/valid", "internal/...")
+		if err != nil {
+			t.Fatal(err)
+		}
+		violations := rules.CheckLayerDirection(pkgs, "github.com/wrong/module", "../testdata/valid")
+		found := false
+		for _, v := range violations {
+			if v.Rule == "meta.no-matching-packages" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected meta.no-matching-packages warning for wrong module path")
+		}
+	})
+
 }

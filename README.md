@@ -87,6 +87,21 @@ Sample output when violations exist:
 --- FAIL: TestArchitecture/domain_isolation
 ```
 
+### Simplified Usage
+
+Pass empty strings for `module` and `root` to auto-extract them from the loaded packages:
+
+```go
+t.Run("domain isolation", func(t *testing.T) {
+	report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, "", ""))
+})
+t.Run("layer direction", func(t *testing.T) {
+	report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, "", ""))
+})
+```
+
+If the module cannot be determined (e.g. packages loaded without module metadata), a `meta.no-matching-packages` warning is emitted.
+
 ## Target Architecture
 
 `go-arch-guard` assumes a domain-centric vertical-slice layout.
@@ -332,13 +347,19 @@ rules.CheckDomainIsolation(
 - Do not use module-qualified paths (`github.com/yourmodule/...`)
 - The same format applies across all check functions
 
+## Diagnostics
+
+| Rule | Meaning |
+|------|---------|
+| `meta.no-matching-packages` | the `module` argument does not match any loaded package — usually a misconfiguration |
+
 ## API Reference
 
 | Function | Description |
 |----------|-------------|
 | `analyzer.Load(dir, patterns...)` | load Go packages for analysis |
-| `rules.CheckDomainIsolation(pkgs, module, root, opts...)` | cross-domain and orchestration boundary checks |
-| `rules.CheckLayerDirection(pkgs, module, root, opts...)` | intra-domain dependency direction checks |
+| `rules.CheckDomainIsolation(pkgs, module, root, opts...)` | cross-domain and orchestration boundary checks (`""` auto-extracts from packages) |
+| `rules.CheckLayerDirection(pkgs, module, root, opts...)` | intra-domain dependency direction checks (`""` auto-extracts from packages) |
 | `rules.CheckNaming(pkgs, opts...)` | naming convention checks |
 | `rules.CheckStructure(root, opts...)` | filesystem structure checks |
 | `report.AssertNoViolations(t, violations)` | fail test on `Error` violations |

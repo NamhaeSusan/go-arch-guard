@@ -11,10 +11,7 @@ import (
 
 func TestCheckNaming(t *testing.T) {
 	t.Run("valid project has no violations", func(t *testing.T) {
-		pkgs, err := analyzer.Load("../testdata/valid", "internal/...")
-		if err != nil {
-			t.Fatal(err)
-		}
+		pkgs := loadValid(t)
 		violations := rules.CheckNaming(pkgs)
 		if len(violations) > 0 {
 			for _, v := range violations {
@@ -25,10 +22,7 @@ func TestCheckNaming(t *testing.T) {
 	})
 
 	t.Run("detects handler exported interface", func(t *testing.T) {
-		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
-		if err != nil {
-			t.Fatal(err)
-		}
+		pkgs := loadInvalid(t)
 		violations := rules.CheckNaming(pkgs)
 		found := false
 		for _, v := range violations {
@@ -43,10 +37,7 @@ func TestCheckNaming(t *testing.T) {
 	})
 
 	t.Run("reports relative file paths", func(t *testing.T) {
-		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
-		if err != nil {
-			t.Fatal(err)
-		}
+		pkgs := loadInvalid(t)
 		violations := rules.CheckNaming(pkgs)
 		if len(violations) == 0 {
 			t.Fatal("expected naming violations")
@@ -85,10 +76,7 @@ func TestCheckNaming(t *testing.T) {
 	})
 
 	t.Run("project-relative exclude skips matching files", func(t *testing.T) {
-		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
-		if err != nil {
-			t.Fatal(err)
-		}
+		pkgs := loadInvalid(t)
 		violations := rules.CheckNaming(pkgs, rules.WithExclude("internal/domain/order/handler/..."))
 		for _, v := range violations {
 			if v.File == "internal/domain/order/handler/http/bad_handler.go" {

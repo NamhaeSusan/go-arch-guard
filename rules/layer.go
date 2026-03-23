@@ -10,6 +10,11 @@ import (
 
 func CheckLayerDirection(pkgs []*packages.Package, projectModule string, projectRoot string, opts ...Option) []Violation {
 	cfg := NewConfig(opts...)
+	projectModule = resolveModule(pkgs, projectModule)
+	projectRoot = resolveRoot(pkgs, projectRoot)
+	if warns := validateModule(pkgs, projectModule); len(warns) > 0 {
+		return warns
+	}
 	internalPrefix := projectModule + "/internal/"
 
 	var violations []Violation
@@ -45,9 +50,10 @@ func CheckLayerDirection(pkgs []*packages.Package, projectModule string, project
 
 			if isPkgPkg(impPath, internalPrefix) {
 				if pkgRestrictedSublayers[srcSublayer] {
+					file, line := findImportPosition(pkg, impPath, projectRoot)
 					violations = append(violations, Violation{
-						File:     findImportFile(pkg, impPath, projectRoot),
-						Line:     findImportLine(pkg, impPath),
+						File:     file,
+						Line:     line,
 						Rule:     "layer.inner-imports-pkg",
 						Message:  fmt.Sprintf("inner sublayer %q must not import internal/pkg in domain %q", srcSublayer, srcDomain),
 						Fix:      "keep core and event layers self-contained; move shared concerns outward to app, handler, or infra",
@@ -77,9 +83,10 @@ func CheckLayerDirection(pkgs []*packages.Package, projectModule string, project
 			}
 
 			if impSublayer != "" && !isKnownSublayer(impSublayer) {
+				file, line := findImportPosition(pkg, impPath, projectRoot)
 				violations = append(violations, Violation{
-					File:     findImportFile(pkg, impPath, projectRoot),
-					Line:     findImportLine(pkg, impPath),
+					File:     file,
+					Line:     line,
 					Rule:     "layer.unknown-sublayer",
 					Message:  fmt.Sprintf("unknown sublayer %q in domain %q", impSublayer, srcDomain),
 					Fix:      fmt.Sprintf("use one of the supported sublayers: %v", knownDomainSublayers),
@@ -104,9 +111,10 @@ func CheckLayerDirection(pkgs []*packages.Package, projectModule string, project
 				continue
 			}
 
+			file, line := findImportPosition(pkg, impPath, projectRoot)
 			violations = append(violations, Violation{
-				File:     findImportFile(pkg, impPath, projectRoot),
-				Line:     findImportLine(pkg, impPath),
+				File:     file,
+				Line:     line,
 				Rule:     "layer.direction",
 				Message:  fmt.Sprintf("sublayer %q must not import sublayer %q in domain %q", srcSublayer, impSublayer, srcDomain),
 				Fix:      fmt.Sprintf("allowed imports for %q: %v", srcSublayer, allowed),

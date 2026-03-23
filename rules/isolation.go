@@ -9,6 +9,11 @@ import (
 
 func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projectRoot string, opts ...Option) []Violation {
 	cfg := NewConfig(opts...)
+	projectModule = resolveModule(pkgs, projectModule)
+	projectRoot = resolveRoot(pkgs, projectRoot)
+	if warns := validateModule(pkgs, projectModule); len(warns) > 0 {
+		return warns
+	}
 	internalPrefix := projectModule + "/internal/"
 	cmdPrefix := projectModule + "/cmd"
 
@@ -31,9 +36,10 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 				if isDomainAlias(impPath, internalPrefix, impDomain) {
 					continue // alias import is allowed
 				}
+				file, line := findImportPosition(pkg, impPath, projectRoot)
 				violations = append(violations, Violation{
-					File:     findImportFile(pkg, impPath, projectRoot),
-					Line:     findImportLine(pkg, impPath),
+					File:     file,
+					Line:     line,
 					Rule:     "isolation.cmd-deep-import",
 					Message:  fmt.Sprintf("cmd/ must only import domain alias, not sub-package %q", impPath),
 					Fix:      fmt.Sprintf("import the domain alias package instead: %sdomain/%s", internalPrefix, impDomain),
@@ -80,9 +86,10 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 				if isOrchestrationHandler(pkg.PkgPath, internalPrefix) {
 					label = "orchestration handler"
 				}
+				file, line := findImportPosition(pkg, impPath, projectRoot)
 				violations = append(violations, Violation{
-					File:     findImportFile(pkg, impPath, projectRoot),
-					Line:     findImportLine(pkg, impPath),
+					File:     file,
+					Line:     line,
 					Rule:     "isolation.orchestration-deep-import",
 					Message:  fmt.Sprintf("%s must only import domain alias, not sub-package %q", label, impPath),
 					Fix:      fmt.Sprintf("import the domain alias package instead: %sdomain/%s", internalPrefix, impDomain),
@@ -94,9 +101,10 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 			// pkg/ must stay domain-unaware and orchestration-unaware
 			if srcIsPkg {
 				if impDomain != "" {
+					file, line := findImportPosition(pkg, impPath, projectRoot)
 					violations = append(violations, Violation{
-						File:     findImportFile(pkg, impPath, projectRoot),
-						Line:     findImportLine(pkg, impPath),
+						File:     file,
+						Line:     line,
 						Rule:     "isolation.pkg-imports-domain",
 						Message:  fmt.Sprintf("pkg/ must not import domain %q", impDomain),
 						Fix:      "pkg/ should only contain shared utilities with no domain or orchestration dependencies",
@@ -105,9 +113,10 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 					continue
 				}
 				if isOrchestrationPkg(impPath, internalPrefix) {
+					file, line := findImportPosition(pkg, impPath, projectRoot)
 					violations = append(violations, Violation{
-						File:     findImportFile(pkg, impPath, projectRoot),
-						Line:     findImportLine(pkg, impPath),
+						File:     file,
+						Line:     line,
 						Rule:     "isolation.pkg-imports-orchestration",
 						Message:  "pkg/ must not import orchestration",
 						Fix:      "move orchestration-aware code to internal/orchestration or cmd/",
@@ -119,9 +128,10 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 
 			if isOrchestrationPkg(impPath, internalPrefix) {
 				if srcDomain != "" {
+					file, line := findImportPosition(pkg, impPath, projectRoot)
 					violations = append(violations, Violation{
-						File:     findImportFile(pkg, impPath, projectRoot),
-						Line:     findImportLine(pkg, impPath),
+						File:     file,
+						Line:     line,
 						Rule:     "isolation.domain-imports-orchestration",
 						Message:  fmt.Sprintf("domain %q must not import orchestration", srcDomain),
 						Fix:      "move cross-domain coordination to internal/orchestration callers instead of domain internals",
@@ -129,9 +139,10 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 					})
 					continue
 				}
+				file, line := findImportPosition(pkg, impPath, projectRoot)
 				violations = append(violations, Violation{
-					File:     findImportFile(pkg, impPath, projectRoot),
-					Line:     findImportLine(pkg, impPath),
+					File:     file,
+					Line:     line,
 					Rule:     "isolation.internal-imports-orchestration",
 					Message:  fmt.Sprintf("package %q must not import orchestration", pkg.PkgPath),
 					Fix:      "only cmd/ and internal/orchestration may depend on orchestration",
@@ -142,9 +153,10 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 
 			// Rule 7: domain A importing domain B → violation
 			if srcDomain != "" && impDomain != "" && srcDomain != impDomain {
+				file, line := findImportPosition(pkg, impPath, projectRoot)
 				violations = append(violations, Violation{
-					File:     findImportFile(pkg, impPath, projectRoot),
-					Line:     findImportLine(pkg, impPath),
+					File:     file,
+					Line:     line,
 					Rule:     "isolation.cross-domain",
 					Message:  fmt.Sprintf("domain %q must not import domain %q", srcDomain, impDomain),
 					Fix:      "use orchestration/ for cross-domain orchestration or move shared types to pkg/",
@@ -155,9 +167,10 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 
 			// Rule 8: non-domain internal packages other than orchestration/cmd/pkg must not import domains
 			if srcDomain == "" && impDomain != "" {
+				file, line := findImportPosition(pkg, impPath, projectRoot)
 				violations = append(violations, Violation{
-					File:     findImportFile(pkg, impPath, projectRoot),
-					Line:     findImportLine(pkg, impPath),
+					File:     file,
+					Line:     line,
 					Rule:     "isolation.internal-imports-domain",
 					Message:  fmt.Sprintf("package %q must not import domain %q", pkg.PkgPath, impDomain),
 					Fix:      "move domain orchestration to internal/orchestration or app wiring to cmd/",
