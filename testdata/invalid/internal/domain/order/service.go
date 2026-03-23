@@ -1,3 +1,0 @@
-package order
-
-func Process() {}
