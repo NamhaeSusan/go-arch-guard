@@ -1,6 +1,7 @@
 package rules_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/kimtaeyun/go-arch-guard/analyzer"
@@ -19,6 +20,24 @@ func TestCheckLayerDirection(t *testing.T) {
 				t.Log(v.String())
 			}
 			t.Errorf("expected no violations, got %d", len(violations))
+		}
+	})
+
+	t.Run("detects core importing app (reverse dependency)", func(t *testing.T) {
+		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
+		if err != nil {
+			t.Fatal(err)
+		}
+		violations := rules.CheckLayerDirection(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
+		found := false
+		for _, v := range violations {
+			if v.Rule == "layer.direction" && strings.Contains(v.Message, `"core"`) && strings.Contains(v.Message, `"app"`) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected core→app reverse dependency violation")
 		}
 	})
 

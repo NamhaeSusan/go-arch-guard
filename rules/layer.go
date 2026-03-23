@@ -16,6 +16,7 @@ var allowedLayerImports = map[string][]string{
 	"infra":      {"core/repo", "core/model"},
 	"event":      {"core/model"},
 	"core/model": {},
+	"core":       {"core/model"},
 }
 
 func CheckLayerDirection(pkgs []*packages.Package, projectModule string, projectRoot string, opts ...Option) []Violation {
