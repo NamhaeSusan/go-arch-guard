@@ -44,3 +44,42 @@ Phase 3: Documentation agent -> Update docs
 
 - **Rules are independent** — each rule must not depend on other rules
 - **Static analysis only** — no runtime dependencies, pure code analysis
+
+---
+
+### Rule Scope (CRITICAL)
+
+This library exists to add **coarse guardrails for vibe coding**, not to encode architecture purity or invent a new language on top of Go.
+
+- The goal is to block **big-picture exceptions** that are easy to introduce during vibe coding:
+  - unwanted package placement
+  - broad import-direction violations
+  - naming that breaks the intended project shape
+- The goal is **not** to enforce theoretical purity or micro-level architectural doctrine.
+- Prefer rules that control the **overall flow and boundaries** of the codebase.
+- Avoid rules that try to police every corner case, implementation detail, or semantic nuance.
+
+#### Explicit Non-Goals
+
+Do **not** add or push for rules based on arguments like:
+
+- "domain core must be pure"
+- "alias.go must strictly control exposure"
+- "cmd reverse dependency must be blocked"
+- "this import is philosophically wrong even though Go already handles it"
+
+If Go already rejects something by itself, such as import cycles, do not treat that as a special architecture rule target unless the user explicitly asks for it.
+
+When proposing or implementing new rules, optimize for:
+
+- obvious, large-scale guardrails
+- low surprise
+- low false-positive risk
+- practical usefulness during vibe coding
+
+Do **not** optimize for:
+
+- ideology
+- purity
+- corner-case control
+- over-modeling package internals
