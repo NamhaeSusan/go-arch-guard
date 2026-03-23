@@ -18,6 +18,7 @@ func CheckNaming(pkgs []*packages.Package, opts ...Option) []Violation {
 		violations = append(violations, checkSnakeCaseFiles(pkg, cfg)...)
 		violations = append(violations, checkRepoFileInterface(pkg, cfg)...)
 		violations = append(violations, checkNoLayerSuffix(pkg, cfg)...)
+		violations = append(violations, checkHandlerNoExportedInterface(pkg, cfg)...)
 	}
 	return violations
 }
@@ -277,6 +278,48 @@ func checkNoLayerSuffix(pkg *packages.Package, cfg Config) []Violation {
 					Severity: cfg.Sev,
 				})
 				break
+			}
+		}
+	}
+	return violations
+}
+
+func isHandlerPackage(pkgPath string) bool {
+	return strings.HasSuffix(pkgPath, "/handler") ||
+		strings.Contains(pkgPath, "/handler/")
+}
+
+func checkHandlerNoExportedInterface(pkg *packages.Package, cfg Config) []Violation {
+	if !isHandlerPackage(pkg.PkgPath) {
+		return nil
+	}
+	var violations []Violation
+	for _, file := range pkg.Syntax {
+		filePath := pkg.Fset.Position(file.Pos()).Filename
+		if cfg.IsExcluded(filePath) {
+			continue
+		}
+		for _, decl := range file.Decls {
+			gd, ok := decl.(*ast.GenDecl)
+			if !ok {
+				continue
+			}
+			for _, spec := range gd.Specs {
+				ts, ok := spec.(*ast.TypeSpec)
+				if !ok || !ts.Name.IsExported() {
+					continue
+				}
+				if _, isIface := ts.Type.(*ast.InterfaceType); isIface {
+					pos := pkg.Fset.Position(ts.Name.Pos())
+					violations = append(violations, Violation{
+						File:     pos.Filename,
+						Line:     pos.Line,
+						Rule:     "naming.handler-no-exported-interface",
+						Message:  `handler package defines exported interface "` + ts.Name.Name + `"`,
+						Fix:      "use *app.Service concrete type instead; define test interfaces in _test.go",
+						Severity: cfg.Sev,
+					})
+				}
 			}
 		}
 	}
