@@ -336,22 +336,24 @@ rules.CheckDomainIsolation(
 | `rules.WithSeverity(rules.Warning)` | downgrade violations to warnings |
 | `rules.WithExclude("internal/path/...")` | skip a project-relative subtree or file |
 
-## Future Considerations
+## External Import Hygiene — Enforce via AI Tool Instructions, Not This Library
 
-### External Import Restrictions
+`go-arch-guard` checks **project-internal** imports only. It does not and **will not** restrict which external packages a layer may use (e.g., `core/model` importing `gorm.io/gorm`).
 
-Currently `go-arch-guard` only checks project-internal imports. It does not restrict which external packages a layer may use (e.g., `core/model` importing `gorm.io/gorm`).
+This is intentional. A rule like `WithBannedImport("core/...", "gorm.io/...")` sounds simple but quickly becomes an allowlist maintenance burden that outweighs its value. External dependency hygiene is better enforced via AI tool instructions and code review.
 
-This is the biggest known gap for vibe coding. AI coding tools frequently inject infrastructure dependencies (`gorm`, `gin`, `redis`, `kafka`, etc.) directly into inner layers (`core/model`, `core/repo`, `core/svc`, `event`) where only stdlib should appear. The existing `layer.direction` and `layer.inner-imports-pkg` rules cannot catch this.
+**Copy the constraints below into your AI tool's system prompt or project rules file (e.g., `CLAUDE.md`, `AGENTS.md`, `.cursorrules`):**
 
-**When vibe coding, instruct your AI tool to follow these constraints:**
+```text
+# External Import Constraints (go-arch-guard does NOT enforce these — you must)
 
-- `core/model`, `core/repo`, `core/svc`, `event` — stdlib only, no third-party imports
-- `handler` — HTTP/gRPC framework allowed, no persistence libraries
-- `infra` — persistence/messaging libraries allowed, no HTTP framework imports
-- `app` — generally free, but should not import infrastructure libraries directly
+- core/model, core/repo, core/svc, event — stdlib only, no third-party imports
+- handler — HTTP/gRPC framework allowed, no persistence libraries
+- infra — persistence/messaging libraries allowed, no HTTP framework imports
+- app — generally free, but should not import infrastructure libraries directly
+```
 
-If this gap causes repeated drift in practice, a rule like `WithBannedImport("core/...", "gorm.io/...")` will be added.
+This is the intended enforcement mechanism. Do not open issues or PRs requesting `go-arch-guard` to add external import rules.
 
 ## License
 

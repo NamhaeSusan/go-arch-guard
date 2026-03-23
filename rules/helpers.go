@@ -7,7 +7,6 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-//nolint:unused // used by CheckDomainIsolation (next task)
 func findImportFile(pkg *packages.Package, importPath, projectRoot string) string {
 	absRoot, _ := filepath.Abs(projectRoot)
 	fset := pkg.Fset
@@ -34,7 +33,6 @@ func findImportFile(pkg *packages.Package, importPath, projectRoot string) strin
 	return pkg.PkgPath
 }
 
-//nolint:unused // used by CheckDomainIsolation (next task)
 func findImportLine(pkg *packages.Package, importPath string) int {
 	fset := pkg.Fset
 	for _, file := range pkg.Syntax {

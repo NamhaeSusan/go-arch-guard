@@ -71,38 +71,23 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 			// Orchestration rules
 			if srcIsOrchestration {
 				if impDomain == "" {
-					continue
+					continue // non-domain internal packages → allowed
 				}
-				isSrcHandler := isOrchestrationHandler(pkg.PkgPath, internalPrefix)
-				// Rule 6: orchestration/handler/ importing orchestration internal → allowed (handled above by orchestration prefix check)
-				// Rule 4: orchestration (non-handler) importing domain alias → allowed
-				if !isSrcHandler && isDomainAlias(impPath, internalPrefix, impDomain) {
-					continue
+				if isDomainAlias(impPath, internalPrefix, impDomain) {
+					continue // domain alias → allowed for all orchestration
 				}
-				// Rule 5: orchestration (non-handler) importing domain sub-package → violation
-				if !isSrcHandler && !isDomainAlias(impPath, internalPrefix, impDomain) {
-					violations = append(violations, Violation{
-						File:     findImportFile(pkg, impPath, projectRoot),
-						Line:     findImportLine(pkg, impPath),
-						Rule:     "isolation.orchestration-deep-import",
-						Message:  fmt.Sprintf("orchestration must only import domain alias, not sub-package %q", impPath),
-						Fix:      fmt.Sprintf("import the domain alias package instead: %sdomain/%s", internalPrefix, impDomain),
-						Severity: cfg.Sev,
-					})
-					continue
+				label := "orchestration"
+				if isOrchestrationHandler(pkg.PkgPath, internalPrefix) {
+					label = "orchestration handler"
 				}
-				// orchestration handler can import orchestration internals (rule 6) but not domain sub-packages
-				if isSrcHandler && impDomain != "" && !isDomainAlias(impPath, internalPrefix, impDomain) {
-					violations = append(violations, Violation{
-						File:     findImportFile(pkg, impPath, projectRoot),
-						Line:     findImportLine(pkg, impPath),
-						Rule:     "isolation.orchestration-deep-import",
-						Message:  fmt.Sprintf("orchestration handler must only import domain alias, not sub-package %q", impPath),
-						Fix:      fmt.Sprintf("import the domain alias package instead: %sdomain/%s", internalPrefix, impDomain),
-						Severity: cfg.Sev,
-					})
-					continue
-				}
+				violations = append(violations, Violation{
+					File:     findImportFile(pkg, impPath, projectRoot),
+					Line:     findImportLine(pkg, impPath),
+					Rule:     "isolation.orchestration-deep-import",
+					Message:  fmt.Sprintf("%s must only import domain alias, not sub-package %q", label, impPath),
+					Fix:      fmt.Sprintf("import the domain alias package instead: %sdomain/%s", internalPrefix, impDomain),
+					Severity: cfg.Sev,
+				})
 				continue
 			}
 
