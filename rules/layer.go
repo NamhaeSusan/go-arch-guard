@@ -8,7 +8,9 @@ import (
 )
 
 var allowedLayerImports = map[string][]string{
-	"":           {"app"},
+	// Domain root ("") is a facade (alias.go) that re-exports from all sublayers.
+	// It is exempt from layer direction checks; cross-domain isolation is enforced
+	// separately by CheckDomainIsolation.
 	"handler":    {"app"},
 	"app":        {"core/model", "core/repo", "core/svc"},
 	"core/svc":   {"core/model"},
@@ -56,6 +58,12 @@ func CheckLayerDirection(pkgs []*packages.Package, projectModule string, project
 			}
 
 			impSublayer := identifySublayer(impPath, internalPrefix, impDomain)
+
+			// Domain root (alias.go) is a facade — it may import any sublayer
+			// within its own domain. Cross-domain isolation is enforced elsewhere.
+			if srcSublayer == "" {
+				continue
+			}
 
 			// Same sublayer → always allowed
 			if srcSublayer == impSublayer {
