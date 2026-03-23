@@ -339,7 +339,16 @@ rules.CheckDomainIsolation(
 
 Currently `go-arch-guard` only checks project-internal imports. It does not restrict which external packages a layer may use (e.g., `core/model` importing `gorm.io/gorm`).
 
-If vibe-coding tools repeatedly introduce infrastructure dependencies into inner layers, a rule like `WithBannedImport("core/...", "gorm.io/...")` may be added.
+This is the biggest known gap for vibe coding. AI coding tools frequently inject infrastructure dependencies (`gorm`, `gin`, `redis`, `kafka`, etc.) directly into inner layers (`core/model`, `core/repo`, `core/svc`, `event`) where only stdlib should appear. The existing `layer.direction` and `layer.inner-imports-pkg` rules cannot catch this.
+
+**When vibe coding, instruct your AI tool to follow these constraints:**
+
+- `core/model`, `core/repo`, `core/svc`, `event` — stdlib only, no third-party imports
+- `handler` — HTTP/gRPC framework allowed, no persistence libraries
+- `infra` — persistence/messaging libraries allowed, no HTTP framework imports
+- `app` — generally free, but should not import infrastructure libraries directly
+
+If this gap causes repeated drift in practice, a rule like `WithBannedImport("core/...", "gorm.io/...")` will be added.
 
 ## License
 
