@@ -40,7 +40,7 @@ func TestCheckDomainIsolation(t *testing.T) {
 		}
 	})
 
-	t.Run("detects saga deep import", func(t *testing.T) {
+	t.Run("detects orchestration deep import", func(t *testing.T) {
 		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
 		if err != nil {
 			t.Fatal(err)
@@ -48,13 +48,13 @@ func TestCheckDomainIsolation(t *testing.T) {
 		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
 		found := false
 		for _, v := range violations {
-			if v.Rule == "isolation.saga-deep-import" {
+			if v.Rule == "isolation.orchestration-deep-import" {
 				found = true
 				break
 			}
 		}
 		if !found {
-			t.Error("expected saga-deep-import violation")
+			t.Error("expected orchestration-deep-import violation")
 		}
 	})
 }

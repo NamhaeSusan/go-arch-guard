@@ -27,7 +27,7 @@ internal/
 │   │   └── infra/persistence/   ← DB implementation (implements repo/)
 │   └── user/
 │       └── ...                   ← same structure
-├── saga/                         ← cross-domain orchestration
+├── orchestration/                ← cross-domain orchestration
 │   ├── handler/http/             ← cross-domain API endpoints
 │   ├── create_order.go           ← imports domain aliases only
 │   └── draft_submit.go
@@ -84,7 +84,7 @@ Run: `go test -run TestArchitecture -v`
 
 ### Domain Isolation (`rules.CheckDomainIsolation`)
 
-**Purpose:** Domains must not know about each other. Cross-domain coordination goes through `saga/` only.
+**Purpose:** Domains must not know about each other. Cross-domain coordination goes through `orchestration/` only.
 
 #### Import Matrix
 
@@ -93,20 +93,20 @@ Run: `go test -run TestArchitecture -v`
 | same domain | same domain | Yes |
 | anyone | `pkg/` | Yes |
 | `pkg/` | any domain | **No** — `isolation.pkg-imports-domain` |
-| `saga/` | domain alias (root package) | Yes |
-| `saga/` | domain sub-package | **No** — `isolation.saga-deep-import` |
-| `saga/handler/` | saga internals | Yes |
+| `orchestration/` | domain alias (root package) | Yes |
+| `orchestration/` | domain sub-package | **No** — `isolation.orchestration-deep-import` |
+| `orchestration/handler/` | orchestration internals | Yes |
 | domain A | domain B | **No** — `isolation.cross-domain` |
 
 #### Examples
 
 ```go
-// ✅ saga imports domain via alias (root package)
+// ✅ orchestration imports domain via alias (root package)
 import "mymodule/internal/domain/user"        // alias.go
 import "mymodule/internal/domain/order"       // alias.go
 
-// ❌ saga imports domain internals
-import "mymodule/internal/domain/user/core/model"  // isolation.saga-deep-import
+// ❌ orchestration imports domain internals
+import "mymodule/internal/domain/user/core/model"  // isolation.orchestration-deep-import
 
 // ❌ order handler imports user domain
 import "mymodule/internal/domain/user/app"    // isolation.cross-domain
@@ -121,7 +121,7 @@ import "mymodule/internal/pkg/db"
 [ERROR] violation: domain "order" imports domain "user" sub-package directly
   (file: internal/domain/order/handler/http/handler.go:5,
    rule: isolation.cross-domain,
-   fix: use saga/ for cross-domain coordination)
+   fix: use orchestration/ for cross-domain coordination)
 ```
 
 ---
@@ -335,7 +335,7 @@ internal/domain/audit/
 
 ### Handler-Only Domain (e.g., dashboard)
 
-No service layer — calls saga/ for cross-domain queries:
+No service layer — calls orchestration/ for cross-domain queries:
 
 ```
 internal/domain/dashboard/
@@ -343,17 +343,17 @@ internal/domain/dashboard/
 └── handler/http/handler.go
 ```
 
-### Saga (Cross-Domain Orchestration)
+### Orchestration (Cross-Domain Orchestration)
 
 ```
-internal/saga/
+internal/orchestration/
 ├── handler/http/handler.go      ← cross-domain API endpoints
 ├── draft_submit.go              ← draft → review conversion
 ├── contract_create.go           ← review → contract creation
 └── dashboard_query.go           ← multi-domain data assembly
 ```
 
-Each saga struct depends on multiple domain aliases:
+Each orchestration struct depends on multiple domain aliases:
 
 ```go
 type DraftSubmit struct {
@@ -410,7 +410,7 @@ Logs all violations. Fails the test only if any `Error`-level violations exist. 
 | Rule | Function | Severity | Description |
 |------|----------|----------|-------------|
 | `isolation.cross-domain` | CheckDomainIsolation | Error | Domain A imports domain B |
-| `isolation.saga-deep-import` | CheckDomainIsolation | Error | Saga imports domain sub-package instead of alias |
+| `isolation.orchestration-deep-import` | CheckDomainIsolation | Error | Orchestration imports domain sub-package instead of alias |
 | `isolation.pkg-imports-domain` | CheckDomainIsolation | Error | pkg/ imports a domain |
 | `layer.direction` | CheckLayerDirection | Error | Intra-domain layer imports in wrong direction |
 | `naming.no-stutter` | CheckNaming | Error | Type name repeats package name |

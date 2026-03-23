@@ -43,8 +43,8 @@ func CheckLayerDirection(pkgs []*packages.Package, projectModule string, project
 				continue
 			}
 
-			// Skip imports to pkg/ or saga/
-			if isPkgPkg(impPath, internalPrefix) || isSagaPkg(impPath, internalPrefix) {
+			// Skip imports to pkg/ or orchestration/
+			if isPkgPkg(impPath, internalPrefix) || isOrchestrationPkg(impPath, internalPrefix) {
 				continue
 			}
 

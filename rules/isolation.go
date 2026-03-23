@@ -21,7 +21,7 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 		}
 
 		srcDomain := identifyDomain(pkg.PkgPath, internalPrefix)
-		srcIsSaga := isSagaPkg(pkg.PkgPath, internalPrefix)
+		srcIsOrchestration := isOrchestrationPkg(pkg.PkgPath, internalPrefix)
 		srcIsPkg := isPkgPkg(pkg.PkgPath, internalPrefix)
 
 		for impPath := range pkg.Imports {
@@ -54,36 +54,36 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 				continue
 			}
 
-			// Saga rules
-			if srcIsSaga {
+			// Orchestration rules
+			if srcIsOrchestration {
 				if impDomain == "" {
 					continue
 				}
-				isSrcHandler := isSagaHandler(pkg.PkgPath, internalPrefix)
-				// Rule 6: saga/handler/ importing saga internal → allowed (handled above by saga prefix check)
-				// Rule 4: saga (non-handler) importing domain alias → allowed
+				isSrcHandler := isOrchestrationHandler(pkg.PkgPath, internalPrefix)
+				// Rule 6: orchestration/handler/ importing orchestration internal → allowed (handled above by orchestration prefix check)
+				// Rule 4: orchestration (non-handler) importing domain alias → allowed
 				if !isSrcHandler && isDomainAlias(impPath, internalPrefix, impDomain) {
 					continue
 				}
-				// Rule 5: saga (non-handler) importing domain sub-package → violation
+				// Rule 5: orchestration (non-handler) importing domain sub-package → violation
 				if !isSrcHandler && !isDomainAlias(impPath, internalPrefix, impDomain) {
 					violations = append(violations, Violation{
 						File:     findImportFile(pkg, impPath, projectRoot),
 						Line:     findImportLine(pkg, impPath),
-						Rule:     "isolation.saga-deep-import",
-						Message:  fmt.Sprintf("saga must only import domain alias, not sub-package %q", impPath),
+						Rule:     "isolation.orchestration-deep-import",
+						Message:  fmt.Sprintf("orchestration must only import domain alias, not sub-package %q", impPath),
 						Fix:      fmt.Sprintf("import the domain alias package instead: %sdomain/%s", internalPrefix, impDomain),
 						Severity: cfg.Sev,
 					})
 					continue
 				}
-				// saga handler can import saga internals (rule 6) but not domain sub-packages
+				// orchestration handler can import orchestration internals (rule 6) but not domain sub-packages
 				if isSrcHandler && impDomain != "" && !isDomainAlias(impPath, internalPrefix, impDomain) {
 					violations = append(violations, Violation{
 						File:     findImportFile(pkg, impPath, projectRoot),
 						Line:     findImportLine(pkg, impPath),
-						Rule:     "isolation.saga-deep-import",
-						Message:  fmt.Sprintf("saga handler must only import domain alias, not sub-package %q", impPath),
+						Rule:     "isolation.orchestration-deep-import",
+						Message:  fmt.Sprintf("orchestration handler must only import domain alias, not sub-package %q", impPath),
 						Fix:      fmt.Sprintf("import the domain alias package instead: %sdomain/%s", internalPrefix, impDomain),
 						Severity: cfg.Sev,
 					})
@@ -99,7 +99,7 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 					Line:     findImportLine(pkg, impPath),
 					Rule:     "isolation.cross-domain",
 					Message:  fmt.Sprintf("domain %q must not import domain %q", srcDomain, impDomain),
-					Fix:      "use saga/ for cross-domain orchestration or move shared types to pkg/",
+					Fix:      "use orchestration/ for cross-domain orchestration or move shared types to pkg/",
 					Severity: cfg.Sev,
 				})
 				continue
@@ -122,9 +122,9 @@ func identifyDomain(pkgPath, internalPrefix string) string {
 	return parts[0]
 }
 
-func isSagaPkg(pkgPath, internalPrefix string) bool {
+func isOrchestrationPkg(pkgPath, internalPrefix string) bool {
 	rel := strings.TrimPrefix(pkgPath, internalPrefix)
-	return rel == "saga" || strings.HasPrefix(rel, "saga/")
+	return rel == "orchestration" || strings.HasPrefix(rel, "orchestration/")
 }
 
 func isPkgPkg(pkgPath, internalPrefix string) bool {
@@ -136,7 +136,7 @@ func isDomainAlias(importPath, internalPrefix, domain string) bool {
 	return importPath == internalPrefix+"domain/"+domain
 }
 
-func isSagaHandler(pkgPath, internalPrefix string) bool {
+func isOrchestrationHandler(pkgPath, internalPrefix string) bool {
 	rel := strings.TrimPrefix(pkgPath, internalPrefix)
-	return strings.HasPrefix(rel, "saga/handler")
+	return strings.HasPrefix(rel, "orchestration/handler")
 }
