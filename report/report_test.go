@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/kimtaeyun/go-arch-guard/report"
-	"github.com/kimtaeyun/go-arch-guard/rules"
+	"github.com/NamhaeSusan/go-arch-guard/report"
+	"github.com/NamhaeSusan/go-arch-guard/rules"
 )
 
 type fakeTB struct {

@@ -1,4 +1,4 @@
-module github.com/kimtaeyun/go-arch-guard
+module github.com/NamhaeSusan/go-arch-guard
 
 go 1.25.0
 

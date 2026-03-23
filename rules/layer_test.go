@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kimtaeyun/go-arch-guard/analyzer"
-	"github.com/kimtaeyun/go-arch-guard/rules"
+	"github.com/NamhaeSusan/go-arch-guard/analyzer"
+	"github.com/NamhaeSusan/go-arch-guard/rules"
 )
 
 func TestCheckLayerDirection(t *testing.T) {

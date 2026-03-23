@@ -3,7 +3,7 @@ package rules_test
 import (
 	"testing"
 
-	"github.com/kimtaeyun/go-arch-guard/rules"
+	"github.com/NamhaeSusan/go-arch-guard/rules"
 )
 
 func TestViolation_String(t *testing.T) {

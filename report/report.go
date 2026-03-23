@@ -3,7 +3,7 @@ package report
 import (
 	"testing"
 
-	"github.com/kimtaeyun/go-arch-guard/rules"
+	"github.com/NamhaeSusan/go-arch-guard/rules"
 )
 
 // AssertNoViolations prints all violations.
