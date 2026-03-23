@@ -40,6 +40,24 @@ func TestCheckDomainIsolation(t *testing.T) {
 		}
 	})
 
+	t.Run("detects router deep import", func(t *testing.T) {
+		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
+		if err != nil {
+			t.Fatal(err)
+		}
+		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
+		found := false
+		for _, v := range violations {
+			if v.Rule == "isolation.router-deep-import" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected router-deep-import violation")
+		}
+	})
+
 	t.Run("detects orchestration deep import", func(t *testing.T) {
 		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
 		if err != nil {

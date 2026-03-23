@@ -22,6 +22,7 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 
 		srcDomain := identifyDomain(pkg.PkgPath, internalPrefix)
 		srcIsOrchestration := isOrchestrationPkg(pkg.PkgPath, internalPrefix)
+		srcIsRouter := isRouterPkg(pkg.PkgPath, internalPrefix)
 		srcIsPkg := isPkgPkg(pkg.PkgPath, internalPrefix)
 
 		for impPath := range pkg.Imports {
@@ -51,6 +52,25 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 
 			// Rule 1: same domain → always allowed
 			if srcDomain != "" && impDomain == srcDomain {
+				continue
+			}
+
+			// Router rules (same as orchestration: alias-only)
+			if srcIsRouter {
+				if impDomain == "" {
+					continue
+				}
+				if isDomainAlias(impPath, internalPrefix, impDomain) {
+					continue
+				}
+				violations = append(violations, Violation{
+					File:     findImportFile(pkg, impPath, projectRoot),
+					Line:     findImportLine(pkg, impPath),
+					Rule:     "isolation.router-deep-import",
+					Message:  fmt.Sprintf("router must only import domain alias, not sub-package %q", impPath),
+					Fix:      fmt.Sprintf("import the domain alias package instead: %sdomain/%s", internalPrefix, impDomain),
+					Severity: cfg.Sev,
+				})
 				continue
 			}
 
@@ -139,4 +159,9 @@ func isDomainAlias(importPath, internalPrefix, domain string) bool {
 func isOrchestrationHandler(pkgPath, internalPrefix string) bool {
 	rel := strings.TrimPrefix(pkgPath, internalPrefix)
 	return strings.HasPrefix(rel, "orchestration/handler")
+}
+
+func isRouterPkg(pkgPath, internalPrefix string) bool {
+	rel := strings.TrimPrefix(pkgPath, internalPrefix)
+	return rel == "router" || strings.HasPrefix(rel, "router/")
 }

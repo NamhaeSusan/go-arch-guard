@@ -8,6 +8,8 @@ import (
 
 var bannedPackageNames = []string{"util", "common", "misc", "helper", "shared"}
 
+var legacyPackageNames = []string{"handler", "app", "infra"}
+
 func CheckStructure(projectRoot string, opts ...Option) []Violation {
 	cfg := NewConfig(opts...)
 	var violations []Violation
@@ -18,6 +20,8 @@ func CheckStructure(projectRoot string, opts ...Option) []Violation {
 	}
 
 	violations = append(violations, checkBannedPackages(internalDir, cfg)...)
+	violations = append(violations, checkLegacyPackages(internalDir, cfg)...)
+	violations = append(violations, checkMiddlewarePlacement(internalDir, cfg)...)
 
 	domainDir := filepath.Join(internalDir, "domain")
 	violations = append(violations, checkDomainModelRequired(domainDir, cfg)...)
@@ -55,6 +59,64 @@ func checkBannedPackages(internalDir string, cfg Config) []Violation {
 	return violations
 }
 
+func checkLegacyPackages(internalDir string, cfg Config) []Violation {
+	var violations []Violation
+	entries, err := os.ReadDir(internalDir)
+	if err != nil {
+		return nil
+	}
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		relPath := filepath.Join("internal", e.Name())
+		if cfg.IsExcluded(relPath + "/") {
+			continue
+		}
+		for _, legacy := range legacyPackageNames {
+			if e.Name() == legacy {
+				violations = append(violations, Violation{
+					File:     relPath + "/",
+					Rule:     "structure.legacy-package",
+					Message:  `legacy package "` + e.Name() + `" should be migrated`,
+					Fix:      "move handlers to domain/*/handler/, middleware to pkg/, router to internal/router/",
+					Severity: cfg.Sev,
+				})
+			}
+		}
+	}
+	return violations
+}
+
+func checkMiddlewarePlacement(internalDir string, cfg Config) []Violation {
+	var violations []Violation
+	_ = filepath.Walk(internalDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || !info.IsDir() {
+			return nil
+		}
+		if info.Name() != "middleware" {
+			return nil
+		}
+		rel, _ := filepath.Rel(filepath.Dir(internalDir), path)
+		if cfg.IsExcluded(rel + "/") {
+			return nil
+		}
+		// middleware/ under pkg/ is OK
+		if strings.Contains(rel, "pkg/") {
+			return nil
+		}
+		violations = append(violations, Violation{
+			File:     rel + "/",
+			Rule:     "structure.middleware-placement",
+			Message:  `middleware found at "` + rel + `"`,
+			Fix:      "move middleware to pkg/middleware/",
+			Severity: cfg.Sev,
+		})
+		return nil
+	})
+	return violations
+}
+
 func checkDomainModelRequired(domainDir string, cfg Config) []Violation {
 	var violations []Violation
 	entries, err := os.ReadDir(domainDir)
@@ -69,8 +131,11 @@ func checkDomainModelRequired(domainDir string, cfg Config) []Violation {
 		if cfg.IsExcluded(relPath + "/") {
 			continue
 		}
-		modelPath := filepath.Join(domainDir, e.Name(), "model.go")
-		if _, err := os.Stat(modelPath); err != nil {
+		modelFile := filepath.Join(domainDir, e.Name(), "model.go")
+		modelDir := filepath.Join(domainDir, e.Name(), "core", "model")
+		_, fileErr := os.Stat(modelFile)
+		_, dirErr := os.Stat(modelDir)
+		if fileErr != nil && dirErr != nil {
 			violations = append(violations, Violation{
 				File:     relPath + "/",
 				Rule:     "structure.domain-model-required",

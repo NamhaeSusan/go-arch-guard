@@ -1,1 +1,47 @@
 package rules_test
+
+import (
+	"testing"
+
+	"github.com/kimtaeyun/go-arch-guard/rules"
+)
+
+func TestCheckStructure(t *testing.T) {
+	t.Run("valid project has no violations", func(t *testing.T) {
+		violations := rules.CheckStructure("../testdata/valid")
+		if len(violations) > 0 {
+			for _, v := range violations {
+				t.Log(v.String())
+			}
+			t.Errorf("expected no violations, got %d", len(violations))
+		}
+	})
+
+	t.Run("detects legacy packages", func(t *testing.T) {
+		violations := rules.CheckStructure("../testdata/invalid")
+		found := false
+		for _, v := range violations {
+			if v.Rule == "structure.legacy-package" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected legacy-package violation for internal/handler/")
+		}
+	})
+
+	t.Run("detects middleware outside pkg", func(t *testing.T) {
+		violations := rules.CheckStructure("../testdata/invalid")
+		found := false
+		for _, v := range violations {
+			if v.Rule == "structure.middleware-placement" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected middleware-placement violation")
+		}
+	})
+}

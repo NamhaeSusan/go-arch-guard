@@ -411,6 +411,7 @@ Logs all violations. Fails the test only if any `Error`-level violations exist. 
 |------|----------|----------|-------------|
 | `isolation.cross-domain` | CheckDomainIsolation | Error | Domain A imports domain B |
 | `isolation.orchestration-deep-import` | CheckDomainIsolation | Error | Orchestration imports domain sub-package instead of alias |
+| `isolation.router-deep-import` | CheckDomainIsolation | Error | Router imports domain sub-package instead of alias |
 | `isolation.pkg-imports-domain` | CheckDomainIsolation | Error | pkg/ imports a domain |
 | `layer.direction` | CheckLayerDirection | Error | Intra-domain layer imports in wrong direction |
 | `naming.no-stutter` | CheckNaming | Error | Type name repeats package name |
@@ -419,7 +420,9 @@ Logs all violations. Fails the test only if any `Error`-level violations exist. 
 | `naming.repo-file-interface` | CheckNaming | Error | repo/ file missing matching interface |
 | `naming.no-layer-suffix` | CheckNaming | Error | Filename has redundant layer suffix |
 | `structure.banned-package` | CheckStructure | Error | Package name is util/common/misc/helper/shared |
-| `structure.domain-model-required` | CheckStructure | Error | Domain missing model.go |
+| `structure.legacy-package` | CheckStructure | Error | Legacy package (handler/app/infra) at internal/ top level |
+| `structure.middleware-placement` | CheckStructure | Error | Middleware not in pkg/middleware/ |
+| `structure.domain-model-required` | CheckStructure | Error | Domain missing model.go or core/model/ |
 | `structure.dto-placement` | CheckStructure | Error | dto.go in domain/ or infra/ |
 
 ## License
