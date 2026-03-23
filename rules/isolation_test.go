@@ -112,6 +112,24 @@ func TestCheckDomainIsolation(t *testing.T) {
 		}
 	})
 
+	t.Run("detects pkg importing domain", func(t *testing.T) {
+		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
+		if err != nil {
+			t.Fatal(err)
+		}
+		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
+		found := false
+		for _, v := range violations {
+			if v.Rule == "isolation.pkg-imports-domain" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected pkg-imports-domain violation")
+		}
+	})
+
 	t.Run("detects unauthorized internal package importing domain sub-package", func(t *testing.T) {
 		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
 		if err != nil {
@@ -127,6 +145,24 @@ func TestCheckDomainIsolation(t *testing.T) {
 		}
 		if !found {
 			t.Error("expected internal-imports-domain violation")
+		}
+	})
+
+	t.Run("detects domain importing orchestration", func(t *testing.T) {
+		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
+		if err != nil {
+			t.Fatal(err)
+		}
+		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
+		found := false
+		for _, v := range violations {
+			if v.Rule == "isolation.domain-imports-orchestration" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected domain-imports-orchestration violation")
 		}
 	})
 }

@@ -229,6 +229,7 @@ Run: `go test -run TestArchitecture -v`
 | `orchestration/` | domain sub-package | **No** — `isolation.orchestration-deep-import` |
 | `cmd/` | domain alias (root package) | Yes |
 | `cmd/` | domain sub-package | **No** — `isolation.cmd-deep-import` |
+| domain | `orchestration/` | **No** — `isolation.domain-imports-orchestration` |
 | other internal package | any domain | **No** — `isolation.internal-imports-domain` |
 | domain A | domain B | **No** — `isolation.cross-domain` |
 
@@ -250,6 +251,9 @@ import "mymodule/internal/domain/user"              // isolation.internal-import
 
 // ❌ shared package imports orchestration
 import "mymodule/internal/orchestration"            // isolation.pkg-imports-orchestration
+
+// ❌ domain imports orchestration
+import "mymodule/internal/orchestration"            // isolation.domain-imports-orchestration
 
 // ✅ anyone imports shared utilities
 import "mymodule/internal/pkg/db"
@@ -277,6 +281,7 @@ import "mymodule/internal/pkg/db"
 `alias.go` is the root package's publication file and is not checked by `CheckLayerDirection`.
 
 Same-sublayer imports (e.g., `handler/http` → `handler/grpc`) are always allowed.
+Packages under `internal/domain/<name>/` must use one of the known sublayers only: `handler`, `app`, `core`, `core/model`, `core/repo`, `core/svc`, `event`, `infra`. Any other sublayer is rejected as `layer.unknown-sublayer`.
 
 #### Examples
 
@@ -315,6 +320,7 @@ import "mymodule/internal/domain/order/infra/persistence"  // layer.direction
 | Banned packages | `util`, `common`, `misc`, `helper`, `shared` under `internal/` | `structure.banned-package` |
 | Legacy packages | `handler`, `app`, `infra`, `router`, `bootstrap` at `internal/` top level | `structure.legacy-package` |
 | Middleware placement | `middleware/` must be under `pkg/` | `structure.middleware-placement` |
+| Domain root alias required | each domain root must define `alias.go` | `structure.domain-root-alias-required` |
 | Domain root alias only | each domain root may contain only `alias.go` as a non-test Go file | `structure.domain-root-alias-only` |
 | Domain model required | each domain must have `model.go` or `core/model/` | `structure.domain-model-required` |
 | DTO placement | `dto.go` must not be in `domain/` or `infra/` | `structure.dto-placement` |
@@ -424,7 +430,9 @@ internal/domain/audit/
 | `isolation.cmd-deep-import` | CheckDomainIsolation | cmd/ imports domain sub-package |
 | `isolation.pkg-imports-domain` | CheckDomainIsolation | pkg/ imports a domain |
 | `isolation.pkg-imports-orchestration` | CheckDomainIsolation | pkg/ imports orchestration |
+| `isolation.domain-imports-orchestration` | CheckDomainIsolation | Domain imports orchestration |
 | `layer.direction` | CheckLayerDirection | Wrong layer direction within domain |
+| `layer.unknown-sublayer` | CheckLayerDirection | Package uses an unsupported domain sublayer |
 | `naming.no-stutter` | CheckNaming | Type name repeats package name |
 | `naming.no-impl-suffix` | CheckNaming | Type ends with "Impl" |
 | `naming.snake-case-file` | CheckNaming | Filename not snake_case |
@@ -434,6 +442,7 @@ internal/domain/audit/
 | `structure.banned-package` | CheckStructure | Package is util/common/misc/helper/shared |
 | `structure.legacy-package` | CheckStructure | Legacy handler/app/infra/router/bootstrap at top level |
 | `structure.middleware-placement` | CheckStructure | Middleware not in pkg/ |
+| `structure.domain-root-alias-required` | CheckStructure | Domain root is missing alias.go |
 | `structure.domain-root-alias-only` | CheckStructure | Domain root contains files other than alias.go |
 | `structure.domain-model-required` | CheckStructure | Domain missing model.go or core/model/ |
 | `structure.dto-placement` | CheckStructure | dto.go in domain/ or infra/ |

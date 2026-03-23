@@ -78,4 +78,46 @@ func TestCheckStructure(t *testing.T) {
 			t.Error("expected domain-root-alias-only violation")
 		}
 	})
+
+	t.Run("detects missing domain root alias", func(t *testing.T) {
+		violations := rules.CheckStructure("../testdata/invalid")
+		found := false
+		for _, v := range violations {
+			if v.Rule == "structure.domain-root-alias-required" && v.File == "internal/domain/noalias/" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected domain-root-alias-required violation")
+		}
+	})
+
+	t.Run("detects missing domain model", func(t *testing.T) {
+		violations := rules.CheckStructure("../testdata/invalid")
+		found := false
+		for _, v := range violations {
+			if v.Rule == "structure.domain-model-required" && v.File == "internal/domain/ghost/" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected domain-model-required violation")
+		}
+	})
+
+	t.Run("detects dto placement under domain", func(t *testing.T) {
+		violations := rules.CheckStructure("../testdata/invalid")
+		found := false
+		for _, v := range violations {
+			if v.Rule == "structure.dto-placement" && v.File == "internal/domain/user/core/model/user_dto.go" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected dto-placement violation")
+		}
+	})
 }

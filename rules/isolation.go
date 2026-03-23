@@ -132,6 +132,18 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 				}
 			}
 
+			if srcDomain != "" && isOrchestrationPkg(impPath, internalPrefix) {
+				violations = append(violations, Violation{
+					File:     findImportFile(pkg, impPath, projectRoot),
+					Line:     findImportLine(pkg, impPath),
+					Rule:     "isolation.domain-imports-orchestration",
+					Message:  fmt.Sprintf("domain %q must not import orchestration", srcDomain),
+					Fix:      "move cross-domain coordination to internal/orchestration callers instead of domain internals",
+					Severity: cfg.Sev,
+				})
+				continue
+			}
+
 			// Rule 7: domain A importing domain B → violation
 			if srcDomain != "" && impDomain != "" && srcDomain != impDomain {
 				violations = append(violations, Violation{

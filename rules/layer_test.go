@@ -58,4 +58,22 @@ func TestCheckLayerDirection(t *testing.T) {
 			t.Error("expected layer.direction violation")
 		}
 	})
+
+	t.Run("detects unknown domain sublayer", func(t *testing.T) {
+		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
+		if err != nil {
+			t.Fatal(err)
+		}
+		violations := rules.CheckLayerDirection(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
+		found := false
+		for _, v := range violations {
+			if v.Rule == "layer.unknown-sublayer" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected layer.unknown-sublayer violation")
+		}
+	})
 }

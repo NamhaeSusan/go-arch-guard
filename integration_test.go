@@ -58,6 +58,19 @@ func TestIntegration_Invalid(t *testing.T) {
 			t.Error("expected structure violations")
 		}
 	})
+
+	t.Run("new rule ids are surfaced", func(t *testing.T) {
+		isolationViolations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "testdata/invalid")
+		layerViolations := rules.CheckLayerDirection(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "testdata/invalid")
+		structureViolations := rules.CheckStructure("testdata/invalid")
+
+		assertHasRule(t, isolationViolations, "isolation.domain-imports-orchestration")
+		assertHasRule(t, isolationViolations, "isolation.pkg-imports-domain")
+		assertHasRule(t, layerViolations, "layer.unknown-sublayer")
+		assertHasRule(t, structureViolations, "structure.domain-root-alias-required")
+		assertHasRule(t, structureViolations, "structure.domain-model-required")
+		assertHasRule(t, structureViolations, "structure.dto-placement")
+	})
 }
 
 func TestIntegration_WarningMode(t *testing.T) {
@@ -77,4 +90,14 @@ func TestIntegration_WarningMode(t *testing.T) {
 		}
 	}
 	report.AssertNoViolations(t, violations)
+}
+
+func assertHasRule(t *testing.T, violations []rules.Violation, rule string) {
+	t.Helper()
+	for _, v := range violations {
+		if v.Rule == rule {
+			return
+		}
+	}
+	t.Fatalf("expected rule %q", rule)
 }

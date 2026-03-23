@@ -24,10 +24,40 @@ func CheckStructure(projectRoot string, opts ...Option) []Violation {
 	violations = append(violations, checkMiddlewarePlacement(internalDir, cfg)...)
 
 	domainDir := filepath.Join(internalDir, "domain")
+	violations = append(violations, checkDomainRootAliasRequired(domainDir, cfg)...)
 	violations = append(violations, checkDomainRootAliasOnly(domainDir, cfg)...)
 	violations = append(violations, checkDomainModelRequired(domainDir, cfg)...)
 	violations = append(violations, checkDTOPlacement(internalDir, cfg)...)
 
+	return violations
+}
+
+func checkDomainRootAliasRequired(domainDir string, cfg Config) []Violation {
+	var violations []Violation
+	entries, err := os.ReadDir(domainDir)
+	if err != nil {
+		return nil
+	}
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		relPath := filepath.Join("internal", "domain", e.Name())
+		if cfg.IsExcluded(relPath + "/") {
+			continue
+		}
+		aliasPath := filepath.Join(domainDir, e.Name(), "alias.go")
+		if _, err := os.Stat(aliasPath); err == nil {
+			continue
+		}
+		violations = append(violations, Violation{
+			File:     relPath + "/",
+			Rule:     "structure.domain-root-alias-required",
+			Message:  `domain root "` + e.Name() + `" must define alias.go`,
+			Fix:      "add alias.go as the single public surface file for the domain root package",
+			Severity: cfg.Sev,
+		})
+	}
 	return violations
 }
 
