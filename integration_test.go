@@ -1,11 +1,14 @@
 package goarchguard_test
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/NamhaeSusan/go-arch-guard/analyzer"
 	"github.com/NamhaeSusan/go-arch-guard/report"
 	"github.com/NamhaeSusan/go-arch-guard/rules"
+	"golang.org/x/tools/go/packages"
 )
 
 func TestIntegration_Valid(t *testing.T) {
@@ -94,6 +97,42 @@ func TestIntegration_WarningMode(t *testing.T) {
 	report.AssertNoViolations(t, violations)
 }
 
+func TestIntegration_AllowsNeutralSupportPackagesOutsideCoreZones(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/supportzones"
+
+	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.25.0\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"), "package order\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"), "package model\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "config", "config.go"), "package config\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "platform", "platform.go"), "package platform\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "system", "system.go"), "package system\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "foundation", "foundation.go"), "package foundation\n")
+
+	pkgs, err := analyzer.Load(root, "internal/...")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertHasPackage(t, pkgs, module+"/internal/config")
+	assertHasPackage(t, pkgs, module+"/internal/platform")
+	assertHasPackage(t, pkgs, module+"/internal/system")
+	assertHasPackage(t, pkgs, module+"/internal/foundation")
+
+	t.Run("domain isolation", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, module, root))
+	})
+	t.Run("layer direction", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, module, root))
+	})
+	t.Run("naming", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckNaming(pkgs))
+	})
+	t.Run("structure", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckStructure(root))
+	})
+}
+
 func assertHasRule(t *testing.T, violations []rules.Violation, rule string) {
 	t.Helper()
 	for _, v := range violations {
@@ -102,4 +141,24 @@ func assertHasRule(t *testing.T, violations []rules.Violation, rule string) {
 		}
 	}
 	t.Fatalf("expected rule %q", rule)
+}
+
+func assertHasPackage(t *testing.T, pkgs []*packages.Package, pkgPath string) {
+	t.Helper()
+	for _, pkg := range pkgs {
+		if pkg.PkgPath == pkgPath {
+			return
+		}
+	}
+	t.Fatalf("expected package %q to be loaded", pkgPath)
+}
+
+func writeIntegrationFile(t *testing.T, path string, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
