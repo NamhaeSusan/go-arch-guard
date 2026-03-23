@@ -2,7 +2,7 @@
 
 Architecture rule enforcement for Go projects via `go test`.
 
-Define domain isolation, layer direction, naming conventions, and structural rules — then enforce them as regular test failures in CI. No CLI tools to learn, no config files to maintain. Just Go tests.
+Define domain isolation, layer direction, structural rules, and opinionated naming checks — then enforce them as regular test failures in CI. No CLI tools to learn, no config files to maintain. Just Go tests.
 
 ## Why
 
@@ -12,7 +12,7 @@ Architecture rules decay silently. A developer adds one cross-domain import, cod
 
 ## Target Architecture
 
-go-arch-guard enforces a **domain-centric vertical slice** architecture. Each domain owns its complete stack — from HTTP handler to DB persistence. Cross-domain coordination happens through a dedicated orchestration layer.
+go-arch-guard enforces a **domain-centric vertical slice** architecture. Each domain owns its complete stack — from HTTP handler to DB persistence. Cross-domain coordination happens through a dedicated orchestration layer for saga-style workflows.
 
 ### Project Layout
 
@@ -31,9 +31,9 @@ internal/
 │   │   ├── app/                        ← application service (facade)
 │   │   │   └── service.go              ← coordinates core/* layers
 │   │   │
-│   │   ├── core/                       ← domain core (pure business logic)
+│   │   ├── core/                       ← domain core (business logic)
 │   │   │   ├── model/                  ← entities, value objects
-│   │   │   │   └── order.go            ← NO dependencies on other layers
+│   │   │   │   └── order.go            ← no project-internal layer dependencies
 │   │   │   ├── repo/                   ← repository interfaces
 │   │   │   │   └── repository.go       ← depends on model/ only
 │   │   │   └── svc/                    ← domain services (stateless logic)
@@ -53,10 +53,10 @@ internal/
 │   └── user/
 │       └── ...                          ← same structure, every domain is identical
 │
-├── orchestration/                       ← cross-domain coordination
+├── orchestration/                       ← cross-domain saga / workflow coordination
 │   ├── handler/http/                    ← cross-domain API endpoints
 │   │   └── handler.go
-│   ├── create_order.go                  ← imports domain aliases ONLY
+│   ├── create_order.go                  ← saga imports domain aliases ONLY
 │   └── draft_submit.go
 │
 └── pkg/                                 ← shared utilities (domain-unaware)
@@ -86,11 +86,11 @@ type Handler = orderhttp.Handler
 
 **Rule:** Outside code can import only the domain root package. Deep imports such as `domain/order/handler/http` or `domain/order/core/model` are violations. `alias.go` itself is the publication file, not a layer-direction target.
 
-### core/ — The Dependency-Free Center
+### core/ — The Inner Domain Center
 
 ```
 core/
-├── model/    ← entities (depends on NOTHING)
+├── model/    ← entities (no project-internal layer dependencies)
 ├── repo/     ← interfaces (depends on model only)
 └── svc/      ← pure logic (depends on model only)
 ```
@@ -101,9 +101,11 @@ core/
 
 Inner layers stay `internal/pkg`-free. `core`, `core/model`, `core/repo`, `core/svc`, and `event` must not import shared support packages directly.
 
-### orchestration/ — Cross-Domain Flows
+These checks are about **project-internal dependency flow**. go-arch-guard does not try to prove total semantic purity against every stdlib or third-party import.
 
-When a use case spans multiple domains (e.g., "submit a draft creates a review and notifies users"), the orchestration layer coordinates:
+### orchestration/ — Cross-Domain Sagas
+
+When a use case spans multiple domains (e.g., "submit a draft creates a review and notifies users"), the orchestration layer runs the saga/workflow by coordinating domain root APIs:
 
 ```go
 // internal/orchestration/draft_submit.go
@@ -122,7 +124,7 @@ type DraftSubmit struct {
 }
 ```
 
-**Rule:** Orchestration can only import domain **aliases** (root packages). Importing `domain/user/core/model` directly is a violation. Outside of `cmd/...`, no other non-orchestration package may depend on `internal/orchestration/...`.
+**Rule:** Orchestration is the cross-domain saga layer. It can import domain **aliases** (root packages), but not domain internals. Importing `domain/user/core/model` directly is a violation. Outside of `cmd/...`, no other non-orchestration package may depend on `internal/orchestration/...`.
 
 ### cmd/ — Composition Root
 
@@ -313,6 +315,8 @@ import "mymodule/internal/pkg/clock"  // layer.inner-imports-pkg
 ---
 
 ### Naming (`rules.CheckNaming`)
+
+`CheckNaming` is intentionally more opinionated than the boundary rules above. Use it when you want project-shape conventions enforced alongside architecture boundaries; omit it if you only want dependency and structure guardrails.
 
 | Rule | Bad | Good | Violation |
 |------|-----|------|-----------|
