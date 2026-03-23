@@ -3,6 +3,7 @@ package rules
 import (
 	"go/parser"
 	"go/token"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -190,8 +191,8 @@ func checkDomainRootAliasOnly(domainDir string, cfg Config) []Violation {
 
 func checkPackageNames(internalDir string, cfg Config) []Violation {
 	var violations []Violation
-	_ = filepath.Walk(internalDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || !info.IsDir() {
+	_ = filepath.WalkDir(internalDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || !d.IsDir() {
 			return nil
 		}
 		rel, relErr := filepath.Rel(filepath.Dir(internalDir), path)
@@ -206,7 +207,7 @@ func checkPackageNames(internalDir string, cfg Config) []Violation {
 			return filepath.SkipDir
 		}
 
-		name := info.Name()
+		name := d.Name()
 		for _, banned := range bannedPackageNames {
 			if name == banned {
 				violations = append(violations, Violation{
@@ -247,11 +248,11 @@ func checkPackageNames(internalDir string, cfg Config) []Violation {
 
 func checkMiddlewarePlacement(internalDir string, cfg Config) []Violation {
 	var violations []Violation
-	_ = filepath.Walk(internalDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || !info.IsDir() {
+	_ = filepath.WalkDir(internalDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || !d.IsDir() {
 			return nil
 		}
-		if info.Name() != "middleware" {
+		if d.Name() != "middleware" {
 			return nil
 		}
 		rel, _ := filepath.Rel(filepath.Dir(internalDir), path)
@@ -310,11 +311,11 @@ func checkDTOPlacement(internalDir string, cfg Config) []Violation {
 	if _, err := os.Stat(domainDir); err != nil {
 		return nil
 	}
-	_ = filepath.Walk(domainDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
+	_ = filepath.WalkDir(domainDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
 			return nil
 		}
-		name := info.Name()
+		name := d.Name()
 		if !strings.HasSuffix(name, ".go") {
 			return nil
 		}

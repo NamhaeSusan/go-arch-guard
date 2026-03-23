@@ -67,9 +67,8 @@ func projectRelativePackagePath(pkgPath, projectModule string) string {
 	if pkgPath == projectModule {
 		return "."
 	}
-	prefix := projectModule + "/"
-	if strings.HasPrefix(pkgPath, prefix) {
-		return strings.TrimPrefix(pkgPath, prefix)
+	if rel, ok := strings.CutPrefix(pkgPath, projectModule+"/"); ok {
+		return rel
 	}
 	return ""
 }

@@ -14,14 +14,14 @@ type fakeTB struct {
 	failed bool
 }
 
-func (f *fakeTB) Errorf(format string, args ...interface{}) {
+func (f *fakeTB) Errorf(format string, args ...any) {
 	f.errors = append(f.errors, fmt.Sprintf(format, args...))
 	f.failed = true
 }
 
 func (f *fakeTB) Helper() {}
 
-func (f *fakeTB) Log(args ...interface{}) {}
+func (f *fakeTB) Log(args ...any) {}
 
 func TestAssertNoViolations(t *testing.T) {
 	t.Run("no violations passes", func(t *testing.T) {

@@ -48,7 +48,13 @@ func TestArchitecture(t *testing.T) {
 
 	pkgs, err := analyzer.Load(root, "internal/...", "cmd/...")
 	if err != nil {
-		t.Fatal(err)
+		// Load returns valid packages alongside the error when only some
+		// packages fail (e.g. a single type error). Use t.Log so analysis
+		// continues on the packages that did load successfully.
+		t.Log(err)
+	}
+	if len(pkgs) == 0 {
+		t.Fatalf("no packages loaded: %v", err)
 	}
 
 	t.Run("domain isolation", func(t *testing.T) {
@@ -168,10 +174,12 @@ Unknown domain sublayers are rejected.
 `internal/orchestration` is the cross-domain coordination layer.
 
 - It may import domain roots only, not domain sub-packages.
+- For domain imports, orchestration must go through the domain root package (`alias.go`), not `app/`, `handler/`, or other domain sub-packages.
 - It may import shared helpers in `internal/pkg/...` when needed.
+- It may also import other non-domain internal packages when those packages exist.
 - It is still a protected layer from the outside: `cmd/...` and `internal/orchestration/...` may depend on orchestration, but domains, `pkg`, and other internal packages may not.
 
-In other words, orchestration may coordinate domain roots and shared helpers, but `internal/` does not allow arbitrary extra top-level support packages.
+In other words, `CheckDomainIsolation` restricts how orchestration reaches domains, not every non-domain internal dependency orchestration may use. Whether extra internal packages are allowed in the tree is checked separately by `CheckStructure`.
 
 ### Shared Packages
 
@@ -202,6 +210,7 @@ Import matrix:
 | `orchestration/...` | domain root | Yes |
 | `orchestration/...` | domain sub-package | No |
 | `orchestration/...` | `internal/pkg/...` | Yes |
+| `orchestration/...` | other non-domain internal package | Yes |
 | `cmd/...` | `internal/orchestration/...` | Yes |
 | `cmd/...` | domain root | Yes |
 | `cmd/...` | domain sub-package | No |

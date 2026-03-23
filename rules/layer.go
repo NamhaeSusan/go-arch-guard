@@ -2,6 +2,7 @@ package rules
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"golang.org/x/tools/go/packages"
@@ -131,13 +132,7 @@ func CheckLayerDirection(pkgs []*packages.Package, projectModule string, project
 				continue
 			}
 
-			isAllowed := false
-			for _, a := range allowed {
-				if impSublayer == a {
-					isAllowed = true
-					break
-				}
-			}
+			isAllowed := slices.Contains(allowed, impSublayer)
 			if isAllowed {
 				continue
 			}

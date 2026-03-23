@@ -9,6 +9,11 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
+// Load parses Go packages matching the given patterns under dir.
+// When some packages contain errors (e.g. type-check failures), they are
+// skipped and the successfully loaded packages are returned alongside a
+// non-nil error describing what was skipped. Callers that want partial
+// analysis should check len(pkgs) rather than treating err as fatal.
 func Load(dir string, patterns ...string) ([]*packages.Package, error) {
 	absDir, err := filepath.Abs(dir)
 	if err != nil {

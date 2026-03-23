@@ -167,23 +167,23 @@ func checkRepoFileInterface(pkg *packages.Package, cfg Config) []Violation {
 	if !isRepoPackage(pkg.PkgPath) {
 		return nil
 	}
+
+	// Iterate Syntax directly instead of cross-referencing GoFiles indices;
+	// Syntax corresponds to CompiledGoFiles, which can differ from GoFiles
+	// when cgo or generated files are involved.
 	var violations []Violation
-	seen := make(map[string]bool)
-	for i, f := range pkg.GoFiles {
-		if seen[f] {
-			continue
-		}
-		seen[f] = true
-		base := filepath.Base(f)
+	for _, astFile := range pkg.Syntax {
+		filename := pkg.Fset.Position(astFile.Pos()).Filename
+		base := filepath.Base(filename)
 		if strings.HasSuffix(base, "_test.go") {
 			continue
 		}
-		relPath := relativePathForPackage(pkg, f)
+		relPath := relativePathForPackage(pkg, filename)
 		if cfg.IsExcluded(relPath) {
 			continue
 		}
 		expected := snakeToPascal(strings.TrimSuffix(base, ".go"))
-		if hasInterface(pkg.Syntax[i], expected) {
+		if hasInterface(astFile, expected) {
 			continue
 		}
 		violations = append(violations, Violation{
@@ -271,8 +271,8 @@ func checkNoLayerSuffix(pkg *packages.Package, cfg Config) []Violation {
 		}
 		name := strings.TrimSuffix(base, ".go")
 		for _, suffix := range bannedLayerSuffixes {
-			if strings.HasSuffix(name, suffix) {
-				suggested := strings.TrimSuffix(name, suffix) + ".go"
+			if trimmed, ok := strings.CutSuffix(name, suffix); ok {
+				suggested := trimmed + ".go"
 				violations = append(violations, Violation{
 					File:     relPath,
 					Rule:     "naming.no-layer-suffix",
