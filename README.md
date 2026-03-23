@@ -4,6 +4,12 @@ Architecture guardrails for Go projects via `go test`.
 
 Define isolation, layer-direction, structure, and naming rules, then fail regular tests when the project shape drifts. No CLI to learn. No separate config format. Just Go tests.
 
+## Opinionated Defaults
+
+The rules, paths (`internal/domain/`, `internal/orchestration/`, `internal/pkg/`), sublayer names, and layer-direction matrix shipped with this library reflect **NamhaeSusan's conventions**. They are not universal Go best practices.
+
+If you want to adopt `go-arch-guard` in your own project, treat the current ruleset as a **reference implementation** and adjust (or rewrite) rules to match your team's architecture.
+
 ## Why
 
 Architecture usually decays through a few broad mistakes, not through deep theoretical violations:
@@ -13,17 +19,67 @@ Architecture usually decays through a few broad mistakes, not through deep theor
 - package placement drift
 - naming that breaks the intended project shape
 
-`go-arch-guard` is meant to catch those coarse mistakes early.
+`go-arch-guard` catches those coarse mistakes early via static analysis. It does not try to model every semantic nuance inside Go packages, and if Go already rejects something by itself (such as import cycles), that is not a primary target here.
 
-## Scope
+## Install
 
-This library is intentionally about broad project-shape guardrails, not purity proofs.
+```bash
+go get github.com/NamhaeSusan/go-arch-guard
+```
 
-- It focuses on static analysis only.
-- It does not try to model every semantic nuance inside Go packages.
-- It prefers low-surprise checks over doctrinal rules.
+## Quick Start
 
-If Go already rejects something by itself, such as import cycles, that is not a primary target here.
+Create `architecture_test.go` in your project root:
+
+```go
+package myproject_test
+
+import (
+	"testing"
+
+	"github.com/NamhaeSusan/go-arch-guard/analyzer"
+	"github.com/NamhaeSusan/go-arch-guard/report"
+	"github.com/NamhaeSusan/go-arch-guard/rules"
+)
+
+func TestArchitecture(t *testing.T) {
+	root := "."
+	module := "github.com/yourmodule"
+
+	pkgs, err := analyzer.Load(root, "internal/...", "cmd/...")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("domain isolation", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, module, root))
+	})
+	t.Run("layer direction", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, module, root))
+	})
+	t.Run("naming", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckNaming(pkgs))
+	})
+	t.Run("structure", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckStructure(root))
+	})
+}
+```
+
+Run:
+
+```bash
+go test -run TestArchitecture -v
+```
+
+Sample output when violations exist:
+
+```text
+=== RUN   TestArchitecture/domain_isolation
+    [ERROR] violation: domain "order" must not import domain "user" (file: internal/domain/order/app/service.go:5, rule: isolation.cross-domain, fix: use orchestration/ for cross-domain orchestration or move shared types to pkg/)
+    found 1 architecture violation(s)
+--- FAIL: TestArchitecture/domain_isolation
+```
 
 ## Target Architecture
 
@@ -123,51 +179,6 @@ In other words, orchestration is restricted on the domain boundary, not forced i
 - `pkg` may not import orchestration.
 - Inner domain layers (`core`, `core/model`, `core/repo`, `core/svc`, `event`) may not import `internal/pkg/...`.
 
-## Quick Start
-
-Create `architecture_test.go` in your project root:
-
-```go
-package myproject_test
-
-import (
-	"testing"
-
-	"github.com/NamhaeSusan/go-arch-guard/analyzer"
-	"github.com/NamhaeSusan/go-arch-guard/report"
-	"github.com/NamhaeSusan/go-arch-guard/rules"
-)
-
-func TestArchitecture(t *testing.T) {
-	root := "."
-	module := "github.com/yourmodule"
-
-	pkgs, err := analyzer.Load(root, "internal/...", "cmd/...")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Run("domain isolation", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, module, root))
-	})
-	t.Run("layer direction", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, module, root))
-	})
-	t.Run("naming", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckNaming(pkgs))
-	})
-	t.Run("structure", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckStructure(root))
-	})
-}
-```
-
-Run:
-
-```bash
-go test -run TestArchitecture -v
-```
-
 ## Rules
 
 ### Domain Isolation
@@ -198,29 +209,6 @@ Import matrix:
 | other internal package | any domain | No |
 | other internal package | `internal/orchestration/...` | No |
 | domain A | domain B | No |
-
-Examples:
-
-```go
-// OK: orchestration imports domain roots
-import "mymodule/internal/domain/order"
-import "mymodule/internal/domain/user"
-
-// OK: orchestration imports an internal helper package
-import "mymodule/internal/pkg/clock"
-
-// BAD: orchestration deep-imports a domain
-import "mymodule/internal/domain/user/core/model" // isolation.orchestration-deep-import
-
-// BAD: shared package imports orchestration
-import "mymodule/internal/orchestration" // isolation.pkg-imports-orchestration
-
-// BAD: domain imports orchestration
-import "mymodule/internal/orchestration" // isolation.domain-imports-orchestration
-
-// BAD: config imports a domain directly
-import "mymodule/internal/domain/user" // isolation.internal-imports-domain
-```
 
 ### Layer Direction
 
@@ -254,17 +242,20 @@ Notes:
 Examples:
 
 ```go
-// OK
-import "mymodule/internal/domain/order/core/model"
+// OK: infra imports core/repo (allowed)
+// in internal/domain/order/infra/persistence/store.go
 import "mymodule/internal/domain/order/core/repo"
 
-// BAD: svc should not know repo
+// BAD: core/svc imports core/repo (not in allowed list)
+// in internal/domain/order/core/svc/order.go
 import "mymodule/internal/domain/order/core/repo" // layer.direction
 
-// BAD: handler should not talk to infra directly
+// BAD: handler imports infra directly (not in allowed list)
+// in internal/domain/order/handler/http/handler.go
 import "mymodule/internal/domain/order/infra/persistence" // layer.direction
 
-// BAD: inner layer imports pkg
+// BAD: core/model imports internal/pkg (inner layer restriction)
+// in internal/domain/order/core/model/order.go
 import "mymodule/internal/pkg/clock" // layer.inner-imports-pkg
 ```
 
@@ -272,18 +263,16 @@ import "mymodule/internal/pkg/clock" // layer.inner-imports-pkg
 
 `rules.CheckStructure(root, opts...)`
 
-Filesystem checks:
-
 | Rule | Meaning |
 |------|---------|
-| `structure.banned-package` | `util`, `common`, `misc`, `helper`, `shared` are banned anywhere under `internal/` |
+| `structure.banned-package` | `util`, `common`, `misc`, `helper`, `shared`, `services` are banned anywhere under `internal/` |
 | `structure.legacy-package` | `router`, `bootstrap`, or misplaced `app`/`handler`/`infra` directories under `internal/` |
 | `structure.middleware-placement` | `middleware/` must live at `internal/pkg/middleware/` |
 | `structure.domain-root-alias-required` | each domain root must define `alias.go` |
 | `structure.domain-root-alias-package` | `alias.go` package name must match the domain directory |
 | `structure.domain-root-alias-only` | the domain root may contain only `alias.go` as a non-test Go file |
 | `structure.domain-model-required` | each domain must have at least one direct non-test Go file in `core/model/` |
-| `structure.dto-placement` | `dto.go` or `*_dto.go` must not live under `domain/` or `infra/` |
+| `structure.dto-placement` | `dto.go` or `*_dto.go` must not live in inner domain layers (`core/`, `event/`) or `infra/`; allowed in `handler/` and `app/` |
 
 ### Naming
 
@@ -300,89 +289,36 @@ This rule set is intentionally more opinionated than the boundary rules.
 | `naming.no-layer-suffix` | file name redundantly repeats the layer name |
 | `naming.handler-no-exported-interface` | handler package defines an exported interface |
 
-## Paths, Excludes, and Output
+## Options
 
-### Root
+### Severity
 
-- `root` is a filesystem path passed to `analyzer.Load`, `CheckDomainIsolation`, `CheckLayerDirection`, and `CheckStructure`.
-- It is usually `"."` in normal project usage.
+Default severity is `Error`. To log violations without failing the test, use `Warning`:
+
+```go
+violations := rules.CheckDomainIsolation(
+	pkgs, module, root,
+	rules.WithSeverity(rules.Warning),
+)
+report.AssertNoViolations(t, violations) // passes — only Error fails
+```
 
 ### Exclude Paths
 
-Exclude patterns are matched against project-relative paths only.
-
-Use:
+Skip subtrees during migration:
 
 ```go
-rules.WithExclude("internal/legacy/...")
-rules.WithExclude("internal/domain/payment/core/model/...")
-```
-
-Do not use module-qualified paths such as:
-
-```go
-rules.WithExclude("github.com/yourmodule/internal/legacy/...")
-```
-
-Rules:
-
-- `...` matches the exact root and all descendants
-- use forward-slash project-relative paths
-- the same exclude format applies across isolation, layer, naming, and structure checks
-
-### Violation File Paths
-
-Violation `File` values are reported as project-relative paths.
-
-## Severity
-
-Default severity is `Error`.
-
-```go
-violations := rules.CheckDomainIsolation(pkgs, module, root)
-```
-
-To log violations without failing the test:
-
-```go
-violations := rules.CheckDomainIsolation(
-	pkgs,
-	module,
-	root,
-	rules.WithSeverity(rules.Warning),
-)
-
-report.AssertNoViolations(t, violations)
-```
-
-`report.AssertNoViolations` fails only when at least one violation has `Error` severity.
-
-## Gradual Adoption
-
-Start with warnings:
-
-```go
-violations := rules.CheckDomainIsolation(
-	pkgs,
-	module,
-	root,
-	rules.WithSeverity(rules.Warning),
-)
-report.AssertNoViolations(t, violations)
-```
-
-Exclude legacy subtrees while migrating:
-
-```go
-violations := rules.CheckDomainIsolation(
-	pkgs,
-	module,
-	root,
+rules.CheckDomainIsolation(
+	pkgs, module, root,
 	rules.WithExclude("internal/legacy/..."),
+	rules.WithExclude("internal/domain/payment/core/model/..."),
 )
 ```
 
-Then remove excludes as the project converges on the target shape.
+- Patterns are project-relative paths with forward slashes
+- `...` matches the exact root and all descendants
+- Do not use module-qualified paths (`github.com/yourmodule/...`)
+- The same format applies across all check functions
 
 ## API Reference
 
@@ -397,35 +333,13 @@ Then remove excludes as the project converges on the target shape.
 | `rules.WithSeverity(rules.Warning)` | downgrade violations to warnings |
 | `rules.WithExclude("internal/path/...")` | skip a project-relative subtree or file |
 
-## Violation Reference
+## Future Considerations
 
-| Rule | Function | Description |
-|------|----------|-------------|
-| `isolation.cross-domain` | `CheckDomainIsolation` | one domain imports another domain |
-| `isolation.internal-imports-domain` | `CheckDomainIsolation` | unsupported internal package imports a domain |
-| `isolation.orchestration-deep-import` | `CheckDomainIsolation` | orchestration imports a domain sub-package |
-| `isolation.cmd-deep-import` | `CheckDomainIsolation` | `cmd/...` imports a domain sub-package |
-| `isolation.pkg-imports-domain` | `CheckDomainIsolation` | `internal/pkg/...` imports a domain |
-| `isolation.pkg-imports-orchestration` | `CheckDomainIsolation` | `internal/pkg/...` imports orchestration |
-| `isolation.domain-imports-orchestration` | `CheckDomainIsolation` | a domain imports orchestration |
-| `isolation.internal-imports-orchestration` | `CheckDomainIsolation` | unsupported internal package imports orchestration |
-| `layer.direction` | `CheckLayerDirection` | disallowed layer dependency inside one domain |
-| `layer.inner-imports-pkg` | `CheckLayerDirection` | inner domain layer imports `internal/pkg/...` |
-| `layer.unknown-sublayer` | `CheckLayerDirection` | unsupported domain sublayer |
-| `naming.no-stutter` | `CheckNaming` | exported type repeats package name |
-| `naming.no-impl-suffix` | `CheckNaming` | exported type ends with `Impl` |
-| `naming.snake-case-file` | `CheckNaming` | file name is not snake_case |
-| `naming.repo-file-interface` | `CheckNaming` | repo file is missing its matching interface |
-| `naming.no-layer-suffix` | `CheckNaming` | file name redundantly repeats the layer |
-| `naming.handler-no-exported-interface` | `CheckNaming` | handler package defines an exported interface |
-| `structure.banned-package` | `CheckStructure` | banned generic package name under `internal/` |
-| `structure.legacy-package` | `CheckStructure` | legacy or misplaced package directory |
-| `structure.middleware-placement` | `CheckStructure` | middleware directory is outside `internal/pkg/middleware/` |
-| `structure.domain-root-alias-required` | `CheckStructure` | domain root is missing `alias.go` |
-| `structure.domain-root-alias-package` | `CheckStructure` | `alias.go` package name mismatches the domain name |
-| `structure.domain-root-alias-only` | `CheckStructure` | domain root contains non-test Go files other than `alias.go` |
-| `structure.domain-model-required` | `CheckStructure` | domain is missing a direct non-test Go file in `core/model/` |
-| `structure.dto-placement` | `CheckStructure` | DTO file is placed under `domain/` or `infra/` |
+### External Import Restrictions
+
+Currently `go-arch-guard` only checks project-internal imports. It does not restrict which external packages a layer may use (e.g., `core/model` importing `gorm.io/gorm`).
+
+If vibe-coding tools repeatedly introduce infrastructure dependencies into inner layers, a rule like `WithBannedImport("core/...", "gorm.io/...")` may be added.
 
 ## License
 

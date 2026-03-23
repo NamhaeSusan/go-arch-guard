@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-var bannedPackageNames = []string{"util", "common", "misc", "helper", "shared"}
+var bannedPackageNames = []string{"util", "common", "misc", "helper", "shared", "services"}
 
 var legacyPackageNames = []string{"router", "bootstrap"}
 
@@ -274,6 +274,9 @@ func checkDTOPlacement(internalDir string, cfg Config) []Violation {
 				if cfg.IsExcluded(rel) {
 					return nil
 				}
+				if forbidden == "domain" && isDTOAllowedSublayer(rel) {
+					return nil
+				}
 				violations = append(violations, Violation{
 					File:     rel,
 					Rule:     "structure.dto-placement",
@@ -286,6 +289,16 @@ func checkDTOPlacement(internalDir string, cfg Config) []Violation {
 		})
 	}
 	return violations
+}
+
+func isDTOAllowedSublayer(relPath string) bool {
+	// relPath: "internal/domain/<name>/<sublayer>/..."
+	parts := strings.Split(relPath, "/")
+	if len(parts) < 4 {
+		return false
+	}
+	sublayer := parts[3]
+	return sublayer == "handler" || sublayer == "app"
 }
 
 func isMisplacedLayerDir(rel, name string) bool {

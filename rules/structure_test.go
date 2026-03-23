@@ -266,6 +266,70 @@ func TestCheckStructure(t *testing.T) {
 		}
 	})
 
+	t.Run("allows dto in handler sublayer", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"), "package order\n")
+		writeFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"), "package model\n")
+		writeFile(t, filepath.Join(root, "internal", "domain", "order", "handler", "http", "dto.go"), "package http\n")
+
+		violations := rules.CheckStructure(root)
+		for _, v := range violations {
+			if v.Rule == "structure.dto-placement" {
+				t.Errorf("dto in handler/ should be allowed, got violation: %s", v.String())
+			}
+		}
+	})
+
+	t.Run("allows dto in app sublayer", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"), "package order\n")
+		writeFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"), "package model\n")
+		writeFile(t, filepath.Join(root, "internal", "domain", "order", "app", "request_dto.go"), "package app\n")
+
+		violations := rules.CheckStructure(root)
+		for _, v := range violations {
+			if v.Rule == "structure.dto-placement" {
+				t.Errorf("dto in app/ should be allowed, got violation: %s", v.String())
+			}
+		}
+	})
+
+	t.Run("still rejects dto in core model", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"), "package order\n")
+		writeFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"), "package model\n")
+		writeFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order_dto.go"), "package model\n")
+
+		violations := rules.CheckStructure(root)
+		found := false
+		for _, v := range violations {
+			if v.Rule == "structure.dto-placement" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected dto-placement violation for core/model/order_dto.go")
+		}
+	})
+
+	t.Run("detects services as banned package", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, filepath.Join(root, "internal", "services", "order.go"), "package services\n")
+
+		violations := rules.CheckStructure(root)
+		found := false
+		for _, v := range violations {
+			if v.Rule == "structure.banned-package" && strings.Contains(v.Message, "services") {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected banned-package violation for internal/services/")
+		}
+	})
+
 	t.Run("project-relative exclude skips matching directory tree", func(t *testing.T) {
 		violations := rules.CheckStructure("../testdata/invalid", rules.WithExclude("internal/platform/..."))
 		for _, v := range violations {
