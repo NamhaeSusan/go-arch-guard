@@ -305,39 +305,38 @@ func checkDomainModelRequired(domainDir string, cfg Config) []Violation {
 
 func checkDTOPlacement(internalDir string, cfg Config) []Violation {
 	var violations []Violation
-	for _, forbidden := range []string{"domain", "infra"} {
-		dir := filepath.Join(internalDir, forbidden)
-		if _, err := os.Stat(dir); err != nil {
-			continue
-		}
-		_ = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-			if err != nil || info.IsDir() {
-				return nil
-			}
-			name := info.Name()
-			if !strings.HasSuffix(name, ".go") {
-				return nil
-			}
-			if name == "dto.go" || (strings.HasSuffix(name, "_dto.go") && !strings.HasSuffix(name, "_test.go")) {
-				rel, _ := filepath.Rel(filepath.Dir(internalDir), path)
-				rel = filepath.ToSlash(rel)
-				if cfg.IsExcluded(rel) {
-					return nil
-				}
-				if forbidden == "domain" && isDTOAllowedSublayer(rel) {
-					return nil
-				}
-				violations = append(violations, Violation{
-					File:     rel,
-					Rule:     "structure.dto-placement",
-					Message:  `"` + name + `" found in ` + forbidden + "/",
-					Fix:      "DTOs belong in handler/ or app/",
-					Severity: cfg.Sev,
-				})
-			}
-			return nil
-		})
+	// Only domain/ is walked; internal/infra/ cannot exist (blocked by structure.internal-top-level).
+	domainDir := filepath.Join(internalDir, "domain")
+	if _, err := os.Stat(domainDir); err != nil {
+		return nil
 	}
+	_ = filepath.Walk(domainDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return nil
+		}
+		name := info.Name()
+		if !strings.HasSuffix(name, ".go") {
+			return nil
+		}
+		if name == "dto.go" || (strings.HasSuffix(name, "_dto.go") && !strings.HasSuffix(name, "_test.go")) {
+			rel, _ := filepath.Rel(filepath.Dir(internalDir), path)
+			rel = filepath.ToSlash(rel)
+			if cfg.IsExcluded(rel) {
+				return nil
+			}
+			if isDTOAllowedSublayer(rel) {
+				return nil
+			}
+			violations = append(violations, Violation{
+				File:     rel,
+				Rule:     "structure.dto-placement",
+				Message:  `"` + name + `" found in forbidden layer`,
+				Fix:      "DTOs belong in handler/ or app/",
+				Severity: cfg.Sev,
+			})
+		}
+		return nil
+	})
 	return violations
 }
 

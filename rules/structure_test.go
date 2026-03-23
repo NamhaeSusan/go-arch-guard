@@ -364,6 +364,47 @@ func TestCheckStructure(t *testing.T) {
 		}
 	})
 
+	t.Run("rejects Go file at internal top level", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, filepath.Join(root, "internal", "helpers.go"), "package internal\n")
+
+		violations := rules.CheckStructure(root)
+		found := false
+		for _, v := range violations {
+			if v.Rule == "structure.internal-top-level" && v.File == "internal/helpers.go" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected internal-top-level violation for Go file at internal/ root")
+		}
+	})
+
+	t.Run("ignores test files at internal top level", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, filepath.Join(root, "internal", "helpers_test.go"), "package internal_test\n")
+
+		violations := rules.CheckStructure(root)
+		for _, v := range violations {
+			if v.Rule == "structure.internal-top-level" && v.File == "internal/helpers_test.go" {
+				t.Error("test files at internal/ root should not be flagged")
+			}
+		}
+	})
+
+	t.Run("ignores non-Go files at internal top level", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, filepath.Join(root, "internal", "README.md"), "# internal\n")
+
+		violations := rules.CheckStructure(root)
+		for _, v := range violations {
+			if v.Rule == "structure.internal-top-level" && v.File == "internal/README.md" {
+				t.Error("non-Go files at internal/ root should not be flagged")
+			}
+		}
+	})
+
 	t.Run("project-relative exclude skips matching directory tree", func(t *testing.T) {
 		violations := rules.CheckStructure("../testdata/invalid", rules.WithExclude("internal/platform/..."))
 		for _, v := range violations {

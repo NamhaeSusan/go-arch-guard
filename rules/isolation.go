@@ -118,9 +118,6 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 			}
 
 			if isOrchestrationPkg(impPath, internalPrefix) {
-				if srcIsOrchestration {
-					continue
-				}
 				if srcDomain != "" {
 					violations = append(violations, Violation{
 						File:     findImportFile(pkg, impPath, projectRoot),
@@ -130,9 +127,6 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 						Fix:      "move cross-domain coordination to internal/orchestration callers instead of domain internals",
 						Severity: cfg.Sev,
 					})
-					continue
-				}
-				if srcIsPkg {
 					continue
 				}
 				violations = append(violations, Violation{

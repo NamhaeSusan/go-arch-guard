@@ -2,6 +2,7 @@ package rules_test
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/NamhaeSusan/go-arch-guard/analyzer"
@@ -54,6 +55,32 @@ func TestCheckNaming(t *testing.T) {
 			if filepath.IsAbs(v.File) {
 				t.Fatalf("expected relative path, got %q", v.File)
 			}
+		}
+	})
+
+	t.Run("detects non-snake-case filename and suggests fix", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, filepath.Join(root, "internal", "domain", "order", "app", "createOrder.go"),
+			"package app\n\ntype Request struct{}\n")
+		writeFile(t, filepath.Join(root, "go.mod"), "module example.com/snaketest\n\ngo 1.25.0\n")
+
+		pkgs, err := analyzer.Load(root, "internal/...")
+		if err != nil {
+			t.Fatal(err)
+		}
+		violations := rules.CheckNaming(pkgs)
+		found := false
+		for _, v := range violations {
+			if v.Rule == "naming.snake-case-file" {
+				found = true
+				if !strings.Contains(v.Fix, "create_order.go") {
+					t.Errorf("expected fix to suggest snake_case name, got %q", v.Fix)
+				}
+				break
+			}
+		}
+		if !found {
+			t.Error("expected snake-case-file violation for createOrder.go")
 		}
 	})
 
