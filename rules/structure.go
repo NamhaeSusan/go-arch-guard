@@ -238,17 +238,15 @@ func checkDomainModelRequired(domainDir string, cfg Config) []Violation {
 		if cfg.IsExcluded(relPath + "/") {
 			continue
 		}
-		modelFile := filepath.Join(domainDir, e.Name(), "model.go")
 		modelDir := filepath.Join(domainDir, e.Name(), "core", "model")
-		_, fileErr := os.Stat(modelFile)
-		if fileErr == nil || hasNonTestGoFiles(modelDir) {
+		if hasNonTestGoFiles(modelDir) {
 			continue
 		}
 		violations = append(violations, Violation{
 			File:     relPath + "/",
 			Rule:     "structure.domain-model-required",
-			Message:  `domain "` + e.Name() + `" missing model.go or non-empty core/model/`,
-			Fix:      "create model.go or add at least one non-test Go file under core/model/",
+			Message:  `domain "` + e.Name() + `" missing non-empty core/model/`,
+			Fix:      "add at least one non-test Go file under core/model/",
 			Severity: cfg.Sev,
 		})
 	}

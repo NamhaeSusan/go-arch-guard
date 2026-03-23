@@ -203,6 +203,30 @@ func TestCheckStructure(t *testing.T) {
 			t.Error("expected domain-model-required violation for empty core/model")
 		}
 	})
+
+	t.Run("root model file does not satisfy alias-only domain model requirement", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, filepath.Join(root, "internal", "domain", "billing", "alias.go"), "package billing\n")
+		writeFile(t, filepath.Join(root, "internal", "domain", "billing", "model.go"), "package billing\n")
+
+		violations := rules.CheckStructure(root)
+		foundAliasOnly := false
+		foundModelRequired := false
+		for _, v := range violations {
+			if v.Rule == "structure.domain-root-alias-only" && v.File == "internal/domain/billing/model.go" {
+				foundAliasOnly = true
+			}
+			if v.Rule == "structure.domain-model-required" && v.File == "internal/domain/billing/" {
+				foundModelRequired = true
+			}
+		}
+		if !foundAliasOnly {
+			t.Error("expected domain-root-alias-only violation for root model.go")
+		}
+		if !foundModelRequired {
+			t.Error("expected domain-model-required violation when core/model is missing")
+		}
+	})
 }
 
 func writeFile(t *testing.T, path string, content string) {

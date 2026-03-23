@@ -334,7 +334,7 @@ import "mymodule/internal/pkg/clock"  // layer.inner-imports-pkg
 | Domain root alias required | each domain root must define `alias.go` | `structure.domain-root-alias-required` |
 | Domain root alias package | `alias.go` package name must match the domain root name | `structure.domain-root-alias-package` |
 | Domain root alias only | each domain root may contain only `alias.go` as a non-test Go file | `structure.domain-root-alias-only` |
-| Domain model required | each domain must have `model.go` or a non-empty `core/model/` | `structure.domain-model-required` |
+| Domain model required | each domain must have a non-empty `core/model/` | `structure.domain-model-required` |
 | DTO placement | `dto.go` must not be in `domain/` or `infra/` | `structure.dto-placement` |
 
 ---
@@ -459,7 +459,7 @@ internal/domain/audit/
 | `structure.domain-root-alias-required` | CheckStructure | Domain root is missing alias.go |
 | `structure.domain-root-alias-package` | CheckStructure | alias.go package name does not match the domain root |
 | `structure.domain-root-alias-only` | CheckStructure | Domain root contains files other than alias.go |
-| `structure.domain-model-required` | CheckStructure | Domain missing model.go or non-empty core/model/ |
+| `structure.domain-model-required` | CheckStructure | Domain missing non-empty core/model/ |
 | `structure.dto-placement` | CheckStructure | dto.go in domain/ or infra/ |
 
 ## License
