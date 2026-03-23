@@ -126,4 +126,23 @@ func TestCheckLayerDirection(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("module-qualified exclude does not skip matching package", func(t *testing.T) {
+		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
+		if err != nil {
+			t.Fatal(err)
+		}
+		violations := rules.CheckLayerDirection(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid",
+			rules.WithExclude("github.com/kimtaeyun/testproject-dc-invalid/internal/domain/payment/core/model/..."))
+		found := false
+		for _, v := range violations {
+			if v.File == "internal/domain/payment/core/model/pkg_leak.go" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatal("expected module-qualified exclude to be ignored")
+		}
+	})
 }

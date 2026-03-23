@@ -56,4 +56,17 @@ func TestCheckNaming(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("project-relative exclude skips matching files", func(t *testing.T) {
+		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
+		if err != nil {
+			t.Fatal(err)
+		}
+		violations := rules.CheckNaming(pkgs, rules.WithExclude("internal/domain/order/handler/..."))
+		for _, v := range violations {
+			if v.File == "internal/domain/order/handler/http/bad_handler.go" {
+				t.Fatalf("expected order handler naming violations to be excluded, got %s", v.String())
+			}
+		}
+	})
 }

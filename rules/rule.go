@@ -1,6 +1,10 @@
 package rules
 
-import "fmt"
+import (
+	"fmt"
+	"path/filepath"
+	"strings"
+)
 
 type Severity int
 
@@ -51,10 +55,15 @@ func WithSeverity(s Severity) Option {
 }
 
 func WithExclude(patterns ...string) Option {
-	return func(c *Config) { c.ExcludePatterns = append(c.ExcludePatterns, patterns...) }
+	return func(c *Config) {
+		for _, pattern := range patterns {
+			c.ExcludePatterns = append(c.ExcludePatterns, normalizeMatchPath(pattern))
+		}
+	}
 }
 
 func (c Config) IsExcluded(path string) bool {
+	path = normalizeMatchPath(path)
 	for _, p := range c.ExcludePatterns {
 		if matchPattern(p, path) {
 			return true
@@ -64,6 +73,8 @@ func (c Config) IsExcluded(path string) bool {
 }
 
 func matchPattern(pattern, path string) bool {
+	pattern = normalizeMatchPath(pattern)
+	path = normalizeMatchPath(path)
 	if len(pattern) > 3 && pattern[len(pattern)-3:] == "..." {
 		prefix := pattern[:len(pattern)-3]
 		if len(path) >= len(prefix) && path[:len(prefix)] == prefix {
@@ -75,4 +86,12 @@ func matchPattern(pattern, path string) bool {
 		return path == prefix
 	}
 	return pattern == path
+}
+
+func normalizeMatchPath(path string) string {
+	path = filepath.ToSlash(path)
+	for strings.HasPrefix(path, "./") {
+		path = strings.TrimPrefix(path, "./")
+	}
+	return path
 }

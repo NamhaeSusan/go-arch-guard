@@ -197,4 +197,23 @@ func TestCheckDomainIsolation(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("module-qualified exclude does not skip matching package", func(t *testing.T) {
+		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
+		if err != nil {
+			t.Fatal(err)
+		}
+		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid",
+			rules.WithExclude("github.com/kimtaeyun/testproject-dc-invalid/internal/config/..."))
+		found := false
+		for _, v := range violations {
+			if v.File == "internal/config/config.go" || v.File == "internal/config/domain_alias.go" || v.File == "internal/config/orchestration.go" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatal("expected module-qualified exclude to be ignored")
+		}
+	})
 }

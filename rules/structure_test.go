@@ -3,6 +3,7 @@ package rules_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/NamhaeSusan/go-arch-guard/rules"
@@ -225,6 +226,15 @@ func TestCheckStructure(t *testing.T) {
 		}
 		if !foundModelRequired {
 			t.Error("expected domain-model-required violation when core/model is missing")
+		}
+	})
+
+	t.Run("project-relative exclude skips matching directory tree", func(t *testing.T) {
+		violations := rules.CheckStructure("../testdata/invalid", rules.WithExclude("internal/platform/..."))
+		for _, v := range violations {
+			if strings.HasPrefix(v.File, "internal/platform/") {
+				t.Fatalf("expected platform subtree to be excluded, got %s", v.String())
+			}
 		}
 	})
 }
