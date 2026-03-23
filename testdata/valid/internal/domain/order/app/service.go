@@ -1,6 +1,9 @@
 package app
 
-import "github.com/kimtaeyun/testproject-dc/internal/domain/order/core/model"
+import (
+	"github.com/kimtaeyun/testproject-dc/internal/domain/order/core/model"
+	_ "github.com/kimtaeyun/testproject-dc/internal/domain/order/event"
+)
 
 type Service struct{}
 

@@ -112,6 +112,24 @@ func TestCheckDomainIsolation(t *testing.T) {
 		}
 	})
 
+	t.Run("detects unauthorized internal package importing orchestration", func(t *testing.T) {
+		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
+		if err != nil {
+			t.Fatal(err)
+		}
+		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
+		found := false
+		for _, v := range violations {
+			if v.Rule == "isolation.internal-imports-orchestration" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected internal-imports-orchestration violation")
+		}
+	})
+
 	t.Run("detects pkg importing domain", func(t *testing.T) {
 		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
 		if err != nil {
@@ -163,6 +181,20 @@ func TestCheckDomainIsolation(t *testing.T) {
 		}
 		if !found {
 			t.Error("expected domain-imports-orchestration violation")
+		}
+	})
+
+	t.Run("project-relative exclude skips matching package", func(t *testing.T) {
+		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
+		if err != nil {
+			t.Fatal(err)
+		}
+		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid",
+			rules.WithExclude("internal/config/..."))
+		for _, v := range violations {
+			if v.File == "internal/config/config.go" || v.File == "internal/config/domain_alias.go" || v.File == "internal/config/orchestration.go" {
+				t.Fatalf("expected config package to be excluded, got %s", v.String())
+			}
 		}
 	})
 }

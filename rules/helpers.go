@@ -57,3 +57,33 @@ func relativePathForPackage(pkg *packages.Package, path string) string {
 	}
 	return filepath.ToSlash(path)
 }
+
+func isExcludedPackage(cfg Config, pkgPath, projectModule string) bool {
+	return isExcludedAny(cfg, pkgPath, projectRelativePackagePath(pkgPath, projectModule))
+}
+
+func isExcludedAny(cfg Config, paths ...string) bool {
+	for _, path := range paths {
+		if path == "" {
+			continue
+		}
+		if cfg.IsExcluded(filepath.ToSlash(path)) {
+			return true
+		}
+	}
+	return false
+}
+
+func projectRelativePackagePath(pkgPath, projectModule string) string {
+	if pkgPath == "" || projectModule == "" {
+		return ""
+	}
+	if pkgPath == projectModule {
+		return "."
+	}
+	prefix := projectModule + "/"
+	if strings.HasPrefix(pkgPath, prefix) {
+		return strings.TrimPrefix(pkgPath, prefix)
+	}
+	return ""
+}

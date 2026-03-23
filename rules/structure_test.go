@@ -1,6 +1,8 @@
 package rules_test
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/NamhaeSusan/go-arch-guard/rules"
@@ -120,4 +122,95 @@ func TestCheckStructure(t *testing.T) {
 			t.Error("expected dto-placement violation")
 		}
 	})
+
+	t.Run("detects recursive banned package name", func(t *testing.T) {
+		violations := rules.CheckStructure("../testdata/invalid")
+		found := false
+		for _, v := range violations {
+			if v.Rule == "structure.banned-package" && v.File == "internal/platform/common/" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected recursive banned-package violation")
+		}
+	})
+
+	t.Run("detects misplaced handler directory", func(t *testing.T) {
+		violations := rules.CheckStructure("../testdata/invalid")
+		found := false
+		for _, v := range violations {
+			if v.Rule == "structure.legacy-package" && v.File == "internal/platform/handler/" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected misplaced handler legacy-package violation")
+		}
+	})
+
+	t.Run("detects recursive bootstrap directory", func(t *testing.T) {
+		violations := rules.CheckStructure("../testdata/invalid")
+		found := false
+		for _, v := range violations {
+			if v.Rule == "structure.legacy-package" && v.File == "internal/platform/bootstrap/" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected recursive bootstrap legacy-package violation")
+		}
+	})
+
+	t.Run("detects alias package name mismatch", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, filepath.Join(root, "internal", "domain", "billing", "alias.go"), "package billingapi\n")
+		writeFile(t, filepath.Join(root, "internal", "domain", "billing", "core", "model", "billing.go"), "package model\n")
+
+		violations := rules.CheckStructure(root)
+		found := false
+		for _, v := range violations {
+			if v.Rule == "structure.domain-root-alias-package" && v.File == "internal/domain/billing/alias.go" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected domain-root-alias-package violation")
+		}
+	})
+
+	t.Run("detects empty core model directory", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, filepath.Join(root, "internal", "domain", "billing", "alias.go"), "package billing\n")
+		if err := os.MkdirAll(filepath.Join(root, "internal", "domain", "billing", "core", "model"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		writeFile(t, filepath.Join(root, "internal", "domain", "billing", "core", "model", "README.md"), "# placeholder\n")
+
+		violations := rules.CheckStructure(root)
+		found := false
+		for _, v := range violations {
+			if v.Rule == "structure.domain-model-required" && v.File == "internal/domain/billing/" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected domain-model-required violation for empty core/model")
+		}
+	})
+}
+
+func writeFile(t *testing.T, path string, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
 }

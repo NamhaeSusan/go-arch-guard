@@ -76,4 +76,54 @@ func TestCheckLayerDirection(t *testing.T) {
 			t.Error("expected layer.unknown-sublayer violation")
 		}
 	})
+
+	t.Run("detects inner layer importing pkg", func(t *testing.T) {
+		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
+		if err != nil {
+			t.Fatal(err)
+		}
+		violations := rules.CheckLayerDirection(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
+		found := false
+		for _, v := range violations {
+			if v.Rule == "layer.inner-imports-pkg" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected layer.inner-imports-pkg violation")
+		}
+	})
+
+	t.Run("detects handler importing event directly", func(t *testing.T) {
+		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
+		if err != nil {
+			t.Fatal(err)
+		}
+		violations := rules.CheckLayerDirection(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
+		found := false
+		for _, v := range violations {
+			if v.Rule == "layer.direction" && strings.Contains(v.Message, `"handler"`) && strings.Contains(v.Message, `"event"`) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected handler->event layer.direction violation")
+		}
+	})
+
+	t.Run("project-relative exclude skips matching package", func(t *testing.T) {
+		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...")
+		if err != nil {
+			t.Fatal(err)
+		}
+		violations := rules.CheckLayerDirection(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid",
+			rules.WithExclude("internal/domain/payment/core/model/..."))
+		for _, v := range violations {
+			if v.File == "internal/domain/payment/core/model/pkg_leak.go" {
+				t.Fatalf("expected model package to be excluded, got %s", v.String())
+			}
+		}
+	})
 }

@@ -99,6 +99,8 @@ core/
 
 `core/repo/` defines interfaces. `infra/persistence/` implements them. This is the dependency inversion boundary.
 
+Inner layers stay `internal/pkg`-free. `core`, `core/model`, `core/repo`, `core/svc`, and `event` must not import shared support packages directly.
+
 ### orchestration/ — Cross-Domain Flows
 
 When a use case spans multiple domains (e.g., "submit a draft creates a review and notifies users"), the orchestration layer coordinates:
@@ -120,7 +122,7 @@ type DraftSubmit struct {
 }
 ```
 
-**Rule:** Orchestration can only import domain **aliases** (root packages). Importing `domain/user/core/model` directly is a violation.
+**Rule:** Orchestration can only import domain **aliases** (root packages). Importing `domain/user/core/model` directly is a violation. Outside of `cmd/...`, no other non-orchestration package may depend on `internal/orchestration/...`.
 
 ### cmd/ — Composition Root
 
@@ -227,9 +229,11 @@ Run: `go test -run TestArchitecture -v`
 | `internal/pkg/` | `orchestration/` | **No** — `isolation.pkg-imports-orchestration` |
 | `orchestration/` | domain alias (root package) | Yes |
 | `orchestration/` | domain sub-package | **No** — `isolation.orchestration-deep-import` |
+| `cmd/` | `orchestration/` | Yes |
 | `cmd/` | domain alias (root package) | Yes |
 | `cmd/` | domain sub-package | **No** — `isolation.cmd-deep-import` |
 | domain | `orchestration/` | **No** — `isolation.domain-imports-orchestration` |
+| other internal package | `orchestration/` | **No** — `isolation.internal-imports-orchestration` |
 | other internal package | any domain | **No** — `isolation.internal-imports-domain` |
 | domain A | domain B | **No** — `isolation.cross-domain` |
 
@@ -255,6 +259,9 @@ import "mymodule/internal/orchestration"            // isolation.pkg-imports-orc
 // ❌ domain imports orchestration
 import "mymodule/internal/orchestration"            // isolation.domain-imports-orchestration
 
+// ❌ config imports orchestration directly
+import "mymodule/internal/orchestration"            // isolation.internal-imports-orchestration
+
 // ✅ anyone imports shared utilities
 import "mymodule/internal/pkg/db"
 ```
@@ -270,11 +277,11 @@ import "mymodule/internal/pkg/db"
 | from | allowed to import |
 |------|-------------------|
 | `handler` | `app` |
-| `app` | `core/model`, `core/repo`, `core/svc` |
+| `app` | `core/model`, `core/repo`, `core/svc`, `event` |
 | `core/svc` | `core/model` |
 | `core/repo` | `core/model` |
 | `core` | `core/model` |
-| `infra` | `core/repo`, `core/model` |
+| `infra` | `core/repo`, `core/model`, `event` |
 | `event` | `core/model` |
 | `core/model` | (nothing) |
 
@@ -282,6 +289,7 @@ import "mymodule/internal/pkg/db"
 
 Same-sublayer imports (e.g., `handler/http` → `handler/grpc`) are always allowed.
 Packages under `internal/domain/<name>/` must use one of the known sublayers only: `handler`, `app`, `core`, `core/model`, `core/repo`, `core/svc`, `event`, `infra`. Any other sublayer is rejected as `layer.unknown-sublayer`.
+`core`, `core/model`, `core/repo`, `core/svc`, and `event` must not import `internal/pkg/...`; that is reported as `layer.inner-imports-pkg`.
 
 #### Examples
 
@@ -296,6 +304,9 @@ import "mymodule/internal/domain/order/core/repo"    // layer.direction
 
 // ❌ handler imports infra directly
 import "mymodule/internal/domain/order/infra/persistence"  // layer.direction
+
+// ❌ event imports internal/pkg directly
+import "mymodule/internal/pkg/clock"  // layer.inner-imports-pkg
 
 ```
 
@@ -317,12 +328,13 @@ import "mymodule/internal/domain/order/infra/persistence"  // layer.direction
 
 | Rule | Description | Violation |
 |------|-------------|-----------|
-| Banned packages | `util`, `common`, `misc`, `helper`, `shared` under `internal/` | `structure.banned-package` |
-| Legacy packages | `handler`, `app`, `infra`, `router`, `bootstrap` at `internal/` top level | `structure.legacy-package` |
+| Banned packages | `util`, `common`, `misc`, `helper`, `shared` anywhere under `internal/` | `structure.banned-package` |
+| Legacy packages | `router`, `bootstrap`, or misplaced `app`/`handler`/`infra` anywhere under `internal/` | `structure.legacy-package` |
 | Middleware placement | `middleware/` must be under `pkg/` | `structure.middleware-placement` |
 | Domain root alias required | each domain root must define `alias.go` | `structure.domain-root-alias-required` |
+| Domain root alias package | `alias.go` package name must match the domain root name | `structure.domain-root-alias-package` |
 | Domain root alias only | each domain root may contain only `alias.go` as a non-test Go file | `structure.domain-root-alias-only` |
-| Domain model required | each domain must have `model.go` or `core/model/` | `structure.domain-model-required` |
+| Domain model required | each domain must have `model.go` or a non-empty `core/model/` | `structure.domain-model-required` |
 | DTO placement | `dto.go` must not be in `domain/` or `infra/` | `structure.dto-placement` |
 
 ---
@@ -344,13 +356,13 @@ rules.CheckDomainIsolation(pkgs, module, root)
 ```go
 // Exclude a legacy subtree from isolation checks
 rules.CheckDomainIsolation(pkgs, module, root,
-    rules.WithExclude("mymodule/internal/legacy", "mymodule/internal/legacy/..."))
+    rules.WithExclude("internal/legacy/..."))
 
 // Exclude specific domains from naming checks
 rules.CheckNaming(pkgs, rules.WithExclude("internal/domain/auth/..."))
 ```
 
-Pattern `...` matches all sub-paths.
+Pattern `...` matches the root and all sub-paths. Project-relative paths are the preferred format; module-qualified paths are still accepted for backward compatibility.
 
 ---
 
@@ -416,7 +428,7 @@ internal/domain/audit/
 | `rules.CheckStructure(root, opts...)` | Directory structure |
 | `report.AssertNoViolations(t, violations)` | Fail test on Error violations |
 | `rules.WithSeverity(rules.Warning)` | Degrade violations to warnings |
-| `rules.WithExclude("path/...")` | Skip matching packages |
+| `rules.WithExclude("internal/path/...")` | Skip matching packages or files |
 
 ---
 
@@ -431,7 +443,9 @@ internal/domain/audit/
 | `isolation.pkg-imports-domain` | CheckDomainIsolation | pkg/ imports a domain |
 | `isolation.pkg-imports-orchestration` | CheckDomainIsolation | pkg/ imports orchestration |
 | `isolation.domain-imports-orchestration` | CheckDomainIsolation | Domain imports orchestration |
+| `isolation.internal-imports-orchestration` | CheckDomainIsolation | Unauthorized internal package imports orchestration |
 | `layer.direction` | CheckLayerDirection | Wrong layer direction within domain |
+| `layer.inner-imports-pkg` | CheckLayerDirection | Inner domain layer imports internal/pkg |
 | `layer.unknown-sublayer` | CheckLayerDirection | Package uses an unsupported domain sublayer |
 | `naming.no-stutter` | CheckNaming | Type name repeats package name |
 | `naming.no-impl-suffix` | CheckNaming | Type ends with "Impl" |
@@ -439,12 +453,13 @@ internal/domain/audit/
 | `naming.repo-file-interface` | CheckNaming | repo/ file missing matching interface |
 | `naming.no-layer-suffix` | CheckNaming | Filename has redundant layer suffix |
 | `naming.handler-no-exported-interface` | CheckNaming | handler package defines exported interface |
-| `structure.banned-package` | CheckStructure | Package is util/common/misc/helper/shared |
-| `structure.legacy-package` | CheckStructure | Legacy handler/app/infra/router/bootstrap at top level |
+| `structure.banned-package` | CheckStructure | Package uses a banned util/common/misc/helper/shared name |
+| `structure.legacy-package` | CheckStructure | Package uses router/bootstrap or a misplaced app/handler/infra directory |
 | `structure.middleware-placement` | CheckStructure | Middleware not in pkg/ |
 | `structure.domain-root-alias-required` | CheckStructure | Domain root is missing alias.go |
+| `structure.domain-root-alias-package` | CheckStructure | alias.go package name does not match the domain root |
 | `structure.domain-root-alias-only` | CheckStructure | Domain root contains files other than alias.go |
-| `structure.domain-model-required` | CheckStructure | Domain missing model.go or core/model/ |
+| `structure.domain-model-required` | CheckStructure | Domain missing model.go or non-empty core/model/ |
 | `structure.dto-placement` | CheckStructure | dto.go in domain/ or infra/ |
 
 ## License

@@ -65,8 +65,10 @@ func TestIntegration_Invalid(t *testing.T) {
 		structureViolations := rules.CheckStructure("testdata/invalid")
 
 		assertHasRule(t, isolationViolations, "isolation.domain-imports-orchestration")
+		assertHasRule(t, isolationViolations, "isolation.internal-imports-orchestration")
 		assertHasRule(t, isolationViolations, "isolation.pkg-imports-domain")
 		assertHasRule(t, layerViolations, "layer.unknown-sublayer")
+		assertHasRule(t, layerViolations, "layer.inner-imports-pkg")
 		assertHasRule(t, structureViolations, "structure.domain-root-alias-required")
 		assertHasRule(t, structureViolations, "structure.domain-model-required")
 		assertHasRule(t, structureViolations, "structure.dto-placement")

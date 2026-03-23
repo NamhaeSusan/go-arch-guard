@@ -12,10 +12,10 @@ var allowedLayerImports = map[string][]string{
 	// It is exempt from layer direction checks; cross-domain isolation is enforced
 	// separately by CheckDomainIsolation.
 	"handler":    {"app"},
-	"app":        {"core/model", "core/repo", "core/svc"},
+	"app":        {"core/model", "core/repo", "core/svc", "event"},
 	"core/svc":   {"core/model"},
 	"core/repo":  {"core/model"},
-	"infra":      {"core/repo", "core/model"},
+	"infra":      {"core/repo", "core/model", "event"},
 	"event":      {"core/model"},
 	"core/model": {},
 	"core":       {"core/model"},
@@ -32,13 +32,21 @@ var knownSublayers = map[string]bool{
 	"core":       true,
 }
 
+var pkgRestrictedSublayers = map[string]bool{
+	"core":       true,
+	"core/model": true,
+	"core/repo":  true,
+	"core/svc":   true,
+	"event":      true,
+}
+
 func CheckLayerDirection(pkgs []*packages.Package, projectModule string, projectRoot string, opts ...Option) []Violation {
 	cfg := NewConfig(opts...)
 	internalPrefix := projectModule + "/internal/"
 
 	var violations []Violation
 	for _, pkg := range pkgs {
-		if cfg.IsExcluded(pkg.PkgPath) {
+		if isExcludedPackage(cfg, pkg.PkgPath, projectModule) {
 			continue
 		}
 		if !strings.HasPrefix(pkg.PkgPath, internalPrefix) {
@@ -67,8 +75,22 @@ func CheckLayerDirection(pkgs []*packages.Package, projectModule string, project
 				continue
 			}
 
-			// Skip imports to pkg/ or orchestration/
-			if isPkgPkg(impPath, internalPrefix) || isOrchestrationPkg(impPath, internalPrefix) {
+			if isPkgPkg(impPath, internalPrefix) {
+				if pkgRestrictedSublayers[srcSublayer] {
+					violations = append(violations, Violation{
+						File:     findImportFile(pkg, impPath, projectRoot),
+						Line:     findImportLine(pkg, impPath),
+						Rule:     "layer.inner-imports-pkg",
+						Message:  fmt.Sprintf("inner sublayer %q must not import internal/pkg in domain %q", srcSublayer, srcDomain),
+						Fix:      "keep core and event layers self-contained; move shared concerns outward to app, handler, or infra",
+						Severity: cfg.Sev,
+					})
+				}
+				continue
+			}
+
+			// Skip imports to orchestration/
+			if isOrchestrationPkg(impPath, internalPrefix) {
 				continue
 			}
 

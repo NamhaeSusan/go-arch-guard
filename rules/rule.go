@@ -5,7 +5,7 @@ import "fmt"
 type Severity int
 
 const (
-	Error   Severity = iota
+	Error Severity = iota
 	Warning
 )
 
@@ -66,7 +66,13 @@ func (c Config) IsExcluded(path string) bool {
 func matchPattern(pattern, path string) bool {
 	if len(pattern) > 3 && pattern[len(pattern)-3:] == "..." {
 		prefix := pattern[:len(pattern)-3]
-		return len(path) >= len(prefix) && path[:len(prefix)] == prefix
+		if len(path) >= len(prefix) && path[:len(prefix)] == prefix {
+			return true
+		}
+		for len(prefix) > 0 && prefix[len(prefix)-1] == '/' {
+			prefix = prefix[:len(prefix)-1]
+		}
+		return path == prefix
 	}
 	return pattern == path
 }
