@@ -9,7 +9,7 @@ import (
 )
 
 func TestIntegration_Valid(t *testing.T) {
-	pkgs, err := analyzer.Load("testdata/valid", "internal/...")
+	pkgs, err := analyzer.Load("testdata/valid", "internal/...", "cmd/...")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,7 +26,7 @@ func TestIntegration_Valid(t *testing.T) {
 }
 
 func TestIntegration_Invalid(t *testing.T) {
-	pkgs, err := analyzer.Load("testdata/invalid", "internal/...")
+	pkgs, err := analyzer.Load("testdata/invalid", "internal/...", "cmd/...")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestIntegration_Invalid(t *testing.T) {
 }
 
 func TestIntegration_WarningMode(t *testing.T) {
-	pkgs, err := analyzer.Load("testdata/invalid", "internal/...")
+	pkgs, err := analyzer.Load("testdata/invalid", "internal/...", "cmd/...")
 	if err != nil {
 		t.Fatal(err)
 	}

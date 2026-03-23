@@ -9,7 +9,7 @@ import (
 
 func TestCheckDomainIsolation(t *testing.T) {
 	t.Run("valid project has no violations", func(t *testing.T) {
-		pkgs, err := analyzer.Load("../testdata/valid", "internal/...")
+		pkgs, err := analyzer.Load("../testdata/valid", "internal/...", "cmd/...")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -73,6 +73,24 @@ func TestCheckDomainIsolation(t *testing.T) {
 		}
 		if !found {
 			t.Error("expected orchestration-deep-import violation")
+		}
+	})
+
+	t.Run("detects cmd deep import", func(t *testing.T) {
+		pkgs, err := analyzer.Load("../testdata/invalid", "internal/...", "cmd/...")
+		if err != nil {
+			t.Fatal(err)
+		}
+		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
+		found := false
+		for _, v := range violations {
+			if v.Rule == "isolation.cmd-deep-import" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected cmd-deep-import violation")
 		}
 	})
 }

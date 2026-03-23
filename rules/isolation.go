@@ -10,12 +10,39 @@ import (
 func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projectRoot string, opts ...Option) []Violation {
 	cfg := NewConfig(opts...)
 	internalPrefix := projectModule + "/internal/"
+	cmdPrefix := projectModule + "/cmd"
 
 	var violations []Violation
 	for _, pkg := range pkgs {
 		if cfg.IsExcluded(pkg.PkgPath) {
 			continue
 		}
+
+		// Check cmd/ packages: they must only import domain aliases, not sub-packages
+		if pkg.PkgPath == cmdPrefix || strings.HasPrefix(pkg.PkgPath, cmdPrefix+"/") {
+			for impPath := range pkg.Imports {
+				if !strings.HasPrefix(impPath, internalPrefix) {
+					continue
+				}
+				impDomain := identifyDomain(impPath, internalPrefix)
+				if impDomain == "" {
+					continue // not a domain import (pkg/, orchestration/, router/)
+				}
+				if isDomainAlias(impPath, internalPrefix, impDomain) {
+					continue // alias import is allowed
+				}
+				violations = append(violations, Violation{
+					File:     findImportFile(pkg, impPath, projectRoot),
+					Line:     findImportLine(pkg, impPath),
+					Rule:     "isolation.cmd-deep-import",
+					Message:  fmt.Sprintf("cmd/ must only import domain alias, not sub-package %q", impPath),
+					Fix:      fmt.Sprintf("import the domain alias package instead: %sdomain/%s", internalPrefix, impDomain),
+					Severity: cfg.Sev,
+				})
+			}
+			continue
+		}
+
 		if !strings.HasPrefix(pkg.PkgPath, internalPrefix) {
 			continue
 		}
