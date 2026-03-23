@@ -96,6 +96,44 @@ Same-sublayer imports are always allowed. Violation rule: `vertical.internal-lay
 rules.CheckVerticalSliceInternal(pkgs, "github.com/yourmodule", ".")
 ```
 
+### Domain Isolation (`rules.CheckDomainIsolation`)
+
+Enforces cross-domain isolation for domain-centric architecture under `internal/domain/`:
+
+- Same domain imports → always allowed
+- Import `pkg/` → always allowed
+- `pkg/` importing a domain → violation (`isolation.pkg-imports-domain`)
+- `saga/` (non-handler) importing domain alias → allowed
+- `saga/` importing domain sub-package → violation (`isolation.saga-deep-import`)
+- Cross-domain import → violation (`isolation.cross-domain`)
+
+```go
+rules.CheckDomainIsolation(pkgs, "github.com/yourmodule", ".")
+```
+
+### Layer Direction (`rules.CheckLayerDirection`)
+
+Enforces intra-domain layer direction within a domain-centric architecture. Cross-domain, `pkg/`, and `saga/` imports are skipped (handled by `CheckDomainIsolation`).
+
+Allowed imports per sublayer:
+
+| from | allowed to import |
+|------|-------------------|
+| "" (alias) | app |
+| handler | app |
+| app | core/model, core/repo, core/svc |
+| core/svc | core/model |
+| core/repo | core/model |
+| infra | core/repo, core/model |
+| event | core/model |
+| core/model | (nothing) |
+
+Same-sublayer imports are always allowed. Violation rule: `layer.direction`.
+
+```go
+rules.CheckLayerDirection(pkgs, "github.com/yourmodule", ".")
+```
+
 ### Structure (`rules.CheckStructure`)
 
 - **Banned packages** — `util`, `common`, `misc`, `helper`, `shared`
