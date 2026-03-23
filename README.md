@@ -278,11 +278,11 @@ Filesystem checks:
 |------|---------|
 | `structure.banned-package` | `util`, `common`, `misc`, `helper`, `shared` are banned anywhere under `internal/` |
 | `structure.legacy-package` | `router`, `bootstrap`, or misplaced `app`/`handler`/`infra` directories under `internal/` |
-| `structure.middleware-placement` | `middleware/` must live under `internal/pkg/` |
+| `structure.middleware-placement` | `middleware/` must live at `internal/pkg/middleware/` |
 | `structure.domain-root-alias-required` | each domain root must define `alias.go` |
 | `structure.domain-root-alias-package` | `alias.go` package name must match the domain directory |
 | `structure.domain-root-alias-only` | the domain root may contain only `alias.go` as a non-test Go file |
-| `structure.domain-model-required` | each domain must have a non-empty `core/model/` |
+| `structure.domain-model-required` | each domain must have at least one direct non-test Go file in `core/model/` |
 | `structure.dto-placement` | `dto.go` or `*_dto.go` must not live under `domain/` or `infra/` |
 
 ### Naming
@@ -420,11 +420,11 @@ Then remove excludes as the project converges on the target shape.
 | `naming.handler-no-exported-interface` | `CheckNaming` | handler package defines an exported interface |
 | `structure.banned-package` | `CheckStructure` | banned generic package name under `internal/` |
 | `structure.legacy-package` | `CheckStructure` | legacy or misplaced package directory |
-| `structure.middleware-placement` | `CheckStructure` | middleware directory is outside `internal/pkg/` |
+| `structure.middleware-placement` | `CheckStructure` | middleware directory is outside `internal/pkg/middleware/` |
 | `structure.domain-root-alias-required` | `CheckStructure` | domain root is missing `alias.go` |
 | `structure.domain-root-alias-package` | `CheckStructure` | `alias.go` package name mismatches the domain name |
 | `structure.domain-root-alias-only` | `CheckStructure` | domain root contains non-test Go files other than `alias.go` |
-| `structure.domain-model-required` | `CheckStructure` | domain is missing a non-empty `core/model/` |
+| `structure.domain-model-required` | `CheckStructure` | domain is missing a direct non-test Go file in `core/model/` |
 | `structure.dto-placement` | `CheckStructure` | DTO file is placed under `domain/` or `infra/` |
 
 ## License

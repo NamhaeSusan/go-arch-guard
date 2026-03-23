@@ -68,6 +68,25 @@ func TestCheckStructure(t *testing.T) {
 		}
 	})
 
+	t.Run("detects middleware nested under non-root pkg path", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, filepath.Join(root, "internal", "domain", "billing", "alias.go"), "package billing\n")
+		writeFile(t, filepath.Join(root, "internal", "domain", "billing", "core", "model", "billing.go"), "package model\n")
+		writeFile(t, filepath.Join(root, "internal", "domain", "billing", "pkg", "middleware", "auth.go"), "package middleware\n")
+
+		violations := rules.CheckStructure(root)
+		found := false
+		for _, v := range violations {
+			if v.Rule == "structure.middleware-placement" && v.File == "internal/domain/billing/pkg/middleware/" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected middleware nested outside internal/pkg to be rejected")
+		}
+	})
+
 	t.Run("detects extra domain root files beyond alias.go", func(t *testing.T) {
 		violations := rules.CheckStructure("../testdata/invalid")
 		found := false
@@ -202,6 +221,24 @@ func TestCheckStructure(t *testing.T) {
 		}
 		if !found {
 			t.Error("expected domain-model-required violation for empty core/model")
+		}
+	})
+
+	t.Run("detects nested-only core model files", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, filepath.Join(root, "internal", "domain", "billing", "alias.go"), "package billing\n")
+		writeFile(t, filepath.Join(root, "internal", "domain", "billing", "core", "model", "types", "billing.go"), "package types\n")
+
+		violations := rules.CheckStructure(root)
+		found := false
+		for _, v := range violations {
+			if v.Rule == "structure.domain-model-required" && v.File == "internal/domain/billing/" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected domain-model-required violation when core/model has no direct Go files")
 		}
 	})
 

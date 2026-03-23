@@ -209,14 +209,14 @@ func checkMiddlewarePlacement(internalDir string, cfg Config) []Violation {
 		if cfg.IsExcluded(rel + "/") {
 			return nil
 		}
-		if strings.Contains(rel, "pkg/") {
+		if rel == "internal/pkg/middleware" {
 			return nil
 		}
 		violations = append(violations, Violation{
 			File:     rel + "/",
 			Rule:     "structure.middleware-placement",
 			Message:  `middleware found at "` + rel + `"`,
-			Fix:      "move middleware to pkg/middleware/",
+			Fix:      "move middleware to internal/pkg/middleware/",
 			Severity: cfg.Sev,
 		})
 		return nil
@@ -245,8 +245,8 @@ func checkDomainModelRequired(domainDir string, cfg Config) []Violation {
 		violations = append(violations, Violation{
 			File:     relPath + "/",
 			Rule:     "structure.domain-model-required",
-			Message:  `domain "` + e.Name() + `" missing non-empty core/model/`,
-			Fix:      "add at least one non-test Go file under core/model/",
+			Message:  `domain "` + e.Name() + `" missing a direct non-test Go file in core/model/`,
+			Fix:      "add at least one non-test Go file directly under core/model/",
 			Severity: cfg.Sev,
 		})
 	}
