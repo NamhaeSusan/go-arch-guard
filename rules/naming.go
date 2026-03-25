@@ -2,6 +2,8 @@ package rules
 
 import (
 	"go/ast"
+	"go/parser"
+	"go/token"
 	"path/filepath"
 	"strings"
 	"unicode"
@@ -19,6 +21,7 @@ func CheckNaming(pkgs []*packages.Package, opts ...Option) []Violation {
 		violations = append(violations, checkRepoFileInterface(pkg, cfg)...)
 		violations = append(violations, checkNoLayerSuffix(pkg, cfg)...)
 		violations = append(violations, checkHandlerNoExportedInterface(pkg, cfg)...)
+		violations = append(violations, checkNoHandMock(pkg, cfg)...)
 	}
 	return violations
 }
@@ -319,4 +322,97 @@ func checkHandlerNoExportedInterface(pkg *packages.Package, cfg Config) []Violat
 		}
 	}
 	return violations
+}
+
+var handMockPrefixes = []string{"mock", "fake", "stub"}
+
+func checkNoHandMock(pkg *packages.Package, cfg Config) []Violation {
+	if len(pkg.GoFiles) == 0 {
+		return nil
+	}
+	pkgDir := filepath.Dir(pkg.GoFiles[0])
+	testFiles, err := filepath.Glob(filepath.Join(pkgDir, "*_test.go"))
+	if err != nil || len(testFiles) == 0 {
+		return nil
+	}
+
+	var violations []Violation
+	fset := token.NewFileSet()
+	seen := make(map[string]bool)
+	for _, f := range testFiles {
+		if seen[f] {
+			continue
+		}
+		seen[f] = true
+		relPath := relativePathForPackage(pkg, f)
+		if cfg.IsExcluded(relPath) {
+			continue
+		}
+		astFile, err := parser.ParseFile(fset, f, nil, 0)
+		if err != nil {
+			continue
+		}
+		structs := collectMockStructs(fset, astFile)
+		if len(structs) == 0 {
+			continue
+		}
+		baseName := filepath.Base(f)
+		for _, decl := range astFile.Decls {
+			fd, ok := decl.(*ast.FuncDecl)
+			if !ok || fd.Recv == nil || len(fd.Recv.List) == 0 {
+				continue
+			}
+			recvName := receiverTypeName(fd.Recv.List[0].Type)
+			if line, ok := structs[recvName]; ok {
+				violations = append(violations, Violation{
+					File:     relPath,
+					Line:     line,
+					Rule:     "naming.no-handmock",
+					Message:  `test file "` + baseName + `" defines hand-rolled mock "` + recvName + `" with methods — use mockery instead`,
+					Fix:      "generate mock with mockery and import from mocks/ package",
+					Severity: cfg.Sev,
+				})
+				delete(structs, recvName)
+			}
+		}
+	}
+	return violations
+}
+
+func collectMockStructs(fset *token.FileSet, file *ast.File) map[string]int {
+	result := make(map[string]int)
+	for _, decl := range file.Decls {
+		gd, ok := decl.(*ast.GenDecl)
+		if !ok {
+			continue
+		}
+		for _, spec := range gd.Specs {
+			ts, ok := spec.(*ast.TypeSpec)
+			if !ok {
+				continue
+			}
+			if _, ok := ts.Type.(*ast.StructType); !ok {
+				continue
+			}
+			name := ts.Name.Name
+			lower := strings.ToLower(name)
+			for _, prefix := range handMockPrefixes {
+				if strings.HasPrefix(lower, prefix) {
+					result[name] = fset.Position(ts.Name.Pos()).Line
+					break
+				}
+			}
+		}
+	}
+	return result
+}
+
+func receiverTypeName(expr ast.Expr) string {
+	if star, ok := expr.(*ast.StarExpr); ok {
+		expr = star.X
+	}
+	if ident, ok := expr.(*ast.Ident); ok {
+		return ident.Name
+	}
+	return ""
 }

@@ -84,4 +84,42 @@ func TestCheckNaming(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("detects hand-rolled mock in test file", func(t *testing.T) {
+		pkgs := loadInvalid(t)
+		violations := rules.CheckNaming(pkgs)
+		found := false
+		for _, v := range violations {
+			if v.Rule == "naming.no-handmock" {
+				found = true
+				if !strings.Contains(v.Message, "mockOrderRepo") {
+					t.Errorf("expected message to mention mockOrderRepo, got %q", v.Message)
+				}
+				break
+			}
+		}
+		if !found {
+			t.Error("expected naming.no-handmock violation for hand-rolled mock")
+		}
+	})
+
+	t.Run("valid project has no handmock violations", func(t *testing.T) {
+		pkgs := loadValid(t)
+		violations := rules.CheckNaming(pkgs)
+		for _, v := range violations {
+			if v.Rule == "naming.no-handmock" {
+				t.Errorf("unexpected naming.no-handmock violation: %s", v.String())
+			}
+		}
+	})
+
+	t.Run("exclude skips handmock check", func(t *testing.T) {
+		pkgs := loadInvalid(t)
+		violations := rules.CheckNaming(pkgs, rules.WithExclude("internal/domain/order/app/..."))
+		for _, v := range violations {
+			if v.Rule == "naming.no-handmock" {
+				t.Errorf("expected handmock violation to be excluded, got %s", v.String())
+			}
+		}
+	})
 }
