@@ -326,6 +326,10 @@ func checkHandlerNoExportedInterface(pkg *packages.Package, cfg Config) []Violat
 
 var handMockPrefixes = []string{"mock", "fake", "stub"}
 
+// checkNoHandMock detects hand-rolled mock structs in _test.go files.
+// Limitation: external test packages (package foo_test) are not covered
+// because the loader does not set Tests: true, so those packages have
+// empty GoFiles and are skipped.
 func checkNoHandMock(pkg *packages.Package, cfg Config) []Violation {
 	if len(pkg.GoFiles) == 0 {
 		return nil

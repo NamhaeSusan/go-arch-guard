@@ -88,18 +88,21 @@ func TestCheckNaming(t *testing.T) {
 	t.Run("detects hand-rolled mock in test file", func(t *testing.T) {
 		pkgs := loadInvalid(t)
 		violations := rules.CheckNaming(pkgs)
-		found := false
+		wantMocks := map[string]bool{"mockOrderRepo": false, "fakeNotifier": false}
 		for _, v := range violations {
-			if v.Rule == "naming.no-handmock" {
-				found = true
-				if !strings.Contains(v.Message, "mockOrderRepo") {
-					t.Errorf("expected message to mention mockOrderRepo, got %q", v.Message)
+			if v.Rule != "naming.no-handmock" {
+				continue
+			}
+			for name := range wantMocks {
+				if strings.Contains(v.Message, name) {
+					wantMocks[name] = true
 				}
-				break
 			}
 		}
-		if !found {
-			t.Error("expected naming.no-handmock violation for hand-rolled mock")
+		for name, found := range wantMocks {
+			if !found {
+				t.Errorf("expected naming.no-handmock violation for %s", name)
+			}
 		}
 	})
 
