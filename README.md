@@ -315,6 +315,7 @@ This rule set is intentionally more opinionated than the boundary rules.
 | `naming.repo-file-interface` | a file under `repo/` does not define the matching interface |
 | `naming.no-layer-suffix` | file name redundantly repeats the layer name |
 | `naming.handler-no-exported-interface` | handler package defines an exported interface |
+| `naming.no-handmock` | test file defines a hand-rolled mock/fake/stub struct with methods |
 
 ## Options
 

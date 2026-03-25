@@ -20,6 +20,7 @@ After every task, leave a record in the `claude_history/` folder.
 
 After any code change, update related documentation (README.md, docs/).
 CLAUDE.md and README.md must be kept in sync.
+SKILL.md must also be updated when rules or API surface changes.
 
 ---
 

@@ -146,7 +146,7 @@ rules.CheckDomainIsolation(pkgs, "", "",
 |----------|--------|
 | Package names | `util`, `common`, `misc`, `helper`, `shared`, `services` |
 | Legacy dirs | `router`, `bootstrap`, misplaced `app`/`handler`/`infra` under `internal/` |
-| Naming | type stuttering (`order.OrderService`), `Impl` suffix, non-snake_case files |
+| Naming | type stuttering (`order.OrderService`), `Impl` suffix, non-snake_case files, hand-rolled mocks in `_test.go` |
 | Placement | `middleware/` must be at `internal/pkg/middleware/` |
 | DTOs | `dto.go` in `core/`, `event/`, `infra/` (allowed in `handler/`, `app/`) |
 
