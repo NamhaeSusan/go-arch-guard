@@ -31,7 +31,12 @@ go get github.com/NamhaeSusan/go-arch-guard
 
 ## Claude Code Plugin
 
-This repository can also be used as a Claude Code plugin marketplace. Add the marketplace, then install the bundled `go-arch-guard` plugin:
+This repository can also be used as a Claude Code plugin marketplace.
+
+Install it in Claude Code:
+
+1. Add this repository as a marketplace.
+2. Install the bundled `go-arch-guard` plugin.
 
 ```text
 /plugin marketplace add NamhaeSusan/go-arch-guard
