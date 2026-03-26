@@ -243,12 +243,18 @@ func checkDomainAliasNoInterface(domainDir string, cfg Config) []Violation {
 									parts := strings.Split(impPath, "/")
 									alias = parts[len(parts)-1]
 								}
-								if alias == ident.Name && strings.Contains(impPath, "/core/svc") {
+								isSvc := strings.Contains(impPath, "/core/svc")
+								isRepo := strings.Contains(impPath, "/core/repo")
+								if alias == ident.Name && (isSvc || isRepo) {
+									src := "core/svc"
+									if isRepo {
+										src = "core/repo"
+									}
 									violations = append(violations, Violation{
 										File:     relPath + "/alias.go",
 										Line:     fset.Position(ts.Name.Pos()).Line,
 										Rule:     "structure.domain-alias-no-interface",
-										Message:  `alias.go re-exports "` + ts.Name.Name + `" from core/svc — suspected cross-domain dependency; use orchestration/ instead`,
+										Message:  `alias.go re-exports "` + ts.Name.Name + `" from ` + src + ` — suspected cross-domain dependency; use orchestration/ instead`,
 										Fix:      "move cross-domain coordination to orchestration/handler/ or orchestration/",
 										Severity: cfg.Sev,
 									})
