@@ -29,6 +29,21 @@ Architecture usually decays through a few broad mistakes, not through deep theor
 go get github.com/NamhaeSusan/go-arch-guard
 ```
 
+## Claude Code Plugin
+
+This repository can also be used as a Claude Code plugin marketplace. Add the marketplace, then install the bundled `go-arch-guard` plugin:
+
+```text
+/plugin marketplace add NamhaeSusan/go-arch-guard
+/plugin install go-arch-guard@go-arch-guard-marketplace
+```
+
+Validate the marketplace/plugin layout locally with:
+
+```bash
+claude plugin validate .
+```
+
 ## Quick Start
 
 Create `architecture_test.go` in your project root:
