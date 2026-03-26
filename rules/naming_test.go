@@ -21,18 +21,24 @@ func TestCheckNaming(t *testing.T) {
 		}
 	})
 
-	t.Run("detects handler exported interface", func(t *testing.T) {
+	t.Run("detects handler interface definitions", func(t *testing.T) {
 		pkgs := loadInvalid(t)
 		violations := rules.CheckNaming(pkgs)
-		found := false
+		wantIfaces := map[string]bool{"Service": false, "auditLogger": false}
 		for _, v := range violations {
-			if v.Rule == "naming.handler-no-exported-interface" {
-				found = true
-				break
+			if v.Rule != "naming.handler-no-interface" {
+				continue
+			}
+			for name := range wantIfaces {
+				if strings.Contains(v.Message, `"`+name+`"`) {
+					wantIfaces[name] = true
+				}
 			}
 		}
-		if !found {
-			t.Error("expected handler-no-exported-interface violation")
+		for name, found := range wantIfaces {
+			if !found {
+				t.Errorf("expected naming.handler-no-interface violation for %s", name)
+			}
 		}
 	})
 

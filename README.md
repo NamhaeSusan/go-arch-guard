@@ -314,7 +314,7 @@ This rule set is intentionally more opinionated than the boundary rules.
 | `naming.snake-case-file` | file name is not snake_case |
 | `naming.repo-file-interface` | a file under `repo/` does not define the matching interface |
 | `naming.no-layer-suffix` | file name redundantly repeats the layer name |
-| `naming.handler-no-exported-interface` | handler package defines an exported interface |
+| `naming.handler-no-interface` | handler package defines an interface (use concrete app.Service or orchestration) |
 | `naming.no-handmock` | test file defines a hand-rolled mock/fake/stub struct with methods |
 
 ## Options

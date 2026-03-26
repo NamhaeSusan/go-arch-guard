@@ -20,7 +20,7 @@ func CheckNaming(pkgs []*packages.Package, opts ...Option) []Violation {
 		violations = append(violations, checkSnakeCaseFiles(pkg, cfg)...)
 		violations = append(violations, checkRepoFileInterface(pkg, cfg)...)
 		violations = append(violations, checkNoLayerSuffix(pkg, cfg)...)
-		violations = append(violations, checkHandlerNoExportedInterface(pkg, cfg)...)
+		violations = append(violations, checkHandlerNoInterface(pkg, cfg)...)
 		violations = append(violations, checkNoHandMock(pkg, cfg)...)
 	}
 	return violations
@@ -287,7 +287,7 @@ func isHandlerPackage(pkgPath string) bool {
 		strings.Contains(pkgPath, "/handler/")
 }
 
-func checkHandlerNoExportedInterface(pkg *packages.Package, cfg Config) []Violation {
+func checkHandlerNoInterface(pkg *packages.Package, cfg Config) []Violation {
 	if !isHandlerPackage(pkg.PkgPath) {
 		return nil
 	}
@@ -304,7 +304,7 @@ func checkHandlerNoExportedInterface(pkg *packages.Package, cfg Config) []Violat
 			}
 			for _, spec := range gd.Specs {
 				ts, ok := spec.(*ast.TypeSpec)
-				if !ok || !ts.Name.IsExported() {
+				if !ok {
 					continue
 				}
 				if _, isIface := ts.Type.(*ast.InterfaceType); isIface {
@@ -312,9 +312,9 @@ func checkHandlerNoExportedInterface(pkg *packages.Package, cfg Config) []Violat
 					violations = append(violations, Violation{
 						File:     relativePathForPackage(pkg, pos.Filename),
 						Line:     pos.Line,
-						Rule:     "naming.handler-no-exported-interface",
-						Message:  `handler package defines exported interface "` + ts.Name.Name + `"`,
-						Fix:      "use *app.Service concrete type instead; define test interfaces in _test.go",
+						Rule:     "naming.handler-no-interface",
+						Message:  `handler package defines interface "` + ts.Name.Name + `" — inject via app.Service or orchestration instead`,
+						Fix:      "remove interface and use concrete type from app/ or orchestration/",
 						Severity: cfg.Sev,
 					})
 				}
