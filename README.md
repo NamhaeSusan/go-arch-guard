@@ -298,6 +298,7 @@ import "mymodule/internal/pkg/clock" // layer.inner-imports-pkg
 | `structure.domain-root-alias-required` | each domain root must define `alias.go` |
 | `structure.domain-root-alias-package` | `alias.go` package name must match the domain directory |
 | `structure.domain-root-alias-only` | the domain root may contain only `alias.go` as a non-test Go file |
+| `structure.domain-alias-no-interface` | `alias.go` must not re-export interfaces — suspected cross-domain dependency |
 | `structure.domain-model-required` | each domain must have at least one direct non-test Go file in `core/model/` |
 | `structure.dto-placement` | `dto.go` or `*_dto.go` must not live in inner domain layers (`core/`, `event/`) or `infra/`; allowed in `handler/` and `app/` |
 

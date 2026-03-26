@@ -437,6 +437,20 @@ func TestCheckStructure(t *testing.T) {
 		}
 	})
 
+	t.Run("detects interface in alias.go", func(t *testing.T) {
+		violations := rules.CheckStructure("../testdata/invalid")
+		found := false
+		for _, v := range violations {
+			if v.Rule == "structure.domain-alias-no-interface" && strings.Contains(v.Message, "CrossDomainOps") {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected domain-alias-no-interface violation for CrossDomainOps")
+		}
+	})
+
 	t.Run("project-relative exclude skips matching directory tree", func(t *testing.T) {
 		violations := rules.CheckStructure("../testdata/invalid", rules.WithExclude("internal/platform/..."))
 		for _, v := range violations {

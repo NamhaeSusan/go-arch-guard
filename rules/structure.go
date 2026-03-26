@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"io/fs"
@@ -26,6 +27,7 @@ func CheckStructure(projectRoot string, opts ...Option) []Violation {
 	violations = append(violations, checkDomainRootAliasRequired(domainDir, cfg)...)
 	violations = append(violations, checkDomainRootAliasPackage(domainDir, cfg)...)
 	violations = append(violations, checkDomainRootAliasOnly(domainDir, cfg)...)
+	violations = append(violations, checkDomainAliasNoInterface(domainDir, cfg)...)
 	violations = append(violations, checkDomainModelRequired(domainDir, cfg)...)
 	violations = append(violations, checkDTOPlacement(internalDir, cfg)...)
 
@@ -174,6 +176,88 @@ func checkDomainRootAliasOnly(domainDir string, cfg Config) []Violation {
 				Fix:      `move "` + name + `" into a sub-package or merge the public API into alias.go`,
 				Severity: cfg.Sev,
 			})
+		}
+	}
+	return violations
+}
+
+func checkDomainAliasNoInterface(domainDir string, cfg Config) []Violation {
+	var violations []Violation
+	entries, err := os.ReadDir(domainDir)
+	if err != nil {
+		return nil
+	}
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		relPath := filepath.ToSlash(filepath.Join("internal", "domain", e.Name()))
+		if cfg.IsExcluded(relPath + "/") {
+			continue
+		}
+		aliasPath := filepath.Join(domainDir, e.Name(), "alias.go")
+		if _, err := os.Stat(aliasPath); err != nil {
+			continue
+		}
+		fset := token.NewFileSet()
+		file, err := parser.ParseFile(fset, aliasPath, nil, 0)
+		if err != nil {
+			continue
+		}
+		for _, decl := range file.Decls {
+			gd, ok := decl.(*ast.GenDecl)
+			if !ok {
+				continue
+			}
+			for _, spec := range gd.Specs {
+				ts, ok := spec.(*ast.TypeSpec)
+				if !ok {
+					continue
+				}
+				// type alias: ts.Assign != 0, check if the underlying type is interface
+				// direct interface definition: ts.Type is *ast.InterfaceType
+				if _, isIface := ts.Type.(*ast.InterfaceType); isIface {
+					violations = append(violations, Violation{
+						File:     relPath + "/alias.go",
+						Line:     fset.Position(ts.Name.Pos()).Line,
+						Rule:     "structure.domain-alias-no-interface",
+						Message:  `alias.go re-exports interface "` + ts.Name.Name + `" — suspected cross-domain dependency; use orchestration/ instead`,
+						Fix:      "move cross-domain coordination to orchestration/handler/ or orchestration/",
+						Severity: cfg.Sev,
+					})
+				}
+				// type alias to an interface from another package (e.g., type AdminOps = svc.AdminOps)
+				// This is a SelectorExpr, not InterfaceType — we can't know if it's an interface
+				// from AST alone. But we CAN flag all type aliases that reference core/svc/
+				if ts.Assign != 0 {
+					if sel, ok := ts.Type.(*ast.SelectorExpr); ok {
+						if ident, ok := sel.X.(*ast.Ident); ok {
+							// Check if the alias source looks like a svc/repo-adjacent import
+							// We check imports to see what package the identifier refers to
+							for _, imp := range file.Imports {
+								impPath := strings.Trim(imp.Path.Value, `"`)
+								alias := ""
+								if imp.Name != nil {
+									alias = imp.Name.Name
+								} else {
+									parts := strings.Split(impPath, "/")
+									alias = parts[len(parts)-1]
+								}
+								if alias == ident.Name && strings.Contains(impPath, "/core/svc") {
+									violations = append(violations, Violation{
+										File:     relPath + "/alias.go",
+										Line:     fset.Position(ts.Name.Pos()).Line,
+										Rule:     "structure.domain-alias-no-interface",
+										Message:  `alias.go re-exports "` + ts.Name.Name + `" from core/svc — suspected cross-domain dependency; use orchestration/ instead`,
+										Fix:      "move cross-domain coordination to orchestration/handler/ or orchestration/",
+										Severity: cfg.Sev,
+									})
+								}
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 	return violations
