@@ -152,7 +152,30 @@ rules.CheckDomainIsolation(pkgs, "", "",
 
 ---
 
-## 7. Common Setup Scenarios
+## 7. Cross-Domain Interface 금지 원칙 (CRITICAL)
+
+도메인 내에서 interface는 **`core/repo/`에만** 정의할 수 있으며, 이는 **infra가 구현하는 persistence 추상화 전용**입니다.
+
+### 위반 시 올바른 수정 방향
+
+cross-domain 데이터가 필요한 endpoint는 **도메인 handler가 아닌 `orchestration/handler/http/`로 이동**해야 합니다. interface를 다른 패키지로 옮기는 것은 해결이 아닙니다.
+
+### 금지되는 우회 패턴
+
+| 우회 시도 | 잡는 규칙 |
+|----------|----------|
+| handler/app/core/svc에서 interface 정의 | `naming.domain-interface-repo-only` |
+| app에서 core/repo interface를 type alias | `naming.domain-interface-repo-only` |
+| alias.go에서 interface re-export | `structure.domain-alias-no-interface` |
+| alias.go에서 core/repo, core/svc type alias | `structure.domain-alias-no-interface` |
+
+### core/repo에 cross-domain interface를 넣지 말 것
+
+`core/repo/`는 persistence interface 전용입니다. `GetUserByID`, `SetUserActive` 같은 다른 도메인 조작 메서드는 repo에 넣지 마세요. 이런 기능이 필요하면 해당 endpoint를 `orchestration/handler/http/`로 이동하세요.
+
+---
+
+## 8. Common Setup Scenarios
 
 ### New project from scratch
 
