@@ -21,12 +21,13 @@ func TestCheckNaming(t *testing.T) {
 		}
 	})
 
-	t.Run("detects handler interface definitions", func(t *testing.T) {
+	t.Run("detects interface outside core/repo in domain", func(t *testing.T) {
 		pkgs := loadInvalid(t)
 		violations := rules.CheckNaming(pkgs)
-		wantIfaces := map[string]bool{"Service": false, "auditLogger": false}
+		// handler has Service + auditLogger, app has AdminOps
+		wantIfaces := map[string]bool{"Service": false, "auditLogger": false, "AdminOps": false}
 		for _, v := range violations {
-			if v.Rule != "naming.handler-no-interface" {
+			if v.Rule != "naming.domain-interface-repo-only" {
 				continue
 			}
 			for name := range wantIfaces {
@@ -37,7 +38,7 @@ func TestCheckNaming(t *testing.T) {
 		}
 		for name, found := range wantIfaces {
 			if !found {
-				t.Errorf("expected naming.handler-no-interface violation for %s", name)
+				t.Errorf("expected naming.domain-interface-repo-only violation for %s", name)
 			}
 		}
 	})
@@ -88,21 +89,6 @@ func TestCheckNaming(t *testing.T) {
 			if v.File == "internal/domain/order/handler/http/bad_handler.go" {
 				t.Fatalf("expected order handler naming violations to be excluded, got %s", v.String())
 			}
-		}
-	})
-
-	t.Run("detects app interface definition", func(t *testing.T) {
-		pkgs := loadInvalid(t)
-		violations := rules.CheckNaming(pkgs)
-		found := false
-		for _, v := range violations {
-			if v.Rule == "naming.app-no-interface" && strings.Contains(v.Message, "AdminOps") {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Error("expected naming.app-no-interface violation for AdminOps")
 		}
 	})
 

@@ -20,8 +20,7 @@ func CheckNaming(pkgs []*packages.Package, opts ...Option) []Violation {
 		violations = append(violations, checkSnakeCaseFiles(pkg, cfg)...)
 		violations = append(violations, checkRepoFileInterface(pkg, cfg)...)
 		violations = append(violations, checkNoLayerSuffix(pkg, cfg)...)
-		violations = append(violations, checkHandlerNoInterface(pkg, cfg)...)
-		violations = append(violations, checkAppNoInterface(pkg, cfg)...)
+		violations = append(violations, checkDomainInterfaceRepoOnly(pkg, cfg)...)
 		violations = append(violations, checkNoHandMock(pkg, cfg)...)
 	}
 	return violations
@@ -283,13 +282,17 @@ func checkNoLayerSuffix(pkg *packages.Package, cfg Config) []Violation {
 	return violations
 }
 
-func isHandlerPackage(pkgPath string) bool {
-	return strings.HasSuffix(pkgPath, "/handler") ||
-		strings.Contains(pkgPath, "/handler/")
+func isDomainPackage(pkgPath string) bool {
+	return strings.Contains(pkgPath, "/domain/")
 }
 
-func checkHandlerNoInterface(pkg *packages.Package, cfg Config) []Violation {
-	if !isHandlerPackage(pkg.PkgPath) {
+func isRepoPackageByPath(pkgPath string) bool {
+	return strings.HasSuffix(pkgPath, "/core/repo") ||
+		strings.Contains(pkgPath, "/core/repo/")
+}
+
+func checkDomainInterfaceRepoOnly(pkg *packages.Package, cfg Config) []Violation {
+	if !isDomainPackage(pkg.PkgPath) || isRepoPackageByPath(pkg.PkgPath) {
 		return nil
 	}
 	var violations []Violation
@@ -313,51 +316,9 @@ func checkHandlerNoInterface(pkg *packages.Package, cfg Config) []Violation {
 					violations = append(violations, Violation{
 						File:     relativePathForPackage(pkg, pos.Filename),
 						Line:     pos.Line,
-						Rule:     "naming.handler-no-interface",
-						Message:  `handler package defines interface "` + ts.Name.Name + `" — inject via app.Service or orchestration instead`,
-						Fix:      "remove interface and use concrete type from app/ or orchestration/",
-						Severity: cfg.Sev,
-					})
-				}
-			}
-		}
-	}
-	return violations
-}
-
-func isAppPackage(pkgPath string) bool {
-	return strings.HasSuffix(pkgPath, "/app") ||
-		strings.Contains(pkgPath, "/app/")
-}
-
-func checkAppNoInterface(pkg *packages.Package, cfg Config) []Violation {
-	if !isAppPackage(pkg.PkgPath) {
-		return nil
-	}
-	var violations []Violation
-	for _, file := range pkg.Syntax {
-		filePath := relativePathForPackage(pkg, pkg.Fset.Position(file.Pos()).Filename)
-		if cfg.IsExcluded(filePath) {
-			continue
-		}
-		for _, decl := range file.Decls {
-			gd, ok := decl.(*ast.GenDecl)
-			if !ok {
-				continue
-			}
-			for _, spec := range gd.Specs {
-				ts, ok := spec.(*ast.TypeSpec)
-				if !ok {
-					continue
-				}
-				if _, isIface := ts.Type.(*ast.InterfaceType); isIface {
-					pos := pkg.Fset.Position(ts.Name.Pos())
-					violations = append(violations, Violation{
-						File:     relativePathForPackage(pkg, pos.Filename),
-						Line:     pos.Line,
-						Rule:     "naming.app-no-interface",
-						Message:  `app package defines interface "` + ts.Name.Name + `" — define in core/repo or core/svc instead`,
-						Fix:      "move interface to core/repo/ or core/svc/",
+						Rule:     "naming.domain-interface-repo-only",
+						Message:  `interface "` + ts.Name.Name + `" must be defined in core/repo/, not in ` + filepath.Base(filepath.Dir(pkg.PkgPath)) + `/`,
+						Fix:      "move interface to core/repo/",
 						Severity: cfg.Sev,
 					})
 				}
