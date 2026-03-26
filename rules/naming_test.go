@@ -24,8 +24,8 @@ func TestCheckNaming(t *testing.T) {
 	t.Run("detects interface outside core/repo in domain", func(t *testing.T) {
 		pkgs := loadInvalid(t)
 		violations := rules.CheckNaming(pkgs)
-		// handler has Service + auditLogger, app has AdminOps
-		wantIfaces := map[string]bool{"Service": false, "auditLogger": false, "AdminOps": false}
+		// handler: Service + auditLogger (direct), app: AdminOps (direct) + OrderRepo (alias)
+		wantIfaces := map[string]bool{"Service": false, "auditLogger": false, "AdminOps": false, "OrderRepo": false}
 		for _, v := range violations {
 			if v.Rule != "naming.domain-interface-repo-only" {
 				continue

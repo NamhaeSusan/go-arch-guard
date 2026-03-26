@@ -311,6 +311,7 @@ func checkDomainInterfaceRepoOnly(pkg *packages.Package, cfg Config) []Violation
 				if !ok {
 					continue
 				}
+				// Direct interface definition
 				if _, isIface := ts.Type.(*ast.InterfaceType); isIface {
 					pos := pkg.Fset.Position(ts.Name.Pos())
 					violations = append(violations, Violation{
@@ -321,6 +322,34 @@ func checkDomainInterfaceRepoOnly(pkg *packages.Package, cfg Config) []Violation
 						Fix:      "move interface to core/repo/",
 						Severity: cfg.Sev,
 					})
+				}
+				// Type alias from core/repo (re-exporting interface)
+				if ts.Assign != 0 {
+					if sel, ok := ts.Type.(*ast.SelectorExpr); ok {
+						if ident, ok := sel.X.(*ast.Ident); ok {
+							for _, imp := range file.Imports {
+								impPath := strings.Trim(imp.Path.Value, `"`)
+								alias := ""
+								if imp.Name != nil {
+									alias = imp.Name.Name
+								} else {
+									parts := strings.Split(impPath, "/")
+									alias = parts[len(parts)-1]
+								}
+								if alias == ident.Name && strings.Contains(impPath, "/core/repo") {
+									pos := pkg.Fset.Position(ts.Name.Pos())
+									violations = append(violations, Violation{
+										File:     relativePathForPackage(pkg, pos.Filename),
+										Line:     pos.Line,
+										Rule:     "naming.domain-interface-repo-only",
+										Message:  `type alias "` + ts.Name.Name + `" re-exports interface from core/repo — suspected cross-domain dependency; use orchestration/ instead`,
+										Fix:      "remove alias and move cross-domain coordination to orchestration/",
+										Severity: cfg.Sev,
+									})
+								}
+							}
+						}
+					}
 				}
 			}
 		}

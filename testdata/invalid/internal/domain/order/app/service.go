@@ -1,11 +1,17 @@
 package app
 
-import "github.com/kimtaeyun/testproject-dc-invalid/internal/domain/order/core/model"
+import (
+	"github.com/kimtaeyun/testproject-dc-invalid/internal/domain/order/core/model"
+	"github.com/kimtaeyun/testproject-dc-invalid/internal/domain/order/core/repo"
+)
 
-// VIOLATION: app package defines interface (should be in core/repo or core/svc)
+// VIOLATION: app package defines interface
 type AdminOps interface {
 	GetUserByID(id string) (string, error)
 }
+
+// VIOLATION: type alias re-exports interface from core/repo
+type OrderRepo = repo.Repository
 
 type Service struct{}
 
