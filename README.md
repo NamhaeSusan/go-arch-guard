@@ -1,5 +1,7 @@
 # go-arch-guard
 
+[한국어](README.ko.md)
+
 Architecture guardrails for Go projects via `go test`.
 
 Define isolation, layer-direction, structure, and naming rules, then fail regular tests when the project shape drifts. No CLI to learn. No separate config format. Just Go tests.
