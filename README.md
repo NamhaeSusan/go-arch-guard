@@ -216,6 +216,17 @@ Purpose:
 - force external access through the domain root package
 - keep orchestration and `pkg` from becoming hidden dependency shortcuts
 
+| Rule | Meaning |
+|------|---------|
+| `isolation.cross-domain` | domain A must not import domain B |
+| `isolation.cmd-deep-import` | `cmd/` must only import domain roots, not sub-packages |
+| `isolation.orchestration-deep-import` | `orchestration/` must only import domain roots, not sub-packages |
+| `isolation.pkg-imports-domain` | `pkg/` must not import any domain |
+| `isolation.pkg-imports-orchestration` | `pkg/` must not import orchestration |
+| `isolation.domain-imports-orchestration` | domains must not import orchestration |
+| `isolation.internal-imports-orchestration` | non-cmd/orchestration packages must not import orchestration |
+| `isolation.internal-imports-domain` | unregistered internal packages must not import domains |
+
 Import matrix:
 
 | from | to | allowed? |
@@ -245,6 +256,12 @@ Purpose:
 - enforce allowed intra-domain dependency direction
 - reject unknown domain sublayers
 - keep inner layers free of `internal/pkg/...`
+
+| Rule | Meaning |
+|------|---------|
+| `layer.direction` | import violates the allowed layer direction |
+| `layer.inner-imports-pkg` | inner layer (`core/*`, `event`) imports `internal/pkg/` |
+| `layer.unknown-sublayer` | unknown sublayer found in domain |
 
 Allowed imports inside one domain:
 
@@ -315,7 +332,7 @@ This rule set is intentionally more opinionated than the boundary rules.
 | `naming.snake-case-file` | file name is not snake_case |
 | `naming.repo-file-interface` | a file under `repo/` does not define the matching interface |
 | `naming.no-layer-suffix` | file name redundantly repeats the layer name |
-| `naming.domain-interface-repo-only` | domain interface defined outside core/repo/ (the only allowed location) |
+| `naming.domain-interface-repo-only` | domain interface defined outside `core/repo/`, or type alias re-exporting `core/repo` interface |
 | `naming.no-handmock` | test file defines a hand-rolled mock/fake/stub struct with methods |
 
 ## Options
