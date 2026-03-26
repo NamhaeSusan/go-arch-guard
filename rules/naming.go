@@ -21,6 +21,7 @@ func CheckNaming(pkgs []*packages.Package, opts ...Option) []Violation {
 		violations = append(violations, checkRepoFileInterface(pkg, cfg)...)
 		violations = append(violations, checkNoLayerSuffix(pkg, cfg)...)
 		violations = append(violations, checkHandlerNoInterface(pkg, cfg)...)
+		violations = append(violations, checkAppNoInterface(pkg, cfg)...)
 		violations = append(violations, checkNoHandMock(pkg, cfg)...)
 	}
 	return violations
@@ -315,6 +316,48 @@ func checkHandlerNoInterface(pkg *packages.Package, cfg Config) []Violation {
 						Rule:     "naming.handler-no-interface",
 						Message:  `handler package defines interface "` + ts.Name.Name + `" — inject via app.Service or orchestration instead`,
 						Fix:      "remove interface and use concrete type from app/ or orchestration/",
+						Severity: cfg.Sev,
+					})
+				}
+			}
+		}
+	}
+	return violations
+}
+
+func isAppPackage(pkgPath string) bool {
+	return strings.HasSuffix(pkgPath, "/app") ||
+		strings.Contains(pkgPath, "/app/")
+}
+
+func checkAppNoInterface(pkg *packages.Package, cfg Config) []Violation {
+	if !isAppPackage(pkg.PkgPath) {
+		return nil
+	}
+	var violations []Violation
+	for _, file := range pkg.Syntax {
+		filePath := relativePathForPackage(pkg, pkg.Fset.Position(file.Pos()).Filename)
+		if cfg.IsExcluded(filePath) {
+			continue
+		}
+		for _, decl := range file.Decls {
+			gd, ok := decl.(*ast.GenDecl)
+			if !ok {
+				continue
+			}
+			for _, spec := range gd.Specs {
+				ts, ok := spec.(*ast.TypeSpec)
+				if !ok {
+					continue
+				}
+				if _, isIface := ts.Type.(*ast.InterfaceType); isIface {
+					pos := pkg.Fset.Position(ts.Name.Pos())
+					violations = append(violations, Violation{
+						File:     relativePathForPackage(pkg, pos.Filename),
+						Line:     pos.Line,
+						Rule:     "naming.app-no-interface",
+						Message:  `app package defines interface "` + ts.Name.Name + `" — define in core/repo or core/svc instead`,
+						Fix:      "move interface to core/repo/ or core/svc/",
 						Severity: cfg.Sev,
 					})
 				}

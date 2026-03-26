@@ -91,6 +91,21 @@ func TestCheckNaming(t *testing.T) {
 		}
 	})
 
+	t.Run("detects app interface definition", func(t *testing.T) {
+		pkgs := loadInvalid(t)
+		violations := rules.CheckNaming(pkgs)
+		found := false
+		for _, v := range violations {
+			if v.Rule == "naming.app-no-interface" && strings.Contains(v.Message, "AdminOps") {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected naming.app-no-interface violation for AdminOps")
+		}
+	})
+
 	t.Run("detects hand-rolled mock in test file", func(t *testing.T) {
 		pkgs := loadInvalid(t)
 		violations := rules.CheckNaming(pkgs)
