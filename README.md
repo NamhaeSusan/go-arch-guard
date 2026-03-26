@@ -44,6 +44,13 @@ Validate the marketplace/plugin layout locally with:
 claude plugin validate .
 ```
 
+Plugin versioning is automated for skill updates on `main`. When `SKILL.md` or `plugins/go-arch-guard/skills/go-arch-guard/SKILL.md` changes, GitHub Actions bumps `plugins/go-arch-guard/.claude-plugin/plugin.json` using this repository rule:
+
+- start at `0.0.1`
+- patch bump by default
+- `0.0.99 -> 0.1.0`
+- `0.99.99` is rejected
+
 ## Quick Start
 
 Create `architecture_test.go` in your project root:
