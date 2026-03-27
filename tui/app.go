@@ -45,7 +45,7 @@ func Run(pkgs []*packages.Package, module, root string) error {
 		violCount += len(v)
 	}
 	status := tview.NewTextView().SetDynamicColors(true)
-	status.SetText(fmt.Sprintf(" [green]%d[white] pkgs  [red]%d[white] violations  [gray]│  / search  q quit  ↑↓ navigate  Enter expand/collapse",
+	status.SetText(fmt.Sprintf(" [green]%d[white] pkgs  [red]%d[white] violations  [gray]│  / search  Tab panel  q quit  ↑↓ navigate",
 		len(pkgs), violCount))
 
 	// Layout.
@@ -89,9 +89,19 @@ func Run(pkgs []*packages.Package, module, root string) error {
 		}
 	})
 
+	detailFocused := false
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if searchVisible {
 			return event
+		}
+		if event.Key() == tcell.KeyTab {
+			detailFocused = !detailFocused
+			if detailFocused {
+				app.SetFocus(detail.View())
+			} else {
+				app.SetFocus(tree)
+			}
+			return nil
 		}
 		switch event.Rune() {
 		case 'q':

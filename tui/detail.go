@@ -144,29 +144,38 @@ func (d *DetailPanel) renderGroup(node *PkgNode) {
 	}
 	b.WriteString("\n\n")
 
-	// Group by file path.
-	byFile := make(map[string][]rules.Violation)
-	for _, vp := range allViols {
-		byFile[vp.v.File] = append(byFile[vp.v.File], vp.v)
-	}
-	files := make([]string, 0, len(byFile))
-	for f := range byFile {
-		files = append(files, f)
-	}
-	sort.Strings(files)
+	// Sort: errors first, then warnings. Within each group, sort by file.
+	sort.Slice(allViols, func(i, j int) bool {
+		if allViols[i].v.Severity != allViols[j].v.Severity {
+			return allViols[i].v.Severity < allViols[j].v.Severity // Error(0) before Warning(1)
+		}
+		return allViols[i].v.File < allViols[j].v.File
+	})
 
-	for _, file := range files {
-		fmt.Fprintf(&b, "[white::b]%s\n", file)
-		for _, v := range byFile[file] {
-			color := "red"
-			sev := "ERR"
-			if v.Severity == rules.Warning {
-				color = "yellow"
-				sev = "WARN"
+	// Render errors section.
+	if errors > 0 {
+		b.WriteString("[red::b]── Errors ──\n")
+		for _, vp := range allViols {
+			if vp.v.Severity != rules.Error {
+				break
 			}
-			fmt.Fprintf(&b, "[%s]  [%s] %s\n", color, sev, v.Rule)
-			fmt.Fprintf(&b, "[gray]    %s\n", v.Message)
-			fmt.Fprintf(&b, "[darkgray]    fix: %s\n", v.Fix)
+			fmt.Fprintf(&b, "[red]  ✗ [%s] %s\n", vp.v.Rule, vp.v.File)
+			fmt.Fprintf(&b, "[gray]    %s\n", vp.v.Message)
+			fmt.Fprintf(&b, "[darkgray]    fix: %s\n", vp.v.Fix)
+		}
+		b.WriteString("\n")
+	}
+
+	// Render warnings section.
+	if warnings > 0 {
+		b.WriteString("[yellow::b]── Warnings ──\n")
+		for _, vp := range allViols {
+			if vp.v.Severity != rules.Warning {
+				continue
+			}
+			fmt.Fprintf(&b, "[yellow]  ⚠ [%s] %s\n", vp.v.Rule, vp.v.File)
+			fmt.Fprintf(&b, "[gray]    %s\n", vp.v.Message)
+			fmt.Fprintf(&b, "[darkgray]    fix: %s\n", vp.v.Fix)
 		}
 		b.WriteString("\n")
 	}
