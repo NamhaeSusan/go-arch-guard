@@ -29,6 +29,22 @@ func TestIntegration_Valid(t *testing.T) {
 	t.Run("structure", func(t *testing.T) {
 		report.AssertNoViolations(t, rules.CheckStructure("testdata/valid"))
 	})
+	t.Run("blast radius", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.AnalyzeBlastRadius(pkgs, "github.com/kimtaeyun/testproject-dc", "testdata/valid"))
+	})
+}
+
+func TestIntegration_BlastRadius(t *testing.T) {
+	pkgs, err := analyzer.Load("testdata/blast", "internal/...")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	violations := rules.AnalyzeBlastRadius(pkgs, "github.com/kimtaeyun/testproject-blast", "testdata/blast")
+	if len(violations) == 0 {
+		t.Error("expected blast radius violations for hub package")
+	}
+	assertHasRule(t, violations, "blast-radius.high-coupling")
 }
 
 func TestIntegration_Invalid(t *testing.T) {

@@ -18,6 +18,7 @@ func Example() {
 	violations = append(violations, rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc", "testdata/valid")...)
 	violations = append(violations, rules.CheckLayerDirection(pkgs, "github.com/kimtaeyun/testproject-dc", "testdata/valid")...)
 	violations = append(violations, rules.CheckNaming(pkgs)...)
+	violations = append(violations, rules.AnalyzeBlastRadius(pkgs, "github.com/kimtaeyun/testproject-dc", "testdata/valid")...)
 
 	fmt.Printf("violations: %d\n", len(violations))
 	// Output: violations: 0
