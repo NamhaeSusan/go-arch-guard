@@ -12,10 +12,7 @@ import (
 // Warning violations for packages whose transitive dependents count is a
 // statistical outlier (IQR method). No configuration required.
 func AnalyzeBlastRadius(pkgs []*packages.Package, projectModule string, _ string, opts ...Option) []Violation {
-	cfg := Config{Sev: Warning}
-	for _, o := range opts {
-		o(&cfg)
-	}
+	cfg := NewConfig(append([]Option{WithSeverity(Warning)}, opts...)...)
 	projectModule = resolveModule(pkgs, projectModule)
 	if warns := validateModule(pkgs, projectModule); len(warns) > 0 {
 		return warns
