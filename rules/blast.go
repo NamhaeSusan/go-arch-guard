@@ -11,7 +11,7 @@ import (
 // AnalyzeBlastRadius computes coupling metrics for internal packages and emits
 // Warning violations for packages whose transitive dependents count is a
 // statistical outlier (IQR method). No configuration required.
-func AnalyzeBlastRadius(pkgs []*packages.Package, projectModule string, _ string, opts ...Option) []Violation {
+func AnalyzeBlastRadius(pkgs []*packages.Package, projectModule string, projectRoot string, opts ...Option) []Violation {
 	cfg := NewConfig(append([]Option{WithSeverity(Warning)}, opts...)...)
 	projectModule = resolveModule(pkgs, projectModule)
 	if warns := validateModule(pkgs, projectModule); len(warns) > 0 {
