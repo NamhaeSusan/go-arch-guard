@@ -4,7 +4,7 @@
 
 Architecture guardrails for Go projects via `go test`.
 
-Define isolation, layer-direction, structure, and naming rules, then fail regular tests when the project shape drifts. No CLI to learn. No separate config format. Just Go tests.
+Define isolation, layer-direction, structure, naming, and blast-radius rules, then fail regular tests when the project shape drifts. No CLI to learn. No separate config format. Just Go tests.
 
 ## Opinionated Defaults
 
@@ -97,6 +97,9 @@ func TestArchitecture(t *testing.T) {
 	})
 	t.Run("structure", func(t *testing.T) {
 		report.AssertNoViolations(t, rules.CheckStructure(root))
+	})
+	t.Run("blast radius", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.AnalyzeBlastRadius(pkgs, module, root))
 	})
 }
 ```
@@ -364,6 +367,31 @@ This rule set is intentionally more opinionated than the boundary rules.
 | `naming.domain-interface-repo-only` | domain interface defined outside `core/repo/`, or type alias re-exporting `core/repo` interface |
 | `naming.no-handmock` | test file defines a hand-rolled mock/fake/stub struct with methods |
 
+### Blast Radius
+
+`rules.AnalyzeBlastRadius(pkgs, module, root, opts...)`
+
+Purpose:
+
+- surface internal packages with abnormally high coupling
+- zero configuration — uses IQR-based statistical outlier detection
+- default severity is Warning (does not fail tests unless overridden)
+
+| Rule | Meaning |
+|------|---------|
+| `blast-radius.high-coupling` | package has statistically outlying transitive dependents |
+
+Metrics computed per internal package:
+
+| Metric | Definition |
+|--------|-----------|
+| Ca (Afferent Coupling) | count of internal packages that import this package |
+| Ce (Efferent Coupling) | count of internal packages this package imports |
+| Instability | Ce / (Ca + Ce) — 0 = stable, 1 = unstable |
+| Transitive Dependents | full reverse-reachable set via BFS |
+
+Outlier detection uses Q3 + 1.5 × IQR on the Transitive Dependents distribution. Projects with fewer than 5 internal packages skip analysis.
+
 ## Options
 
 ### Severity
@@ -410,6 +438,7 @@ rules.CheckDomainIsolation(
 | `rules.CheckLayerDirection(pkgs, module, root, opts...)` | intra-domain dependency direction checks (`""` auto-extracts from packages) |
 | `rules.CheckNaming(pkgs, opts...)` | naming convention checks |
 | `rules.CheckStructure(root, opts...)` | filesystem structure checks |
+| `rules.AnalyzeBlastRadius(pkgs, module, root, opts...)` | coupling outlier detection (default Warning) (`""` auto-extracts from packages) |
 | `report.AssertNoViolations(t, violations)` | fail test on `Error` violations |
 | `rules.WithSeverity(rules.Warning)` | downgrade violations to warnings |
 | `rules.WithExclude("internal/path/...")` | skip a project-relative subtree or file |

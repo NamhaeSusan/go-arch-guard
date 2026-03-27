@@ -99,6 +99,9 @@ func TestArchitecture(t *testing.T) {
 	t.Run("structure", func(t *testing.T) {
 		report.AssertNoViolations(t, rules.CheckStructure("."))
 	})
+	t.Run("blast radius", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.AnalyzeBlastRadius(pkgs, "", ""))
+	})
 }
 ```
 
@@ -181,6 +184,20 @@ cross-domain 데이터가 필요한 endpoint는 **도메인 handler가 아닌 `o
 ### core/repo에 cross-domain interface를 넣지 말 것
 
 `core/repo/`는 persistence interface 전용입니다. `GetUserByID`, `SetUserActive` 같은 다른 도메인 조작 메서드는 repo에 넣지 마세요. 이런 기능이 필요하면 해당 endpoint를 `orchestration/handler/http/`로 이동하세요.
+
+---
+
+## Blast Radius
+
+`AnalyzeBlastRadius`는 내부 패키지 간 의존 그래프를 분석하여 coupling이 비정상적으로 높은 패키지를 Warning으로 보고한다.
+
+- 설정 불필요 — IQR 기반 통계적 이상치 자동 탐지
+- 기본 severity: Warning (테스트를 실패시키지 않음)
+- 내부 패키지 5개 미만이면 분석 스킵
+
+| Rule | 의미 |
+|------|------|
+| `blast-radius.high-coupling` | transitive dependents가 통계적 이상치인 패키지 |
 
 ---
 
