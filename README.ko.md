@@ -374,18 +374,26 @@ rules.CheckDomainIsolation(
 프로젝트의 패키지 구조와 의존성을 인터랙티브 터미널 UI로 시각화합니다.
 
 ```bash
-go run ./cmd/tui .
-# 또는 프로젝트 디렉토리 지정
+# go-arch-guard를 의존성으로 쓰는 프로젝트에서
+go run github.com/NamhaeSusan/go-arch-guard/cmd/tui .
+
+# 또는 go-arch-guard 저장소에서 직접 실행
 go run ./cmd/tui /path/to/your/project
 ```
 
+의존성이 없다면 먼저 추가:
+
+```bash
+go get github.com/NamhaeSusan/go-arch-guard@latest
+```
+
 기능:
-- 아키텍처 레이어별 색상 코딩된 패키지 트리 (파랑: `cmd/`, 초록: `domain/`, 노랑: `orchestration/`, 회색: `pkg/`)
-- 위반 하이라이트 — 규칙 위반 패키지를 빨간색 `✗`로 표시
+- 건강 상태 기반 트리 색상 — 초록 (정상), 노랑 `⚠` (경고), 빨강 `✗` (에러)
 - 패키지 선택 시 imports, 역방향 의존성, 커플링 메트릭(Ca, Ce, Instability, Transitive Dependents) 표시
+- 그룹 노드 선택 시 (예: `domain/`) 하위 전체 위반 요약: 에러 우선, 경고 후순
 - 위반 상세 정보: 심각도, 규칙 ID, 메시지, 수정 가이드
 - 검색/필터 — `/` 키로 패키지명 필터링, `Esc`로 초기화
-- 키보드: `↑↓` 탐색, `Enter` 열기/닫기, `/` 검색, `q` 종료
+- 키보드: `↑↓` 탐색, `Enter` 열기/닫기, `/` 검색, `Tab` 디테일 패널 스크롤, `q` 종료
 
 ## API 레퍼런스
 

@@ -434,18 +434,26 @@ rules.CheckDomainIsolation(
 Visualize your project's package structure and dependencies in an interactive terminal UI.
 
 ```bash
-go run ./cmd/tui .
-# or specify a project directory
+# from any Go project that depends on go-arch-guard
+go run github.com/NamhaeSusan/go-arch-guard/cmd/tui .
+
+# or from the go-arch-guard repo itself
 go run ./cmd/tui /path/to/your/project
 ```
 
+If your project doesn't already depend on go-arch-guard, add it first:
+
+```bash
+go get github.com/NamhaeSusan/go-arch-guard@latest
+```
+
 Features:
-- Package tree with architectural layer color-coding (blue: `cmd/`, green: `domain/`, yellow: `orchestration/`, gray: `pkg/`)
-- Violation highlighting — packages with rule violations are marked red with `✗`
+- Health-status tree coloring — green (clean), yellow `⚠` (warnings), red `✗` (errors)
 - Select a package to see its imports, reverse dependencies, and coupling metrics (Ca, Ce, Instability, Transitive Dependents)
+- Select a group node (e.g. `domain/`) to see aggregated violations: errors first, then warnings
 - Violation details with severity, rule ID, message, and fix guidance
 - Search/filter — press `/` to filter packages by name, `Esc` to clear
-- Keyboard: `↑↓` navigate, `Enter` expand/collapse, `/` search, `q` quit
+- Keyboard: `↑↓` navigate, `Enter` expand/collapse, `/` search, `Tab` scroll detail panel, `q` quit
 
 ## API Reference
 
