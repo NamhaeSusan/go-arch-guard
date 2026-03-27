@@ -441,8 +441,11 @@ go run ./cmd/tui /path/to/your/project
 
 Features:
 - Package tree with architectural layer color-coding (blue: `cmd/`, green: `domain/`, yellow: `orchestration/`, gray: `pkg/`)
-- Select a package to see its imports and reverse dependencies
-- Keyboard: `↑↓` navigate, `Enter` expand/collapse, `q` quit
+- Violation highlighting — packages with rule violations are marked red with `✗`
+- Select a package to see its imports, reverse dependencies, and coupling metrics (Ca, Ce, Instability, Transitive Dependents)
+- Violation details with severity, rule ID, message, and fix guidance
+- Search/filter — press `/` to filter packages by name, `Esc` to clear
+- Keyboard: `↑↓` navigate, `Enter` expand/collapse, `/` search, `q` quit
 
 ## API Reference
 

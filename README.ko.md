@@ -381,8 +381,11 @@ go run ./cmd/tui /path/to/your/project
 
 기능:
 - 아키텍처 레이어별 색상 코딩된 패키지 트리 (파랑: `cmd/`, 초록: `domain/`, 노랑: `orchestration/`, 회색: `pkg/`)
-- 패키지 선택 시 imports 및 역방향 의존성 표시
-- 키보드: `↑↓` 탐색, `Enter` 열기/닫기, `q` 종료
+- 위반 하이라이트 — 규칙 위반 패키지를 빨간색 `✗`로 표시
+- 패키지 선택 시 imports, 역방향 의존성, 커플링 메트릭(Ca, Ce, Instability, Transitive Dependents) 표시
+- 위반 상세 정보: 심각도, 규칙 ID, 메시지, 수정 가이드
+- 검색/필터 — `/` 키로 패키지명 필터링, `Esc`로 초기화
+- 키보드: `↑↓` 탐색, `Enter` 열기/닫기, `/` 검색, `q` 종료
 
 ## API 레퍼런스
 

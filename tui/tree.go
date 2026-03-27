@@ -27,14 +27,15 @@ func layerColor(relPath string) tcell.Color {
 
 // PkgNode holds metadata for a tree node.
 type PkgNode struct {
-	RelPath  string
-	IsLeaf   bool
-	Imports  []string
-	FullPath string
+	RelPath       string
+	IsLeaf        bool
+	Imports       []string
+	FullPath      string
+	HasViolations bool
 }
 
 // BuildTree creates a tview.TreeView from loaded packages.
-func BuildTree(pkgs []*packages.Package, module string) *tview.TreeView {
+func BuildTree(pkgs []*packages.Package, module string, violations ViolationIndex) *tview.TreeView {
 	root := tview.NewTreeNode("📦 " + module).SetColor(tcell.ColorWhite)
 	root.SetReference(&PkgNode{RelPath: "", IsLeaf: false})
 
@@ -76,15 +77,22 @@ func BuildTree(pkgs []*packages.Package, module string) *tview.TreeView {
 
 			isLeaf := depth == len(parts)
 			name := parts[depth-1]
+			hasViol := violations.HasViolations(key)
+			color := layerColor(key)
+			if hasViol {
+				color = tcell.ColorRed
+				name = "✗ " + name
+			}
 			node := tview.NewTreeNode(name).
-				SetColor(layerColor(key)).
+				SetColor(color).
 				SetSelectable(true).
 				SetExpanded(depth <= 2)
 			node.SetReference(&PkgNode{
-				RelPath:  key,
-				IsLeaf:   isLeaf,
-				Imports:  info.imports,
-				FullPath: info.fullPath,
+				RelPath:       key,
+				IsLeaf:        isLeaf,
+				Imports:       info.imports,
+				FullPath:      info.fullPath,
+				HasViolations: hasViol,
 			})
 
 			parent.AddChild(node)

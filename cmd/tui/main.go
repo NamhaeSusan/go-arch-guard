@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/NamhaeSusan/go-arch-guard/analyzer"
 	"github.com/NamhaeSusan/go-arch-guard/tui"
@@ -12,6 +13,12 @@ func main() {
 	dir := "."
 	if len(os.Args) > 1 {
 		dir = os.Args[1]
+	}
+
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
 	}
 
 	pkgs, err := analyzer.Load(dir, "internal/...", "cmd/...")
@@ -31,7 +38,7 @@ func main() {
 		}
 	}
 
-	if err := tui.Run(pkgs, module); err != nil {
+	if err := tui.Run(pkgs, module, absDir); err != nil {
 		fmt.Fprintf(os.Stderr, "tui error: %v\n", err)
 		os.Exit(1)
 	}

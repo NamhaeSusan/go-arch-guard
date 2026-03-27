@@ -1,16 +1,21 @@
 package tui
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 	"golang.org/x/tools/go/packages"
 )
 
 // Run launches the TUI application for the given packages.
-func Run(pkgs []*packages.Package, module string) error {
+func Run(pkgs []*packages.Package, module, root string) error {
+	violations := BuildViolationIndex(pkgs, module, root)
 	importedBy := BuildImportedByMap(pkgs)
-	tree := BuildTree(pkgs, module)
-	detail := NewDetailPanel(importedBy, module)
+	metrics := BuildMetricsIndex(pkgs, module)
+	tree := BuildTree(pkgs, module, violations)
+	detail := NewDetailPanel(importedBy, violations, metrics, module)
 
 	tree.SetSelectedFunc(func(node *tview.TreeNode) {
 		node.SetExpanded(!node.IsExpanded())
@@ -25,21 +30,109 @@ func Run(pkgs []*packages.Package, module string) error {
 	})
 
 	tree.SetBorder(true).
-		SetTitle(" Package Tree ").
+		SetTitle(" Package Tree (/ search, q quit) ").
 		SetBorderColor(tcell.ColorGray)
 
-	flex := tview.NewFlex().
+	// Search input.
+	searchInput := tview.NewInputField().
+		SetLabel(" / ").
+		SetFieldWidth(0).
+		SetFieldBackgroundColor(tcell.ColorBlack)
+
+	// Status bar.
+	violCount := 0
+	for _, v := range violations {
+		violCount += len(v)
+	}
+	status := tview.NewTextView().SetDynamicColors(true)
+	status.SetText(fmt.Sprintf(" [green]%d[white] pkgs  [red]%d[white] violations  [gray]│  / search  q quit  ↑↓ navigate  Enter expand/collapse",
+		len(pkgs), violCount))
+
+	// Layout.
+	mainFlex := tview.NewFlex().
 		AddItem(tree, 0, 1, true).
 		AddItem(detail.View(), 0, 1, false)
 
-	app := tview.NewApplication().SetRoot(flex, true)
+	searchRow := tview.NewFlex().
+		AddItem(searchInput, 0, 1, false)
+
+	layout := tview.NewFlex().SetDirection(tview.FlexRow).
+		AddItem(status, 1, 0, false).
+		AddItem(mainFlex, 0, 1, true).
+		AddItem(searchRow, 0, 0, false)
+
+	app := tview.NewApplication().SetRoot(layout, true)
+	searchVisible := false
+
+	filterTree := func(query string) {
+		r := tree.GetRoot()
+		if r == nil {
+			return
+		}
+		filterNode(r, strings.ToLower(query))
+		app.Draw()
+	}
+
+	searchInput.SetChangedFunc(func(text string) {
+		filterTree(text)
+	})
+
+	searchInput.SetDoneFunc(func(key tcell.Key) {
+		if key == tcell.KeyEscape || key == tcell.KeyEnter {
+			searchVisible = false
+			layout.ResizeItem(searchRow, 0, 0)
+			app.SetFocus(tree)
+			if key == tcell.KeyEscape {
+				searchInput.SetText("")
+				filterTree("")
+			}
+		}
+	})
+
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Rune() == 'q' {
+		if searchVisible {
+			return event
+		}
+		switch event.Rune() {
+		case 'q':
 			app.Stop()
+			return nil
+		case '/':
+			searchVisible = true
+			layout.ResizeItem(searchRow, 1, 0)
+			app.SetFocus(searchInput)
 			return nil
 		}
 		return event
 	})
 
 	return app.Run()
+}
+
+func filterNode(node *tview.TreeNode, query string) bool {
+	if query == "" {
+		node.SetExpanded(true)
+		for _, child := range node.GetChildren() {
+			filterNode(child, query)
+		}
+		return true
+	}
+
+	ref, ok := node.GetReference().(*PkgNode)
+	name := ""
+	if ok {
+		name = strings.ToLower(ref.RelPath)
+	}
+
+	selfMatch := strings.Contains(name, query)
+	childMatch := false
+	for _, child := range node.GetChildren() {
+		if filterNode(child, query) {
+			childMatch = true
+		}
+	}
+
+	visible := selfMatch || childMatch
+	node.SetExpanded(visible)
+	return visible
 }
