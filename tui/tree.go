@@ -9,22 +9,6 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-// layerColor returns a color based on the architectural layer of the path.
-func layerColor(relPath string) tcell.Color {
-	switch {
-	case strings.HasPrefix(relPath, "cmd/"):
-		return tcell.ColorDodgerBlue
-	case strings.Contains(relPath, "domain/"):
-		return tcell.ColorGreen
-	case strings.Contains(relPath, "orchestration/"):
-		return tcell.ColorYellow
-	case strings.Contains(relPath, "pkg/"):
-		return tcell.ColorGray
-	default:
-		return tcell.ColorWhite
-	}
-}
-
 // PkgNode holds metadata for a tree node.
 type PkgNode struct {
 	RelPath       string
@@ -77,13 +61,9 @@ func BuildTree(pkgs []*packages.Package, module string, violations ViolationInde
 
 			isLeaf := depth == len(parts)
 			name := parts[depth-1]
-			hasViol := violations.HasViolations(key)
-			color := layerColor(key)
-			if hasViol {
-				color = tcell.ColorRed
-				name = "✗ " + name
-			}
-			node := tview.NewTreeNode(name).
+			sev := violations.Severity(key)
+			color, prefix := severityStyle(sev)
+			node := tview.NewTreeNode(prefix + name).
 				SetColor(color).
 				SetSelectable(true).
 				SetExpanded(depth <= 2)
@@ -92,7 +72,7 @@ func BuildTree(pkgs []*packages.Package, module string, violations ViolationInde
 				IsLeaf:        isLeaf,
 				Imports:       info.imports,
 				FullPath:      info.fullPath,
-				HasViolations: hasViol,
+				HasViolations: sev != sevNone,
 			})
 
 			parent.AddChild(node)
@@ -105,6 +85,17 @@ func BuildTree(pkgs []*packages.Package, module string, violations ViolationInde
 		SetCurrentNode(root)
 
 	return tree
+}
+
+func severityStyle(sev severity) (tcell.Color, string) {
+	switch sev {
+	case sevError:
+		return tcell.ColorRed, "✗ "
+	case sevWarning:
+		return tcell.ColorYellow, "⚠ "
+	default:
+		return tcell.ColorGreen, ""
+	}
 }
 
 // BuildImportedByMap creates a reverse lookup: package path → list of packages that import it.
