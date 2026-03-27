@@ -16,6 +16,10 @@ var (
 	invalidOnce sync.Once
 	invalidPkgs []*packages.Package
 	invalidErr  error
+
+	blastOnce sync.Once
+	blastPkgs []*packages.Package
+	blastErr  error
 )
 
 func loadValid(t *testing.T) []*packages.Package {
@@ -38,4 +42,15 @@ func loadInvalid(t *testing.T) []*packages.Package {
 		t.Fatal(invalidErr)
 	}
 	return invalidPkgs
+}
+
+func loadBlast(t *testing.T) []*packages.Package {
+	t.Helper()
+	blastOnce.Do(func() {
+		blastPkgs, blastErr = analyzer.Load("../testdata/blast", "internal/...")
+	})
+	if blastErr != nil {
+		t.Fatal(blastErr)
+	}
+	return blastPkgs
 }
