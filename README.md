@@ -429,6 +429,21 @@ rules.CheckDomainIsolation(
 |------|---------|
 | `meta.no-matching-packages` | the `module` argument does not match any loaded package — usually a misconfiguration |
 
+## TUI Viewer
+
+Visualize your project's package structure and dependencies in an interactive terminal UI.
+
+```bash
+go run ./cmd/tui .
+# or specify a project directory
+go run ./cmd/tui /path/to/your/project
+```
+
+Features:
+- Package tree with architectural layer color-coding (blue: `cmd/`, green: `domain/`, yellow: `orchestration/`, gray: `pkg/`)
+- Select a package to see its imports and reverse dependencies
+- Keyboard: `↑↓` navigate, `Enter` expand/collapse, `q` quit
+
 ## API Reference
 
 | Function | Description |

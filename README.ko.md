@@ -369,6 +369,21 @@ rules.CheckDomainIsolation(
 |------|------|
 | `meta.no-matching-packages` | `module` 인수가 로드된 패키지와 일치하지 않음 — 보통 설정 오류 |
 
+## TUI 뷰어
+
+프로젝트의 패키지 구조와 의존성을 인터랙티브 터미널 UI로 시각화합니다.
+
+```bash
+go run ./cmd/tui .
+# 또는 프로젝트 디렉토리 지정
+go run ./cmd/tui /path/to/your/project
+```
+
+기능:
+- 아키텍처 레이어별 색상 코딩된 패키지 트리 (파랑: `cmd/`, 초록: `domain/`, 노랑: `orchestration/`, 회색: `pkg/`)
+- 패키지 선택 시 imports 및 역방향 의존성 표시
+- 키보드: `↑↓` 탐색, `Enter` 열기/닫기, `q` 종료
+
 ## API 레퍼런스
 
 | 함수 | 설명 |
