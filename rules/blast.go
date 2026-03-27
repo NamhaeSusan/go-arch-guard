@@ -18,7 +18,7 @@ func AnalyzeBlastRadius(pkgs []*packages.Package, projectModule string, projectR
 		return warns
 	}
 
-	internalPrefix := projectModule + "/"
+	internalPrefix := projectModule + "/internal/"
 
 	// 1. Collect internal packages
 	internalPkgs := make(map[string]bool)
