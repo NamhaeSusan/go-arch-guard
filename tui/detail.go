@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/NamhaeSusan/go-arch-guard/rules"
@@ -44,11 +45,19 @@ func (d *DetailPanel) View() *tview.TextView {
 // Update refreshes the detail panel for the selected package node.
 func (d *DetailPanel) Update(node *PkgNode) {
 	d.view.Clear()
-	if node == nil || !node.IsLeaf {
-		d.view.SetText("[gray]Select a package to view dependencies")
+	if node == nil {
+		d.view.SetText("[gray]Select a package to view details")
 		return
 	}
 
+	if node.IsLeaf {
+		d.renderLeaf(node)
+	} else {
+		d.renderGroup(node)
+	}
+}
+
+func (d *DetailPanel) renderLeaf(node *PkgNode) {
 	var b strings.Builder
 
 	fmt.Fprintf(&b, "[white::b]%s\n", node.RelPath)
@@ -60,19 +69,7 @@ func (d *DetailPanel) Update(node *PkgNode) {
 	b.WriteString("\n")
 
 	// Violations section.
-	if viols, ok := d.violations[node.RelPath]; ok && len(viols) > 0 {
-		fmt.Fprintf(&b, "[red::b]Violations (%d):\n", len(viols))
-		for _, v := range viols {
-			sev := "ERR"
-			if v.Severity == rules.Warning {
-				sev = "WARN"
-			}
-			fmt.Fprintf(&b, "[red]  [%s] %s\n", sev, v.Rule)
-			fmt.Fprintf(&b, "[gray]    %s\n", v.Message)
-			fmt.Fprintf(&b, "[darkgray]    fix: %s\n", v.Fix)
-		}
-		b.WriteString("\n")
-	}
+	d.writeViolations(&b, node.RelPath)
 
 	// Imports section.
 	b.WriteString("[dodgerblue::b]Imports:\n")
@@ -104,4 +101,99 @@ func (d *DetailPanel) Update(node *PkgNode) {
 	}
 
 	d.view.SetText(b.String())
+}
+
+func (d *DetailPanel) renderGroup(node *PkgNode) {
+	var b strings.Builder
+
+	fmt.Fprintf(&b, "[white::b]%s\n\n", node.RelPath)
+
+	// Collect all violations under this path.
+	var allViols []violWithPath
+	d.violations.walkPath(node.RelPath, func(viols []rules.Violation) {
+		for i := range viols {
+			allViols = append(allViols, violWithPath{v: viols[i]})
+		}
+	})
+
+	if len(allViols) == 0 {
+		b.WriteString("[green]No violations under this path")
+		d.view.SetText(b.String())
+		return
+	}
+
+	// Count by severity.
+	errors, warnings := 0, 0
+	for _, vp := range allViols {
+		if vp.v.Severity == rules.Error {
+			errors++
+		} else {
+			warnings++
+		}
+	}
+
+	// Summary.
+	if errors > 0 {
+		fmt.Fprintf(&b, "[red::b]%d error(s)", errors)
+	}
+	if warnings > 0 {
+		if errors > 0 {
+			b.WriteString("[white]  ")
+		}
+		fmt.Fprintf(&b, "[yellow::b]%d warning(s)", warnings)
+	}
+	b.WriteString("\n\n")
+
+	// Group by file path.
+	byFile := make(map[string][]rules.Violation)
+	for _, vp := range allViols {
+		byFile[vp.v.File] = append(byFile[vp.v.File], vp.v)
+	}
+	files := make([]string, 0, len(byFile))
+	for f := range byFile {
+		files = append(files, f)
+	}
+	sort.Strings(files)
+
+	for _, file := range files {
+		fmt.Fprintf(&b, "[white::b]%s\n", file)
+		for _, v := range byFile[file] {
+			color := "red"
+			sev := "ERR"
+			if v.Severity == rules.Warning {
+				color = "yellow"
+				sev = "WARN"
+			}
+			fmt.Fprintf(&b, "[%s]  [%s] %s\n", color, sev, v.Rule)
+			fmt.Fprintf(&b, "[gray]    %s\n", v.Message)
+			fmt.Fprintf(&b, "[darkgray]    fix: %s\n", v.Fix)
+		}
+		b.WriteString("\n")
+	}
+
+	d.view.SetText(b.String())
+}
+
+func (d *DetailPanel) writeViolations(b *strings.Builder, relPath string) {
+	viols, ok := d.violations[relPath]
+	if !ok || len(viols) == 0 {
+		return
+	}
+	fmt.Fprintf(b, "[red::b]Violations (%d):\n", len(viols))
+	for _, v := range viols {
+		color := "red"
+		sev := "ERR"
+		if v.Severity == rules.Warning {
+			color = "yellow"
+			sev = "WARN"
+		}
+		fmt.Fprintf(b, "[%s]  [%s] %s\n", color, sev, v.Rule)
+		fmt.Fprintf(b, "[gray]    %s\n", v.Message)
+		fmt.Fprintf(b, "[darkgray]    fix: %s\n", v.Fix)
+	}
+	b.WriteString("\n")
+}
+
+type violWithPath struct {
+	v rules.Violation
 }

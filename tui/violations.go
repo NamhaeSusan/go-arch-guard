@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"strings"
+
 	"github.com/NamhaeSusan/go-arch-guard/rules"
 	"golang.org/x/tools/go/packages"
 )
@@ -28,7 +30,8 @@ func BuildViolationIndex(pkgs []*packages.Package, module, root string) Violatio
 
 	idx := make(ViolationIndex)
 	for _, v := range all {
-		idx[v.File] = append(idx[v.File], v)
+		key := strings.TrimRight(v.File, "/")
+		idx[key] = append(idx[key], v)
 	}
 	return idx
 }
