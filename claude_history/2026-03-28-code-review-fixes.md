@@ -1,53 +1,32 @@
 # 2026-03-28 Code Review Fixes
 
 ## Task
-Code review of the entire codebase and fix identified issues.
+Comprehensive code review of the entire go-arch-guard codebase across 5 iterations.
 
 ## Changes (Commit 1: fix)
-
-### rules/naming.go
-- Fix `stutters()` UTF-8 safety (rune-based indexing)
-- Fix suggested name preserving original casing
+- Fix `stutters()` UTF-8 safety (rune-based indexing) and suggested name casing bug
 - Narrow `isDomainPackage` to `/internal/domain/`
 - Rename `isRepoPackage`/`isRepoPackageByPath` for clarity
-
-### tui/tree.go
-- Fix group node incorrectly inheriting leaf package data
-
-### tui/detail.go
-- Remove unnecessary `violWithPath` wrapper
-
-### tui/app.go
-- Separate error/warning counts in status bar
+- Fix group tree node incorrectly inheriting leaf package data
+- Remove unnecessary `violWithPath` wrapper in detail.go
+- Separate error/warning counts in TUI status bar
 
 ## Changes (Commit 2: refactor)
-
-### rules/structure.go
 - Separate `structure.misplaced-layer` rule from `structure.legacy-package`
-
-### rules/helpers.go
 - Extract `resolveIdentImportPath` shared helper
-
-### rules/naming.go, rules/structure.go
-- Use shared `resolveIdentImportPath` helper
-
-### rules/rule.go
 - Use `strings.HasPrefix`/`strings.TrimRight` in `matchPattern`
-
-### README.md, README.ko.md
-- Document new `structure.misplaced-layer` rule
+- Document new `structure.misplaced-layer` rule in README
 
 ## Changes (Commit 3: test)
-
-### integration_test.go
 - Assert `structure.misplaced-layer` in integration test
 - Improve `assertHasRule` failure message with actual rule set
 
 ## Changes (Commit 4: test)
-
-### skill_test.go
-- Add missing `len(pkgs) == 0` guard in `TestSkill_CrossDomainViolation`
+- Add missing `len(pkgs)==0` guard in `TestSkill_CrossDomainViolation`
 - Add structure exclude verification in `TestSkill_ExcludeOption`
+
+## Changes (Commit 5: style)
+- Use `strings.HasPrefix` in `violations.go` walkPath for consistency
 
 ## Verification
 - `go build ./...` — pass

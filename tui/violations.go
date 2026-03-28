@@ -59,7 +59,7 @@ func (vi ViolationIndex) walkPath(relPath string, fn func([]rules.Violation)) {
 	}
 	prefix := relPath + "/"
 	for k, viols := range vi {
-		if len(k) > len(prefix) && k[:len(prefix)] == prefix {
+		if strings.HasPrefix(k, prefix) {
 			fn(viols)
 		}
 	}
