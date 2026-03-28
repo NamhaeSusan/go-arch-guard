@@ -342,7 +342,8 @@ import "mymodule/internal/pkg/clock" // layer.inner-imports-pkg
 |------|---------|
 | `structure.internal-top-level` | only `domain`, `orchestration`, and `pkg` are allowed directly under `internal/` |
 | `structure.banned-package` | `util`, `common`, `misc`, `helper`, `shared`, `services` are banned anywhere under `internal/` |
-| `structure.legacy-package` | `router`, `bootstrap`, or misplaced `app`/`handler`/`infra` directories under `internal/` |
+| `structure.legacy-package` | `router`, `bootstrap` are legacy packages that should be migrated |
+| `structure.misplaced-layer` | `app`/`handler`/`infra` directories outside domain slices or orchestration handler |
 | `structure.middleware-placement` | `middleware/` must live at `internal/pkg/middleware/` |
 | `structure.domain-root-alias-required` | each domain root must define `alias.go` |
 | `structure.domain-root-alias-package` | `alias.go` package name must match the domain directory |

@@ -2,6 +2,7 @@ package rules
 
 import (
 	"fmt"
+	"go/ast"
 	"path/filepath"
 	"strings"
 
@@ -89,6 +90,25 @@ func validateModule(pkgs []*packages.Package, projectModule string) []Violation 
 		Fix:      "verify the module argument matches go.mod (e.g. pass the value from pkgs[0].Module.Path)",
 		Severity: Warning,
 	}}
+}
+
+// resolveIdentImportPath returns the import path that identName refers to
+// by scanning the file's import declarations. Returns "" if not found.
+func resolveIdentImportPath(file *ast.File, identName string) string {
+	for _, imp := range file.Imports {
+		impPath := strings.Trim(imp.Path.Value, `"`)
+		alias := ""
+		if imp.Name != nil {
+			alias = imp.Name.Name
+		} else {
+			parts := strings.Split(impPath, "/")
+			alias = parts[len(parts)-1]
+		}
+		if alias == identName {
+			return impPath
+		}
+	}
+	return ""
 }
 
 func isExcludedPackage(cfg Config, pkgPath, projectModule string) bool {

@@ -232,33 +232,22 @@ func checkDomainAliasNoInterface(domainDir string, cfg Config) []Violation {
 				if ts.Assign != 0 {
 					if sel, ok := ts.Type.(*ast.SelectorExpr); ok {
 						if ident, ok := sel.X.(*ast.Ident); ok {
-							// Check if the alias source looks like a svc/repo-adjacent import
-							// We check imports to see what package the identifier refers to
-							for _, imp := range file.Imports {
-								impPath := strings.Trim(imp.Path.Value, `"`)
-								alias := ""
-								if imp.Name != nil {
-									alias = imp.Name.Name
-								} else {
-									parts := strings.Split(impPath, "/")
-									alias = parts[len(parts)-1]
+							impPath := resolveIdentImportPath(file, ident.Name)
+							isSvc := strings.Contains(impPath, "/core/svc")
+							isRepo := strings.Contains(impPath, "/core/repo")
+							if isSvc || isRepo {
+								src := "core/svc"
+								if isRepo {
+									src = "core/repo"
 								}
-								isSvc := strings.Contains(impPath, "/core/svc")
-								isRepo := strings.Contains(impPath, "/core/repo")
-								if alias == ident.Name && (isSvc || isRepo) {
-									src := "core/svc"
-									if isRepo {
-										src = "core/repo"
-									}
-									violations = append(violations, Violation{
-										File:     relPath + "/alias.go",
-										Line:     fset.Position(ts.Name.Pos()).Line,
-										Rule:     "structure.domain-alias-no-interface",
-										Message:  `alias.go re-exports "` + ts.Name.Name + `" from ` + src + ` — suspected cross-domain dependency; use orchestration/ instead`,
-										Fix:      "move cross-domain coordination to orchestration/handler/ or orchestration/",
-										Severity: cfg.Sev,
-									})
-								}
+								violations = append(violations, Violation{
+									File:     relPath + "/alias.go",
+									Line:     fset.Position(ts.Name.Pos()).Line,
+									Rule:     "structure.domain-alias-no-interface",
+									Message:  `alias.go re-exports "` + ts.Name.Name + `" from ` + src + ` — suspected cross-domain dependency; use orchestration/ instead`,
+									Fix:      "move cross-domain coordination to orchestration/handler/ or orchestration/",
+									Severity: cfg.Sev,
+								})
 							}
 						}
 					}
@@ -318,8 +307,8 @@ func checkPackageNames(internalDir string, cfg Config) []Violation {
 		if isMisplacedLayerDir(rel, name) {
 			violations = append(violations, Violation{
 				File:     rel + "/",
-				Rule:     "structure.legacy-package",
-				Message:  `legacy package "` + name + `" should be migrated`,
+				Rule:     "structure.misplaced-layer",
+				Message:  `layer package "` + name + `" is misplaced`,
 				Fix:      "place app/handler/infra only in domain slices or orchestration handler",
 				Severity: cfg.Sev,
 			})

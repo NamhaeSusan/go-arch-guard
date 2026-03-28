@@ -161,13 +161,13 @@ func TestCheckStructure(t *testing.T) {
 		violations := rules.CheckStructure("../testdata/invalid")
 		found := false
 		for _, v := range violations {
-			if v.Rule == "structure.legacy-package" && v.File == "internal/platform/handler/" {
+			if v.Rule == "structure.misplaced-layer" && v.File == "internal/platform/handler/" {
 				found = true
 				break
 			}
 		}
 		if !found {
-			t.Error("expected misplaced handler legacy-package violation")
+			t.Error("expected misplaced-layer violation for handler")
 		}
 	})
 

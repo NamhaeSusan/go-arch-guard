@@ -307,7 +307,8 @@ import "mymodule/internal/pkg/clock" // layer.inner-imports-pkg
 |------|------|
 | `structure.internal-top-level` | `internal/` 바로 아래에는 `domain`, `orchestration`, `pkg`만 허용 |
 | `structure.banned-package` | `util`, `common`, `misc`, `helper`, `shared`, `services`는 `internal/` 어디서든 금지 |
-| `structure.legacy-package` | `router`, `bootstrap`, 또는 `internal/` 아래에 잘못 배치된 `app`/`handler`/`infra` 디렉토리 |
+| `structure.legacy-package` | `router`, `bootstrap`은 마이그레이션이 필요한 레거시 패키지 |
+| `structure.misplaced-layer` | 도메인 슬라이스나 orchestration handler 외부의 `app`/`handler`/`infra` 디렉토리 |
 | `structure.middleware-placement` | `middleware/`는 `internal/pkg/middleware/`에만 허용 |
 | `structure.domain-root-alias-required` | 각 도메인 루트에 `alias.go` 필수 |
 | `structure.domain-root-alias-package` | `alias.go`의 패키지 이름은 도메인 디렉토리와 일치해야 함 |

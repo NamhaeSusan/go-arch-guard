@@ -77,12 +77,10 @@ func matchPattern(pattern, path string) bool {
 	path = normalizeMatchPath(path)
 	if len(pattern) > 3 && pattern[len(pattern)-3:] == "..." {
 		prefix := pattern[:len(pattern)-3]
-		if len(path) >= len(prefix) && path[:len(prefix)] == prefix {
+		if strings.HasPrefix(path, prefix) {
 			return true
 		}
-		for len(prefix) > 0 && prefix[len(prefix)-1] == '/' {
-			prefix = prefix[:len(prefix)-1]
-		}
+		prefix = strings.TrimRight(prefix, "/")
 		return path == prefix
 	}
 	return pattern == path
