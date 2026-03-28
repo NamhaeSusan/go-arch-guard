@@ -131,11 +131,11 @@ func TestSkill_AutoExtractModuleRoot(t *testing.T) {
 	mod := "example.com/autoextract"
 
 	files := map[string]string{
-		"go.mod":                                         "module " + mod + "\n\ngo 1.26.1\n",
-		"internal/domain/user/alias.go":                  "package user\n",
-		"internal/domain/user/core/model/user.go":        "package model\n\ntype User struct{ ID int64 }\n",
-		"internal/domain/user/app/service.go":            "package app\n",
-		"internal/domain/user/handler/http/handler.go":   "package http\n",
+		"go.mod":                        "module " + mod + "\n\ngo 1.26.1\n",
+		"internal/domain/user/alias.go": "package user\n",
+		"internal/domain/user/core/model/user.go":         "package model\n\ntype User struct{ ID int64 }\n",
+		"internal/domain/user/app/service.go":             "package app\n",
+		"internal/domain/user/handler/http/handler.go":    "package http\n",
 		"internal/domain/user/infra/persistence/store.go": "package persistence\n",
 	}
 
@@ -166,10 +166,10 @@ func TestSkill_ExcludeOption(t *testing.T) {
 	files := map[string]string{
 		"go.mod": "module " + mod + "\n\ngo 1.26.1\n",
 
-		"internal/domain/order/alias.go":                  "package order\n",
-		"internal/domain/order/core/model/order.go":       "package model\n\ntype Order struct{}\n",
-		"internal/domain/order/app/service.go":            "package app\n",
-		"internal/domain/order/handler/http/handler.go":   "package http\n",
+		"internal/domain/order/alias.go":                   "package order\n",
+		"internal/domain/order/core/model/order.go":        "package model\n\ntype Order struct{}\n",
+		"internal/domain/order/app/service.go":             "package app\n",
+		"internal/domain/order/handler/http/handler.go":    "package http\n",
 		"internal/domain/order/infra/persistence/store.go": "package persistence\n",
 
 		// legacy — violates structure.internal-top-level
@@ -225,9 +225,9 @@ func TestSkill_WarningMode(t *testing.T) {
 
 import _ "` + mod + `/internal/domain/user/app"
 `,
-		"internal/domain/user/alias.go":            "package user\n",
-		"internal/domain/user/core/model/user.go":  "package model\n\ntype User struct{}\n",
-		"internal/domain/user/app/service.go":      "package app\n",
+		"internal/domain/user/alias.go":           "package user\n",
+		"internal/domain/user/core/model/user.go": "package model\n\ntype User struct{}\n",
+		"internal/domain/user/app/service.go":     "package app\n",
 	}
 
 	writeProjectFiles(t, root, files)
