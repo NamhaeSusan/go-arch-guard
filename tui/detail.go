@@ -109,11 +109,9 @@ func (d *DetailPanel) renderGroup(node *PkgNode) {
 	fmt.Fprintf(&b, "[white::b]%s\n\n", node.RelPath)
 
 	// Collect all violations under this path.
-	var allViols []violWithPath
+	var allViols []rules.Violation
 	d.violations.walkPath(node.RelPath, func(viols []rules.Violation) {
-		for i := range viols {
-			allViols = append(allViols, violWithPath{v: viols[i]})
-		}
+		allViols = append(allViols, viols...)
 	})
 
 	if len(allViols) == 0 {
@@ -125,7 +123,7 @@ func (d *DetailPanel) renderGroup(node *PkgNode) {
 	// Count by severity.
 	errors, warnings := 0, 0
 	for _, vp := range allViols {
-		if vp.v.Severity == rules.Error {
+		if vp.Severity == rules.Error {
 			errors++
 		} else {
 			warnings++
@@ -146,22 +144,22 @@ func (d *DetailPanel) renderGroup(node *PkgNode) {
 
 	// Sort: errors first, then warnings. Within each group, sort by file.
 	sort.Slice(allViols, func(i, j int) bool {
-		if allViols[i].v.Severity != allViols[j].v.Severity {
-			return allViols[i].v.Severity < allViols[j].v.Severity // Error(0) before Warning(1)
+		if allViols[i].Severity != allViols[j].Severity {
+			return allViols[i].Severity < allViols[j].Severity // Error(0) before Warning(1)
 		}
-		return allViols[i].v.File < allViols[j].v.File
+		return allViols[i].File < allViols[j].File
 	})
 
 	// Render errors section.
 	if errors > 0 {
 		b.WriteString("[red::b]── Errors ──\n")
 		for _, vp := range allViols {
-			if vp.v.Severity != rules.Error {
+			if vp.Severity != rules.Error {
 				break
 			}
-			fmt.Fprintf(&b, "[red]  ✗ [%s] %s\n", vp.v.Rule, vp.v.File)
-			fmt.Fprintf(&b, "[gray]    %s\n", vp.v.Message)
-			fmt.Fprintf(&b, "[darkgray]    fix: %s\n", vp.v.Fix)
+			fmt.Fprintf(&b, "[red]  ✗ [%s] %s\n", vp.Rule, vp.File)
+			fmt.Fprintf(&b, "[gray]    %s\n", vp.Message)
+			fmt.Fprintf(&b, "[darkgray]    fix: %s\n", vp.Fix)
 		}
 		b.WriteString("\n")
 	}
@@ -170,12 +168,12 @@ func (d *DetailPanel) renderGroup(node *PkgNode) {
 	if warnings > 0 {
 		b.WriteString("[yellow::b]── Warnings ──\n")
 		for _, vp := range allViols {
-			if vp.v.Severity != rules.Warning {
+			if vp.Severity != rules.Warning {
 				continue
 			}
-			fmt.Fprintf(&b, "[yellow]  ⚠ [%s] %s\n", vp.v.Rule, vp.v.File)
-			fmt.Fprintf(&b, "[gray]    %s\n", vp.v.Message)
-			fmt.Fprintf(&b, "[darkgray]    fix: %s\n", vp.v.Fix)
+			fmt.Fprintf(&b, "[yellow]  ⚠ [%s] %s\n", vp.Rule, vp.File)
+			fmt.Fprintf(&b, "[gray]    %s\n", vp.Message)
+			fmt.Fprintf(&b, "[darkgray]    fix: %s\n", vp.Fix)
 		}
 		b.WriteString("\n")
 	}
@@ -201,8 +199,4 @@ func (d *DetailPanel) writeViolations(b *strings.Builder, relPath string) {
 		fmt.Fprintf(b, "[darkgray]    fix: %s\n", v.Fix)
 	}
 	b.WriteString("\n")
-}
-
-type violWithPath struct {
-	v rules.Violation
 }

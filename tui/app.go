@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/NamhaeSusan/go-arch-guard/rules"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 	"golang.org/x/tools/go/packages"
@@ -40,13 +41,19 @@ func Run(pkgs []*packages.Package, module, root string) error {
 		SetFieldBackgroundColor(tcell.ColorBlack)
 
 	// Status bar.
-	violCount := 0
-	for _, v := range violations {
-		violCount += len(v)
+	errCount, warnCount := 0, 0
+	for _, viols := range violations {
+		for _, v := range viols {
+			if v.Severity == rules.Error {
+				errCount++
+			} else {
+				warnCount++
+			}
+		}
 	}
 	status := tview.NewTextView().SetDynamicColors(true)
-	status.SetText(fmt.Sprintf(" [green]%d[white] pkgs  [red]%d[white] violations  [gray]│  / search  Tab panel  q quit  ↑↓ navigate",
-		len(pkgs), violCount))
+	status.SetText(fmt.Sprintf(" [green]%d[white] pkgs  [red]%d[white] errors  [yellow]%d[white] warnings  [gray]│  / search  Tab panel  q quit  ↑↓ navigate",
+		len(pkgs), errCount, warnCount))
 
 	// Layout.
 	mainFlex := tview.NewFlex().

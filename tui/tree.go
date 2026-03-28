@@ -67,13 +67,16 @@ func BuildTree(pkgs []*packages.Package, module string, violations ViolationInde
 				SetColor(color).
 				SetSelectable(true).
 				SetExpanded(depth <= 2)
-			node.SetReference(&PkgNode{
+			pn := &PkgNode{
 				RelPath:       key,
 				IsLeaf:        isLeaf,
-				Imports:       info.imports,
-				FullPath:      info.fullPath,
 				HasViolations: sev != sevNone,
-			})
+			}
+			if isLeaf {
+				pn.Imports = info.imports
+				pn.FullPath = info.fullPath
+			}
+			node.SetReference(pn)
 
 			parent.AddChild(node)
 			nodeMap[key] = node

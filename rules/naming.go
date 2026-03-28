@@ -29,6 +29,7 @@ func CheckNaming(pkgs []*packages.Package, opts ...Option) []Violation {
 func checkStutter(pkg *packages.Package, cfg Config) []Violation {
 	var violations []Violation
 	pkgName := pkg.Name
+	pkgNameLen := len([]rune(pkgName))
 	for _, file := range pkg.Syntax {
 		filePath := relativePathForPackage(pkg, pkg.Fset.Position(file.Pos()).Filename)
 		if cfg.IsExcluded(filePath) {
@@ -46,10 +47,7 @@ func checkStutter(pkg *packages.Package, cfg Config) []Violation {
 				}
 				name := ts.Name.Name
 				if stutters(pkgName, name) {
-					suggested := strings.TrimPrefix(strings.ToLower(name), strings.ToLower(pkgName))
-					if len(suggested) > 0 {
-						suggested = strings.ToUpper(suggested[:1]) + suggested[1:]
-					}
+					suggested := string([]rune(name)[pkgNameLen:])
 					pos := pkg.Fset.Position(ts.Name.Pos())
 					violations = append(violations, Violation{
 						File:     relativePathForPackage(pkg, pos.Filename),
@@ -67,15 +65,16 @@ func checkStutter(pkg *packages.Package, cfg Config) []Violation {
 }
 
 func stutters(pkgName, typeName string) bool {
-	if len(typeName) <= len(pkgName) {
+	pkgRunes := []rune(pkgName)
+	typeRunes := []rune(typeName)
+	if len(typeRunes) <= len(pkgRunes) {
 		return false
 	}
-	prefix := strings.ToLower(typeName[:len(pkgName)])
+	prefix := strings.ToLower(string(typeRunes[:len(pkgRunes)]))
 	if prefix != strings.ToLower(pkgName) {
 		return false
 	}
-	next := rune(typeName[len(pkgName)])
-	return unicode.IsUpper(next)
+	return unicode.IsUpper(typeRunes[len(pkgRunes)])
 }
 
 func checkImplSuffix(pkg *packages.Package, cfg Config) []Violation {
@@ -167,7 +166,7 @@ func toSnakeCase(filename string) string {
 }
 
 func checkRepoFileInterface(pkg *packages.Package, cfg Config) []Violation {
-	if !isRepoPackage(pkg.PkgPath) {
+	if !isAnyRepoPackage(pkg.PkgPath) {
 		return nil
 	}
 
@@ -200,7 +199,7 @@ func checkRepoFileInterface(pkg *packages.Package, cfg Config) []Violation {
 	return violations
 }
 
-func isRepoPackage(pkgPath string) bool {
+func isAnyRepoPackage(pkgPath string) bool {
 	return strings.HasSuffix(pkgPath, "/repo") || strings.Contains(pkgPath, "/repo/")
 }
 
@@ -283,16 +282,16 @@ func checkNoLayerSuffix(pkg *packages.Package, cfg Config) []Violation {
 }
 
 func isDomainPackage(pkgPath string) bool {
-	return strings.Contains(pkgPath, "/domain/")
+	return strings.Contains(pkgPath, "/internal/domain/")
 }
 
-func isRepoPackageByPath(pkgPath string) bool {
+func isCoreRepoPackage(pkgPath string) bool {
 	return strings.HasSuffix(pkgPath, "/core/repo") ||
 		strings.Contains(pkgPath, "/core/repo/")
 }
 
 func checkDomainInterfaceRepoOnly(pkg *packages.Package, cfg Config) []Violation {
-	if !isDomainPackage(pkg.PkgPath) || isRepoPackageByPath(pkg.PkgPath) {
+	if !isDomainPackage(pkg.PkgPath) || isCoreRepoPackage(pkg.PkgPath) {
 		return nil
 	}
 	var violations []Violation
