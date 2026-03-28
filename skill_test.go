@@ -7,6 +7,7 @@ package goarchguard_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/NamhaeSusan/go-arch-guard/analyzer"
@@ -191,6 +192,13 @@ func TestSkill_ExcludeOption(t *testing.T) {
 	}
 
 	// With exclude: structure check on legacy path excluded
+	structExcluded := rules.CheckStructure(root, rules.WithExclude("internal/legacy/..."))
+	for _, v := range structExcluded {
+		if v.Rule == "structure.internal-top-level" && strings.Contains(v.File, "legacy") {
+			t.Error("expected legacy to be excluded from structure check")
+		}
+	}
+
 	pkgs, err := analyzer.Load(root, "internal/...")
 	if err != nil {
 		t.Log(err)
@@ -307,6 +315,9 @@ import _ "` + mod + `/internal/domain/user"
 	pkgs, err := analyzer.Load(root, "internal/...")
 	if err != nil {
 		t.Log(err)
+	}
+	if len(pkgs) == 0 {
+		t.Fatalf("no packages loaded: %v", err)
 	}
 
 	violations := rules.CheckDomainIsolation(pkgs, "", "")

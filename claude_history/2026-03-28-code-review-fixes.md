@@ -3,45 +3,51 @@
 ## Task
 Code review of the entire codebase and fix identified issues.
 
-## Changes (Commit 1)
+## Changes (Commit 1: fix)
 
 ### rules/naming.go
-- **Fix `stutters()` UTF-8 safety**: Changed byte-indexing to rune-based indexing
-- **Fix `stutters()` suggested name bug**: Preserve original casing instead of lowercasing
-- **Fix `isDomainPackage` scope**: `/domain/` → `/internal/domain/` to avoid false positives
-- **Rename ambiguous functions**: `isRepoPackage` → `isAnyRepoPackage`, `isRepoPackageByPath` → `isCoreRepoPackage`
+- Fix `stutters()` UTF-8 safety (rune-based indexing)
+- Fix suggested name preserving original casing
+- Narrow `isDomainPackage` to `/internal/domain/`
+- Rename `isRepoPackage`/`isRepoPackageByPath` for clarity
 
 ### tui/tree.go
-- **Fix group node data leak**: Only leaf nodes get `Imports`/`FullPath`
+- Fix group node incorrectly inheriting leaf package data
 
 ### tui/detail.go
-- **Remove `violWithPath` wrapper**: Direct `rules.Violation` usage
+- Remove unnecessary `violWithPath` wrapper
 
 ### tui/app.go
-- **Separate error/warning counts in status bar**
+- Separate error/warning counts in status bar
 
-## Changes (Commit 2)
+## Changes (Commit 2: refactor)
 
 ### rules/structure.go
-- **Separate `structure.misplaced-layer` rule** from `structure.legacy-package`
+- Separate `structure.misplaced-layer` rule from `structure.legacy-package`
 
 ### rules/helpers.go
-- **Extract `resolveIdentImportPath` helper** for shared alias import resolution
+- Extract `resolveIdentImportPath` shared helper
 
 ### rules/naming.go, rules/structure.go
-- **Use shared `resolveIdentImportPath` helper**
+- Use shared `resolveIdentImportPath` helper
 
 ### rules/rule.go
-- **Use `strings.HasPrefix`/`strings.TrimRight`** in `matchPattern`
+- Use `strings.HasPrefix`/`strings.TrimRight` in `matchPattern`
 
 ### README.md, README.ko.md
-- **Document new `structure.misplaced-layer` rule**
+- Document new `structure.misplaced-layer` rule
 
-## Changes (Commit 3)
+## Changes (Commit 3: test)
 
 ### integration_test.go
-- **Add `structure.misplaced-layer` to integration test** rule surface check
-- **Improve `assertHasRule` error messages**: Show actual rule set on failure
+- Assert `structure.misplaced-layer` in integration test
+- Improve `assertHasRule` failure message with actual rule set
+
+## Changes (Commit 4: test)
+
+### skill_test.go
+- Add missing `len(pkgs) == 0` guard in `TestSkill_CrossDomainViolation`
+- Add structure exclude verification in `TestSkill_ExcludeOption`
 
 ## Verification
 - `go build ./...` — pass
