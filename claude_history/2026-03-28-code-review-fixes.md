@@ -6,36 +6,42 @@ Code review of the entire codebase and fix identified issues.
 ## Changes (Commit 1)
 
 ### rules/naming.go
-- **Fix `stutters()` UTF-8 safety**: Changed byte-indexing to rune-based indexing. Previous code used `typeName[:len(pkgName)]` which is unsafe for non-ASCII Go identifiers.
-- **Fix `stutters()` suggested name bug**: Previous code lowercased the entire type name before trimming prefix, losing camelCase casing in the remainder (e.g., `UserOrderID` → `Orderid` instead of `OrderID`). Now slices by rune length to preserve original casing.
-- **Fix `isDomainPackage` scope**: Changed from `/domain/` to `/internal/domain/` to avoid false positives on external dependencies whose import paths contain `/domain/`.
-- **Rename ambiguous functions**: `isRepoPackage` → `isAnyRepoPackage`, `isRepoPackageByPath` → `isCoreRepoPackage` for clarity on their different matching scopes.
+- **Fix `stutters()` UTF-8 safety**: Changed byte-indexing to rune-based indexing
+- **Fix `stutters()` suggested name bug**: Preserve original casing instead of lowercasing
+- **Fix `isDomainPackage` scope**: `/domain/` → `/internal/domain/` to avoid false positives
+- **Rename ambiguous functions**: `isRepoPackage` → `isAnyRepoPackage`, `isRepoPackageByPath` → `isCoreRepoPackage`
 
 ### tui/tree.go
-- **Fix group node data leak**: Intermediate (non-leaf) tree nodes were incorrectly assigned the `Imports` and `FullPath` of the first leaf package processed. Now only leaf nodes get these fields.
+- **Fix group node data leak**: Only leaf nodes get `Imports`/`FullPath`
 
 ### tui/detail.go
-- **Remove `violWithPath` wrapper**: Eliminated unnecessary `violWithPath` struct that added no value over direct `rules.Violation` usage.
+- **Remove `violWithPath` wrapper**: Direct `rules.Violation` usage
 
 ### tui/app.go
-- **Distinguish error/warning counts in status bar**: Status bar now shows separate `errors` and `warnings` counts with appropriate colors instead of a single red `violations` count.
+- **Separate error/warning counts in status bar**
 
 ## Changes (Commit 2)
 
 ### rules/structure.go
-- **Separate `structure.misplaced-layer` rule**: Misplaced layer directories (`app`/`handler`/`infra` outside domain slices) now emit `structure.misplaced-layer` instead of `structure.legacy-package`, enabling proper filtering.
+- **Separate `structure.misplaced-layer` rule** from `structure.legacy-package`
 
 ### rules/helpers.go
-- **Extract `resolveIdentImportPath` helper**: Shared logic for resolving AST identifier to import path, used by both `structure.go` and `naming.go`.
+- **Extract `resolveIdentImportPath` helper** for shared alias import resolution
 
 ### rules/naming.go, rules/structure.go
-- **Use shared helper**: Replaced duplicated alias import resolution loops with `resolveIdentImportPath`.
+- **Use shared `resolveIdentImportPath` helper**
 
 ### rules/rule.go
-- **Use `strings.HasPrefix`/`strings.TrimRight`**: Replaced manual byte-slicing in `matchPattern` for clarity and safety.
+- **Use `strings.HasPrefix`/`strings.TrimRight`** in `matchPattern`
 
 ### README.md, README.ko.md
-- **Document new `structure.misplaced-layer` rule**: Split from `structure.legacy-package` description.
+- **Document new `structure.misplaced-layer` rule**
+
+## Changes (Commit 3)
+
+### integration_test.go
+- **Add `structure.misplaced-layer` to integration test** rule surface check
+- **Improve `assertHasRule` error messages**: Show actual rule set on failure
 
 ## Verification
 - `go build ./...` — pass

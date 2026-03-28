@@ -92,6 +92,7 @@ func TestIntegration_Invalid(t *testing.T) {
 		assertHasRule(t, structureViolations, "structure.domain-root-alias-required")
 		assertHasRule(t, structureViolations, "structure.domain-model-required")
 		assertHasRule(t, structureViolations, "structure.dto-placement")
+		assertHasRule(t, structureViolations, "structure.misplaced-layer")
 	})
 }
 
@@ -158,7 +159,15 @@ func assertHasRule(t *testing.T, violations []rules.Violation, rule string) {
 			return
 		}
 	}
-	t.Fatalf("expected rule %q", rule)
+	seen := make(map[string]bool)
+	for _, v := range violations {
+		seen[v.Rule] = true
+	}
+	var got []string
+	for r := range seen {
+		got = append(got, r)
+	}
+	t.Fatalf("expected rule %q, got rules: %v", rule, got)
 }
 
 func assertHasPackage(t *testing.T, pkgs []*packages.Package, pkgPath string) {
