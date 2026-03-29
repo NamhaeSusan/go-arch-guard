@@ -3,3 +3,4 @@
 *.test
 *.out
 __pycache__/
+claude_history/
