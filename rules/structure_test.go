@@ -451,6 +451,52 @@ func TestCheckStructure(t *testing.T) {
 		}
 	})
 
+	t.Run("detects type alias from core/svc in alias.go", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"),
+			`package order
+
+import "example.com/myapp/internal/domain/order/core/svc"
+
+type AdminOps = svc.AdminOps
+`)
+		writeFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"), "package model\n")
+		writeFile(t, filepath.Join(root, "internal", "domain", "order", "core", "svc", "admin.go"),
+			"package svc\n\ntype AdminOps interface{ Do() }\n")
+
+		violations := rules.CheckStructure(root)
+		found := false
+		for _, v := range violations {
+			if v.Rule == "structure.domain-alias-no-interface" && strings.Contains(v.Message, "AdminOps") {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected domain-alias-no-interface violation for type alias from core/svc")
+		}
+	})
+
+	t.Run("allows type alias from core/model in alias.go", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"),
+			`package order
+
+import "example.com/myapp/internal/domain/order/core/model"
+
+type Order = model.Order
+`)
+		writeFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"),
+			"package model\n\ntype Order struct{ ID string }\n")
+
+		violations := rules.CheckStructure(root)
+		for _, v := range violations {
+			if v.Rule == "structure.domain-alias-no-interface" && strings.Contains(v.Message, "Order") {
+				t.Errorf("type alias from core/model should be allowed, got: %s", v.Message)
+			}
+		}
+	})
+
 	t.Run("project-relative exclude skips matching directory tree", func(t *testing.T) {
 		violations := rules.CheckStructure("../testdata/invalid", rules.WithExclude("internal/platform/..."))
 		for _, v := range violations {
