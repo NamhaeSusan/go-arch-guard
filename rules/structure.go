@@ -241,13 +241,7 @@ func checkDomainAliasNoInterface(domainDir string, m Model, cfg Config) []Violat
 					if sel, ok := ts.Type.(*ast.SelectorExpr); ok {
 						if ident, ok := sel.X.(*ast.Ident); ok {
 							impPath := resolveIdentImportPath(file, ident.Name)
-							isSvc := strings.Contains(impPath, "/core/svc")
-							isRepo := strings.Contains(impPath, "/core/repo")
-							if isSvc || isRepo {
-								src := "core/svc"
-								if isRepo {
-									src = "core/repo"
-								}
+							if src := matchRestrictedSublayer(m, impPath); src != "" {
 								violations = append(violations, Violation{
 									File:     relPath + "/" + m.AliasFileName,
 									Line:     fset.Position(ts.Name.Pos()).Line,
@@ -447,6 +441,18 @@ func isMisplacedLayerDirWith(m Model, rel, name string) bool {
 func matchesDomainLayerWith(m Model, rel, name string) bool {
 	parts := strings.Split(rel, "/")
 	return len(parts) == 4 && parts[0] == "internal" && parts[1] == m.DomainDir && parts[2] != "" && parts[3] == name
+}
+
+// matchRestrictedSublayer returns the sublayer name if impPath matches a
+// pkg-restricted sublayer from the model (e.g. "core/svc", "core/repo").
+// Returns "" if no match.
+func matchRestrictedSublayer(m Model, impPath string) string {
+	for sl := range m.PkgRestricted {
+		if strings.Contains(impPath, "/"+sl) {
+			return sl
+		}
+	}
+	return ""
 }
 
 func hasNonTestGoFiles(dir string) bool {

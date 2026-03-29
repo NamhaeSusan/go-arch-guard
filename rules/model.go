@@ -164,6 +164,14 @@ func WithBannedPkgNames(names []string) ModelOption {
 	return func(m *Model) { m.BannedPkgNames = names }
 }
 
+func WithLegacyPkgNames(names []string) ModelOption {
+	return func(m *Model) { m.LegacyPkgNames = names }
+}
+
+func WithAliasFileName(name string) ModelOption {
+	return func(m *Model) { m.AliasFileName = name }
+}
+
 func WithLayerDirNames(names map[string]bool) ModelOption {
 	return func(m *Model) { m.LayerDirNames = names }
 }

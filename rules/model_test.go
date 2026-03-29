@@ -78,7 +78,13 @@ func TestNewModel_StartsFromDDD(t *testing.T) {
 	m := NewModel()
 	ddd := DDD()
 	if len(m.Sublayers) != len(ddd.Sublayers) {
-		t.Error("NewModel with no options must equal DDD()")
+		t.Error("NewModel with no options must have same sublayer count as DDD()")
+	}
+	if m.DomainDir != ddd.DomainDir {
+		t.Errorf("DomainDir = %q, want %q", m.DomainDir, ddd.DomainDir)
+	}
+	if m.RequireAlias != ddd.RequireAlias {
+		t.Errorf("RequireAlias = %v, want %v", m.RequireAlias, ddd.RequireAlias)
 	}
 }
 
@@ -86,17 +92,32 @@ func TestWithModel_SetsConfigModel(t *testing.T) {
 	m := CleanArch()
 	cfg := NewConfig(WithModel(m))
 	got := cfg.model()
-	if len(got.Sublayers) != len(m.Sublayers) {
-		t.Errorf("WithModel did not apply: sublayers count %d vs %d", len(got.Sublayers), len(m.Sublayers))
+	if got.RequireAlias != false {
+		t.Error("WithModel did not apply: expected RequireAlias=false for CleanArch")
+	}
+	if !slices.Contains(got.Sublayers, "usecase") {
+		t.Error("WithModel did not apply: expected 'usecase' sublayer for CleanArch")
 	}
 }
 
 func TestConfig_DefaultModel_IsDDD(t *testing.T) {
 	cfg := NewConfig()
 	got := cfg.model()
-	ddd := DDD()
-	if len(got.Sublayers) != len(ddd.Sublayers) {
-		t.Error("default model must be DDD")
+	if !got.RequireAlias {
+		t.Error("default model must require alias (DDD)")
+	}
+	if !slices.Contains(got.Sublayers, "core/model") {
+		t.Error("default model must have core/model sublayer (DDD)")
+	}
+}
+
+func TestNewModel_OrchestrationDirPropagation(t *testing.T) {
+	m := NewModel(WithOrchestrationDir("workflow"))
+	if !m.InternalTopLevel["workflow"] {
+		t.Error("InternalTopLevel must include custom OrchestrationDir")
+	}
+	if m.InternalTopLevel["orchestration"] {
+		t.Error("InternalTopLevel must not include old OrchestrationDir after override")
 	}
 }
 

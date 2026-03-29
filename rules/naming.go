@@ -291,22 +291,40 @@ func checkNoLayerSuffixWith(m Model, pkg *packages.Package, cfg Config) []Violat
 	return violations
 }
 
-func isDomainPackage(pkgPath string) bool {
-	return strings.Contains(pkgPath, "/internal/domain/")
+func isDomainPackageWith(m Model, pkgPath string) bool {
+	return strings.Contains(pkgPath, "/internal/"+m.DomainDir+"/")
 }
 
-func isCoreRepoPackage(pkgPath string) bool {
-	return strings.HasSuffix(pkgPath, "/core/repo") ||
-		strings.Contains(pkgPath, "/core/repo/")
+func isRepoPackageWith(m Model, pkgPath string) bool {
+	for _, sl := range m.Sublayers {
+		if sl == "repo" || strings.HasSuffix(sl, "/repo") {
+			// Check if pkgPath ends with this sublayer or is inside it
+			suffix := "/" + sl
+			if strings.HasSuffix(pkgPath, suffix) || strings.Contains(pkgPath, suffix+"/") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func repoSublayerName(m Model) string {
+	for _, sl := range m.Sublayers {
+		if sl == "repo" || strings.HasSuffix(sl, "/repo") {
+			return sl
+		}
+	}
+	return "core/repo"
 }
 
 func checkDomainInterfaceRepoOnlyWith(m Model, pkg *packages.Package, cfg Config) []Violation {
 	if !m.RequireAlias {
 		return nil
 	}
-	if !isDomainPackage(pkg.PkgPath) || isCoreRepoPackage(pkg.PkgPath) {
+	if !isDomainPackageWith(m, pkg.PkgPath) || isRepoPackageWith(m, pkg.PkgPath) {
 		return nil
 	}
+	repoName := repoSublayerName(m)
 	var violations []Violation
 	for _, file := range pkg.Syntax {
 		filePath := relativePathForPackage(pkg, pkg.Fset.Position(file.Pos()).Filename)
@@ -330,24 +348,24 @@ func checkDomainInterfaceRepoOnlyWith(m Model, pkg *packages.Package, cfg Config
 						File:     relativePathForPackage(pkg, pos.Filename),
 						Line:     pos.Line,
 						Rule:     "naming.domain-interface-repo-only",
-						Message:  `interface "` + ts.Name.Name + `" must be defined in core/repo/, not in ` + filepath.Base(filepath.Dir(pkg.PkgPath)) + `/`,
-						Fix:      "move interface to core/repo/",
+						Message:  `interface "` + ts.Name.Name + `" must be defined in ` + repoName + `/, not in ` + filepath.Base(filepath.Dir(pkg.PkgPath)) + `/`,
+						Fix:      "move interface to " + repoName + "/",
 						Severity: cfg.Sev,
 					})
 				}
-				// Type alias from core/repo (re-exporting interface)
+				// Type alias from repo sublayer (re-exporting interface)
 				if ts.Assign != 0 {
 					if sel, ok := ts.Type.(*ast.SelectorExpr); ok {
 						if ident, ok := sel.X.(*ast.Ident); ok {
 							impPath := resolveIdentImportPath(file, ident.Name)
-							if strings.Contains(impPath, "/core/repo") {
+							if isRepoImportPath(m, impPath) {
 								pos := pkg.Fset.Position(ts.Name.Pos())
 								violations = append(violations, Violation{
 									File:     relativePathForPackage(pkg, pos.Filename),
 									Line:     pos.Line,
 									Rule:     "naming.domain-interface-repo-only",
-									Message:  `type alias "` + ts.Name.Name + `" re-exports interface from core/repo — suspected cross-domain dependency; use orchestration/ instead`,
-									Fix:      "remove alias and move cross-domain coordination to orchestration/",
+									Message:  `type alias "` + ts.Name.Name + `" re-exports interface from ` + repoName + ` — suspected cross-domain dependency; use ` + m.OrchestrationDir + `/ instead`,
+									Fix:      "remove alias and move cross-domain coordination to " + m.OrchestrationDir + "/",
 									Severity: cfg.Sev,
 								})
 							}
@@ -445,6 +463,17 @@ func collectMockStructs(fset *token.FileSet, file *ast.File) map[string]int {
 		}
 	}
 	return result
+}
+
+func isRepoImportPath(m Model, impPath string) bool {
+	for _, sl := range m.Sublayers {
+		if sl == "repo" || strings.HasSuffix(sl, "/repo") {
+			if strings.Contains(impPath, "/"+sl) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func receiverTypeName(expr ast.Expr) string {

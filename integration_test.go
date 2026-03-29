@@ -266,6 +266,27 @@ func TestIntegration_CustomModel(t *testing.T) {
 	})
 }
 
+func TestIntegration_CleanArchModel_DirectionViolation(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/cleanviolation"
+	m := rules.CleanArch()
+
+	// usecase imports handler — should violate direction (usecase can only import entity, gateway)
+	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.25.0\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "usecase", "usecase.go"),
+		"package usecase\n\nimport _ \""+module+"/internal/domain/order/handler\"\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "handler", "handler.go"),
+		"package handler\n")
+
+	pkgs, err := analyzer.Load(root, "internal/...")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	violations := rules.CheckLayerDirection(pkgs, module, root, rules.WithModel(m))
+	assertHasRule(t, violations, "layer.direction")
+}
+
 func TestIntegration_CustomModel_DirectionViolation(t *testing.T) {
 	root := t.TempDir()
 	module := "example.com/custom2"
