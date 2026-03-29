@@ -319,6 +319,340 @@ func TestIntegration_CustomModel_DirectionViolation(t *testing.T) {
 	assertHasRule(t, violations, "layer.direction")
 }
 
+// TestIntegration_RealWorldDDD simulates a realistic multi-domain DDD project
+// with orchestration, pkg, cmd, cross-domain isolation, and all layer directions.
+func TestIntegration_RealWorldDDD(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/shop"
+
+	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.25.0\n")
+
+	// --- domain: order ---
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"),
+		`package order
+
+import "example.com/shop/internal/domain/order/app"
+
+type Service = app.Service
+var NewService = app.NewService
+`)
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"),
+		"package model\n\ntype Order struct{ ID string }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "core", "repo", "order.go"),
+		"package repo\n\nimport \"example.com/shop/internal/domain/order/core/model\"\n\ntype Order interface{ Find(id string) (model.Order, error) }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "app", "service.go"),
+		`package app
+
+import (
+	"example.com/shop/internal/domain/order/core/model"
+	"example.com/shop/internal/domain/order/core/repo"
+)
+
+type Service struct {
+	repo repo.Order
+}
+func NewService(r repo.Order) *Service { return &Service{repo: r} }
+func (s *Service) Get(id string) (model.Order, error) { return s.repo.Find(id) }
+`)
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "handler", "http", "handler.go"),
+		"package http\n\nimport \"example.com/shop/internal/domain/order/app\"\n\ntype Handler struct{ svc *app.Service }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "event", "order_created.go"),
+		"package event\n\nimport \"example.com/shop/internal/domain/order/core/model\"\n\ntype OrderCreated struct{ Order model.Order }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "infra", "persistence", "pg.go"),
+		`package persistence
+
+import (
+	"example.com/shop/internal/domain/order/core/model"
+	"example.com/shop/internal/domain/order/core/repo"
+)
+
+type Pg struct{}
+func (Pg) Find(_ string) (model.Order, error) { return model.Order{}, nil }
+var _ repo.Order = Pg{}
+`)
+
+	// --- domain: user ---
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "user", "alias.go"),
+		`package user
+
+import "example.com/shop/internal/domain/user/app"
+
+type Service = app.Service
+var NewService = app.NewService
+`)
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "user", "core", "model", "user.go"),
+		"package model\n\ntype User struct{ ID string; Name string }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "user", "core", "repo", "user.go"),
+		"package repo\n\nimport \"example.com/shop/internal/domain/user/core/model\"\n\ntype User interface{ GetByID(id string) (model.User, error) }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "user", "app", "service.go"),
+		`package app
+
+import (
+	"example.com/shop/internal/domain/user/core/model"
+	"example.com/shop/internal/domain/user/core/repo"
+)
+
+type Service struct{ repo repo.User }
+func NewService(r repo.User) *Service { return &Service{repo: r} }
+func (s *Service) Get(id string) (model.User, error) { return s.repo.GetByID(id) }
+`)
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "user", "infra", "persistence", "pg.go"),
+		`package persistence
+
+import (
+	"example.com/shop/internal/domain/user/core/model"
+	"example.com/shop/internal/domain/user/core/repo"
+)
+
+type Pg struct{}
+func (Pg) GetByID(_ string) (model.User, error) { return model.User{}, nil }
+var _ repo.User = Pg{}
+`)
+
+	// --- orchestration ---
+	writeIntegrationFile(t, filepath.Join(root, "internal", "orchestration", "create_order.go"),
+		`package orchestration
+
+import (
+	"example.com/shop/internal/domain/order"
+	"example.com/shop/internal/domain/user"
+)
+
+type CreateOrder struct {
+	orderSvc *order.Service
+	userSvc  *user.Service
+}
+func New(o *order.Service, u *user.Service) *CreateOrder { return &CreateOrder{orderSvc: o, userSvc: u} }
+`)
+
+	// --- pkg ---
+	writeIntegrationFile(t, filepath.Join(root, "internal", "pkg", "middleware", "auth.go"),
+		"package middleware\n\nfunc Auth() {}\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "pkg", "logger", "logger.go"),
+		"package logger\n\nfunc Info(_ string) {}\n")
+
+	// --- cmd ---
+	writeIntegrationFile(t, filepath.Join(root, "cmd", "api", "main.go"),
+		`package main
+
+import (
+	_ "example.com/shop/internal/domain/order"
+	_ "example.com/shop/internal/domain/user"
+)
+
+func main() {}
+`)
+
+	pkgs, err := analyzer.Load(root, "internal/...", "cmd/...")
+	if err != nil {
+		t.Log("partial load:", err)
+	}
+	if len(pkgs) == 0 {
+		t.Fatal("no packages loaded")
+	}
+
+	t.Run("domain isolation", func(t *testing.T) {
+		violations := rules.CheckDomainIsolation(pkgs, module, root)
+		for _, v := range violations {
+			t.Log(v.String())
+		}
+		report.AssertNoViolations(t, violations)
+	})
+	t.Run("layer direction", func(t *testing.T) {
+		violations := rules.CheckLayerDirection(pkgs, module, root)
+		for _, v := range violations {
+			t.Log(v.String())
+		}
+		report.AssertNoViolations(t, violations)
+	})
+	t.Run("naming", func(t *testing.T) {
+		violations := rules.CheckNaming(pkgs)
+		for _, v := range violations {
+			t.Log(v.String())
+		}
+		report.AssertNoViolations(t, violations)
+	})
+	t.Run("structure", func(t *testing.T) {
+		violations := rules.CheckStructure(root)
+		for _, v := range violations {
+			t.Log(v.String())
+		}
+		report.AssertNoViolations(t, violations)
+	})
+}
+
+// TestIntegration_RealWorldCleanArch simulates a realistic Clean Architecture project
+// with multiple domains, cross-domain isolation via orchestration, and all layer directions.
+func TestIntegration_RealWorldCleanArch(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/cleanshop"
+	m := rules.CleanArch()
+
+	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.25.0\n")
+
+	// --- domain: product ---
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "product", "entity", "product.go"),
+		"package entity\n\ntype Product struct{ ID string; Price int }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "product", "gateway", "product.go"),
+		"package gateway\n\nimport \"example.com/cleanshop/internal/domain/product/entity\"\n\ntype Product interface{ FindByID(id string) (entity.Product, error) }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "product", "usecase", "get_product.go"),
+		`package usecase
+
+import (
+	"example.com/cleanshop/internal/domain/product/entity"
+	"example.com/cleanshop/internal/domain/product/gateway"
+)
+
+type GetProduct struct{ gw gateway.Product }
+func NewGetProduct(gw gateway.Product) *GetProduct { return &GetProduct{gw: gw} }
+func (uc *GetProduct) Execute(id string) (entity.Product, error) { return uc.gw.FindByID(id) }
+`)
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "product", "handler", "http.go"),
+		"package handler\n\nimport \"example.com/cleanshop/internal/domain/product/usecase\"\n\ntype HTTP struct{ uc *usecase.GetProduct }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "product", "infra", "pg_product.go"),
+		`package infra
+
+import (
+	"example.com/cleanshop/internal/domain/product/entity"
+	"example.com/cleanshop/internal/domain/product/gateway"
+)
+
+type PgProduct struct{}
+func (PgProduct) FindByID(_ string) (entity.Product, error) { return entity.Product{}, nil }
+var _ gateway.Product = PgProduct{}
+`)
+
+	// --- domain: cart ---
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "cart", "entity", "cart.go"),
+		"package entity\n\ntype Cart struct{ ID string; Items []string }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "cart", "gateway", "cart.go"),
+		"package gateway\n\nimport \"example.com/cleanshop/internal/domain/cart/entity\"\n\ntype Cart interface{ Save(c entity.Cart) error }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "cart", "usecase", "add_to_cart.go"),
+		`package usecase
+
+import (
+	"example.com/cleanshop/internal/domain/cart/entity"
+	"example.com/cleanshop/internal/domain/cart/gateway"
+)
+
+type AddToCart struct{ gw gateway.Cart }
+func NewAddToCart(gw gateway.Cart) *AddToCart { return &AddToCart{gw: gw} }
+func (uc *AddToCart) Execute(c entity.Cart) error { return uc.gw.Save(c) }
+`)
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "cart", "infra", "redis_cart.go"),
+		`package infra
+
+import (
+	"example.com/cleanshop/internal/domain/cart/entity"
+	"example.com/cleanshop/internal/domain/cart/gateway"
+)
+
+type RedisCart struct{}
+func (RedisCart) Save(_ entity.Cart) error { return nil }
+var _ gateway.Cart = RedisCart{}
+`)
+
+	// --- pkg ---
+	writeIntegrationFile(t, filepath.Join(root, "internal", "pkg", "logger", "logger.go"),
+		"package logger\n\nfunc Log(_ string) {}\n")
+
+	pkgs, err := analyzer.Load(root, "internal/...")
+	if err != nil {
+		t.Log("partial load:", err)
+	}
+	if len(pkgs) == 0 {
+		t.Fatal("no packages loaded")
+	}
+
+	opts := []rules.Option{rules.WithModel(m)}
+
+	t.Run("layer direction", func(t *testing.T) {
+		violations := rules.CheckLayerDirection(pkgs, module, root, opts...)
+		for _, v := range violations {
+			t.Log(v.String())
+		}
+		report.AssertNoViolations(t, violations)
+	})
+	t.Run("domain isolation", func(t *testing.T) {
+		violations := rules.CheckDomainIsolation(pkgs, module, root, opts...)
+		for _, v := range violations {
+			t.Log(v.String())
+		}
+		report.AssertNoViolations(t, violations)
+	})
+	t.Run("structure", func(t *testing.T) {
+		violations := rules.CheckStructure(root, opts...)
+		for _, v := range violations {
+			t.Log(v.String())
+		}
+		report.AssertNoViolations(t, violations)
+	})
+	t.Run("naming", func(t *testing.T) {
+		violations := rules.CheckNaming(pkgs, opts...)
+		for _, v := range violations {
+			t.Log(v.String())
+		}
+		report.AssertNoViolations(t, violations)
+	})
+}
+
+// TestIntegration_RealWorldCleanArch_Violations tests that CleanArch model catches
+// various violations: cross-domain imports, wrong direction, unknown sublayers.
+func TestIntegration_RealWorldCleanArch_Violations(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/cleaninvalid"
+	m := rules.CleanArch()
+
+	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.25.0\n")
+
+	// domain: order — usecase imports handler (direction violation)
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "entity", "order.go"),
+		"package entity\n\ntype Order struct{ ID string }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "handler", "handler.go"),
+		"package handler\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "usecase", "order_uc.go"),
+		"package usecase\n\nimport _ \"example.com/cleaninvalid/internal/domain/order/handler\"\n")
+
+	// domain: user — entity imports from pkg (pkg-restricted violation)
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "user", "entity", "user.go"),
+		"package entity\n\nimport _ \"example.com/cleaninvalid/internal/pkg/logger\"\n\ntype User struct{ ID string }\n")
+
+	// cross-domain: order imports user directly
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "infra", "cross.go"),
+		"package infra\n\nimport _ \"example.com/cleaninvalid/internal/domain/user/entity\"\n")
+
+	// unknown sublayer
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "service", "bad.go"),
+		"package service\n")
+
+	writeIntegrationFile(t, filepath.Join(root, "internal", "pkg", "logger", "logger.go"),
+		"package logger\n")
+
+	pkgs, err := analyzer.Load(root, "internal/...")
+	if err != nil {
+		t.Log("partial load:", err)
+	}
+
+	opts := []rules.Option{rules.WithModel(m)}
+
+	t.Run("detects direction violation", func(t *testing.T) {
+		violations := rules.CheckLayerDirection(pkgs, module, root, opts...)
+		assertHasRule(t, violations, "layer.direction")
+	})
+	t.Run("detects entity importing pkg", func(t *testing.T) {
+		violations := rules.CheckLayerDirection(pkgs, module, root, opts...)
+		assertHasRule(t, violations, "layer.inner-imports-pkg")
+	})
+	t.Run("detects unknown sublayer", func(t *testing.T) {
+		violations := rules.CheckLayerDirection(pkgs, module, root, opts...)
+		assertHasRule(t, violations, "layer.unknown-sublayer")
+	})
+	t.Run("detects cross-domain import", func(t *testing.T) {
+		violations := rules.CheckDomainIsolation(pkgs, module, root, opts...)
+		assertHasRule(t, violations, "isolation.cross-domain")
+	})
+}
+
 func writeIntegrationFile(t *testing.T, path string, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
