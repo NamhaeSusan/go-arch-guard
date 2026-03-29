@@ -241,7 +241,7 @@ func checkDomainAliasNoInterface(domainDir string, m Model, cfg Config) []Violat
 					if sel, ok := ts.Type.(*ast.SelectorExpr); ok {
 						if ident, ok := sel.X.(*ast.Ident); ok {
 							impPath := resolveIdentImportPath(file, ident.Name)
-							if src := matchRestrictedSublayer(m, impPath); src != "" {
+							if src := matchContractSublayer(m, impPath); src != "" {
 								violations = append(violations, Violation{
 									File:     relPath + "/" + m.AliasFileName,
 									Line:     fset.Position(ts.Name.Pos()).Line,
@@ -443,13 +443,17 @@ func matchesDomainLayerWith(m Model, rel, name string) bool {
 	return len(parts) == 4 && parts[0] == "internal" && parts[1] == m.DomainDir && parts[2] != "" && parts[3] == name
 }
 
-// matchRestrictedSublayer returns the sublayer name if impPath matches a
-// pkg-restricted sublayer from the model (e.g. "core/svc", "core/repo").
-// Returns "" if no match.
-func matchRestrictedSublayer(m Model, impPath string) string {
-	for sl := range m.PkgRestricted {
-		if strings.Contains(impPath, "/"+sl) {
-			return sl
+// matchContractSublayer returns the sublayer name if impPath references a
+// contract sublayer (one ending in /repo, /svc, or named repo, svc).
+// These are the sublayers that define interfaces/contracts and should not
+// be re-exported via alias.go. Returns "" if no match.
+func matchContractSublayer(m Model, impPath string) string {
+	for _, sl := range m.Sublayers {
+		if sl == "repo" || sl == "svc" ||
+			strings.HasSuffix(sl, "/repo") || strings.HasSuffix(sl, "/svc") {
+			if strings.Contains(impPath, "/"+sl) {
+				return sl
+			}
 		}
 	}
 	return ""
