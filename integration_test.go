@@ -180,6 +180,124 @@ func assertHasPackage(t *testing.T, pkgs []*packages.Package, pkgPath string) {
 	t.Fatalf("expected package %q to be loaded", pkgPath)
 }
 
+func TestIntegration_CleanArchModel(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/cleanapp"
+	m := rules.CleanArch()
+
+	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.25.0\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "handler", "handler.go"),
+		"package handler\n\nimport _ \""+module+"/internal/domain/order/usecase\"\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "usecase", "usecase.go"),
+		"package usecase\n\nimport _ \""+module+"/internal/domain/order/entity\"\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "entity", "order.go"),
+		"package entity\n\ntype Order struct{ ID string }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "gateway", "repo.go"),
+		"package gateway\n\nimport _ \""+module+"/internal/domain/order/entity\"\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "infra", "persistence.go"),
+		"package infra\n\nimport (\n\t_ \""+module+"/internal/domain/order/gateway\"\n\t_ \""+module+"/internal/domain/order/entity\"\n)\n")
+
+	pkgs, err := analyzer.Load(root, "internal/...")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	opts := []rules.Option{rules.WithModel(m)}
+
+	t.Run("layer direction", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, module, root, opts...))
+	})
+	t.Run("domain isolation", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, module, root, opts...))
+	})
+	t.Run("structure", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckStructure(root, opts...))
+	})
+	t.Run("naming", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckNaming(pkgs, opts...))
+	})
+}
+
+func TestIntegration_CustomModel(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/custom"
+	m := rules.NewModel(
+		rules.WithDomainDir("module"),
+		rules.WithSharedDir("lib"),
+		rules.WithSublayers([]string{"api", "logic", "data"}),
+		rules.WithDirection(map[string][]string{
+			"api":   {"logic"},
+			"logic": {"data"},
+			"data":  {},
+		}),
+		rules.WithPkgRestricted(map[string]bool{"data": true}),
+		rules.WithRequireAlias(false),
+		rules.WithRequireModel(false),
+	)
+
+	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.25.0\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "module", "order", "api", "handler.go"),
+		"package api\n\nimport _ \""+module+"/internal/module/order/logic\"\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "module", "order", "logic", "service.go"),
+		"package logic\n\nimport _ \""+module+"/internal/module/order/data\"\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "module", "order", "data", "repo.go"),
+		"package data\n\ntype OrderRepo struct{}\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "lib", "logger", "logger.go"),
+		"package logger\n")
+
+	pkgs, err := analyzer.Load(root, "internal/...")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	opts := []rules.Option{rules.WithModel(m)}
+
+	t.Run("layer direction", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, module, root, opts...))
+	})
+	t.Run("domain isolation", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, module, root, opts...))
+	})
+	t.Run("structure", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckStructure(root, opts...))
+	})
+	t.Run("naming", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckNaming(pkgs, opts...))
+	})
+}
+
+func TestIntegration_CustomModel_DirectionViolation(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/custom2"
+	m := rules.NewModel(
+		rules.WithDomainDir("module"),
+		rules.WithSharedDir("lib"),
+		rules.WithSublayers([]string{"api", "logic", "data"}),
+		rules.WithDirection(map[string][]string{
+			"api":   {"logic"},
+			"logic": {"data"},
+			"data":  {},
+		}),
+		rules.WithRequireAlias(false),
+		rules.WithRequireModel(false),
+	)
+
+	// api imports data directly — should violate direction (api can only import logic)
+	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.25.0\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "module", "order", "api", "handler.go"),
+		"package api\n\nimport _ \""+module+"/internal/module/order/data\"\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "module", "order", "data", "repo.go"),
+		"package data\n")
+
+	pkgs, err := analyzer.Load(root, "internal/...")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	violations := rules.CheckLayerDirection(pkgs, module, root, rules.WithModel(m))
+	assertHasRule(t, violations, "layer.direction")
+}
+
 func writeIntegrationFile(t *testing.T, path string, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

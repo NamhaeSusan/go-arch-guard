@@ -40,6 +40,14 @@ type Option func(*Config)
 type Config struct {
 	Sev             Severity
 	ExcludePatterns []string
+	Model           *Model
+}
+
+func (c Config) model() Model {
+	if c.Model != nil {
+		return *c.Model
+	}
+	return defaultModel
 }
 
 func NewConfig(opts ...Option) Config {
@@ -52,6 +60,10 @@ func NewConfig(opts ...Option) Config {
 
 func WithSeverity(s Severity) Option {
 	return func(c *Config) { c.Sev = s }
+}
+
+func WithModel(m Model) Option {
+	return func(c *Config) { c.Model = &m }
 }
 
 func WithExclude(patterns ...string) Option {

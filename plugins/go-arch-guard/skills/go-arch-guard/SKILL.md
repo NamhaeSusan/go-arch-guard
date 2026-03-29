@@ -132,7 +132,36 @@ infra → core/repo, core/model, event
 
 ---
 
-## 5. Options
+## 5. Architecture Model Customization
+
+프리셋 또는 커스텀 모델로 아키텍처 규칙을 변경할 수 있습니다:
+
+```go
+// DDD (기본값 — 변경 불필요)
+// CleanArch — alias.go 불필요, usecase/entity/gateway 레이어
+m := rules.CleanArch()
+
+// 커스텀 — DDD에서 시작하여 오버라이드
+m := rules.NewModel(
+    rules.WithDomainDir("module"),
+    rules.WithSharedDir("lib"),
+    rules.WithSublayers([]string{"api", "logic", "data"}),
+    rules.WithDirection(map[string][]string{
+        "api":   {"logic"},
+        "logic": {"data"},
+        "data":  {},
+    }),
+)
+
+// WithModel로 적용
+rules.CheckLayerDirection(pkgs, "", "", rules.WithModel(m))
+```
+
+주요 옵션: `WithSublayers`, `WithDirection`, `WithDomainDir`, `WithSharedDir`, `WithOrchestrationDir`, `WithRequireAlias`, `WithRequireModel`, `WithModelPath`, `WithPkgRestricted`, `WithDTOAllowedLayers`, `WithBannedPkgNames`, `WithLayerDirNames`
+
+---
+
+## 6. Options
 
 ### Migration — 특정 경로 제외
 
@@ -152,7 +181,7 @@ rules.CheckDomainIsolation(pkgs, "", "",
 
 ---
 
-## 6. Banned Patterns
+## 7. Banned Patterns
 
 | Category | Banned |
 |----------|--------|
@@ -164,7 +193,7 @@ rules.CheckDomainIsolation(pkgs, "", "",
 
 ---
 
-## 7. Cross-Domain Interface 금지 원칙 (CRITICAL)
+## 8. Cross-Domain Interface 금지 원칙 (CRITICAL)
 
 도메인 내에서 interface는 **`core/repo/`에만** 정의할 수 있으며, 이는 **infra가 구현하는 persistence 추상화 전용**입니다.
 
@@ -201,7 +230,7 @@ cross-domain 데이터가 필요한 endpoint는 **도메인 handler가 아닌 `o
 
 ---
 
-## 8. Common Setup Scenarios
+## 9. Common Setup Scenarios
 
 ### New project from scratch
 

@@ -101,6 +101,59 @@ t.Run("layer direction", func(t *testing.T) {
 
 모듈을 결정할 수 없는 경우(예: 모듈 메타데이터 없이 패키지를 로드한 경우) `meta.no-matching-packages` 경고가 발생합니다.
 
+## 아키텍처 모델 커스터마이징
+
+go-arch-guard는 프리셋과 완전한 커스터마이징을 지원합니다:
+
+```go
+// 1. 기본 DDD 모델 (기존 동작 — 변경 불필요)
+m := rules.DDD()
+
+// 2. Clean Architecture
+m := rules.CleanArch()
+
+// 3. 커스텀 모델 (DDD 기본값에서 시작, 오버라이드 적용)
+m := rules.NewModel(
+    rules.WithDomainDir("module"),
+    rules.WithSharedDir("lib"),
+    rules.WithSublayers([]string{"api", "logic", "data"}),
+    rules.WithDirection(map[string][]string{
+        "api":   {"logic"},
+        "logic": {"data"},
+        "data":  {},
+    }),
+)
+
+// WithModel로 모든 체크에 적용
+violations := rules.CheckLayerDirection(pkgs, module, root, rules.WithModel(m))
+```
+
+`WithModel` 옵션이 없으면 모든 체크는 `DDD()`를 사용합니다 — 기존 동작이 완전히 보존됩니다.
+
+### 프리셋
+
+| 프리셋 | 서브레이어 | Alias 필수 | 도메인 모델 필수 |
+|--------|-----------|-----------|---------------|
+| `DDD()` | handler, app, core/model, core/repo, core/svc, event, infra | Yes | Yes (core/model/) |
+| `CleanArch()` | handler, usecase, entity, gateway, infra | No | No |
+
+### 모델 옵션
+
+| 옵션 | 설명 |
+|------|------|
+| `WithSublayers([]string{...})` | 인식할 서브레이어 이름 설정 |
+| `WithDirection(map[string][]string{...})` | 허용 import 방향 매트릭스 설정 |
+| `WithPkgRestricted(map[string]bool{...})` | 공유 패키지 import 금지 서브레이어 |
+| `WithDomainDir("domain")` | 도메인 최상위 디렉토리명 |
+| `WithOrchestrationDir("orchestration")` | 오케스트레이션 최상위 디렉토리명 |
+| `WithSharedDir("pkg")` | 공유 패키지 최상위 디렉토리명 |
+| `WithRequireAlias(bool)` | 도메인 루트에 alias.go 필수 여부 |
+| `WithRequireModel(bool)` | 도메인에 모델 디렉토리 필수 여부 |
+| `WithModelPath("core/model")` | 도메인 모델 디렉토리 경로 |
+| `WithDTOAllowedLayers([]string{...})` | DTO 허용 서브레이어 |
+| `WithBannedPkgNames([]string{...})` | internal/ 하위 금지 패키지명 |
+| `WithLayerDirNames(map[string]bool{...})` | 네이밍 체크 시 "레이어" 디렉토리로 간주할 이름 |
+
 ## 대상 아키텍처
 
 `go-arch-guard`는 도메인 중심 수직 슬라이스 레이아웃을 가정합니다.

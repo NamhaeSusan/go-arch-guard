@@ -10,6 +10,7 @@ import (
 
 func CheckLayerDirection(pkgs []*packages.Package, projectModule string, projectRoot string, opts ...Option) []Violation {
 	cfg := NewConfig(opts...)
+	m := cfg.model()
 	projectModule = resolveModule(pkgs, projectModule)
 	projectRoot = resolveRoot(pkgs, projectRoot)
 	if warns := validateModule(pkgs, projectModule); len(warns) > 0 {
@@ -26,18 +27,18 @@ func CheckLayerDirection(pkgs []*packages.Package, projectModule string, project
 			continue
 		}
 
-		srcDomain := identifyDomain(pkg.PkgPath, internalPrefix)
+		srcDomain := identifyDomainWith(m, pkg.PkgPath, internalPrefix)
 		if srcDomain == "" {
 			continue
 		}
 
-		srcSublayer := identifySublayer(pkg.PkgPath, internalPrefix, srcDomain)
-		if srcSublayer != "" && !isKnownSublayer(srcSublayer) {
+		srcSublayer := identifySublayerWith(m, pkg.PkgPath, internalPrefix, srcDomain)
+		if srcSublayer != "" && !isKnownSublayerIn(m, srcSublayer) {
 			violations = append(violations, Violation{
 				File:     relativePackageFile(pkg),
 				Rule:     "layer.unknown-sublayer",
 				Message:  fmt.Sprintf("unknown sublayer %q in domain %q", srcSublayer, srcDomain),
-				Fix:      fmt.Sprintf("use one of the supported sublayers: %v", knownDomainSublayers),
+				Fix:      fmt.Sprintf("use one of the supported sublayers: %v", m.Sublayers),
 				Severity: cfg.Sev,
 			})
 			continue
@@ -48,14 +49,14 @@ func CheckLayerDirection(pkgs []*packages.Package, projectModule string, project
 				continue
 			}
 
-			if isPkgPkg(impPath, internalPrefix) {
-				if pkgRestrictedSublayers[srcSublayer] {
+			if isPkgPkgWith(m, impPath, internalPrefix) {
+				if m.PkgRestricted[srcSublayer] {
 					file, line := findImportPosition(pkg, impPath, projectRoot)
 					violations = append(violations, Violation{
 						File:     file,
 						Line:     line,
 						Rule:     "layer.inner-imports-pkg",
-						Message:  fmt.Sprintf("inner sublayer %q must not import internal/pkg in domain %q", srcSublayer, srcDomain),
+						Message:  fmt.Sprintf("inner sublayer %q must not import internal/%s in domain %q", srcSublayer, m.SharedDir, srcDomain),
 						Fix:      "keep core and event layers self-contained; move shared concerns outward to app, handler, or infra",
 						Severity: cfg.Sev,
 					})
@@ -64,17 +65,17 @@ func CheckLayerDirection(pkgs []*packages.Package, projectModule string, project
 			}
 
 			// Skip imports to orchestration/
-			if isOrchestrationPkg(impPath, internalPrefix) {
+			if isOrchestrationPkgWith(m, impPath, internalPrefix) {
 				continue
 			}
 
-			impDomain := identifyDomain(impPath, internalPrefix)
+			impDomain := identifyDomainWith(m, impPath, internalPrefix)
 			// Only check intra-domain imports
 			if impDomain != srcDomain {
 				continue
 			}
 
-			impSublayer := identifySublayer(impPath, internalPrefix, impDomain)
+			impSublayer := identifySublayerWith(m, impPath, internalPrefix, impDomain)
 
 			// Domain root (alias.go) is a facade — it may import any sublayer
 			// within its own domain. Cross-domain isolation is enforced elsewhere.
@@ -82,14 +83,14 @@ func CheckLayerDirection(pkgs []*packages.Package, projectModule string, project
 				continue
 			}
 
-			if impSublayer != "" && !isKnownSublayer(impSublayer) {
+			if impSublayer != "" && !isKnownSublayerIn(m, impSublayer) {
 				file, line := findImportPosition(pkg, impPath, projectRoot)
 				violations = append(violations, Violation{
 					File:     file,
 					Line:     line,
 					Rule:     "layer.unknown-sublayer",
 					Message:  fmt.Sprintf("unknown sublayer %q in domain %q", impSublayer, srcDomain),
-					Fix:      fmt.Sprintf("use one of the supported sublayers: %v", knownDomainSublayers),
+					Fix:      fmt.Sprintf("use one of the supported sublayers: %v", m.Sublayers),
 					Severity: cfg.Sev,
 				})
 				continue
@@ -101,7 +102,7 @@ func CheckLayerDirection(pkgs []*packages.Package, projectModule string, project
 			}
 
 			// Check allowed table
-			allowed, known := allowedLayerImports[srcSublayer]
+			allowed, known := m.Direction[srcSublayer]
 			if !known {
 				continue
 			}
@@ -125,16 +126,33 @@ func CheckLayerDirection(pkgs []*packages.Package, projectModule string, project
 	return violations
 }
 
-func identifySublayer(pkgPath, internalPrefix, domain string) string {
-	domainPrefix := internalPrefix + "domain/" + domain + "/"
+func identifySublayerWith(m Model, pkgPath, internalPrefix, domain string) string {
+	domainPrefix := internalPrefix + m.DomainDir + "/" + domain + "/"
 	if !strings.HasPrefix(pkgPath, domainPrefix) {
-		return "" // domain root package (alias.go)
+		return "" // domain root package
 	}
 	rel := strings.TrimPrefix(pkgPath, domainPrefix)
 	parts := strings.SplitN(rel, "/", 3)
 
-	if parts[0] == "core" && len(parts) >= 2 {
-		return "core/" + parts[1]
+	// Check if this is a nested sublayer (e.g. "core/model")
+	if len(parts) >= 2 {
+		nested := parts[0] + "/" + parts[1]
+		if slices.Contains(m.Sublayers, nested) {
+			return nested
+		}
+	}
+	return parts[0]
+}
+
+func identifyDomainWith(m Model, pkgPath, internalPrefix string) string {
+	rel := strings.TrimPrefix(pkgPath, internalPrefix)
+	if !strings.HasPrefix(rel, m.DomainDir+"/") {
+		return ""
+	}
+	after := strings.TrimPrefix(rel, m.DomainDir+"/")
+	parts := strings.SplitN(after, "/", 2)
+	if parts[0] == "" {
+		return ""
 	}
 	return parts[0]
 }

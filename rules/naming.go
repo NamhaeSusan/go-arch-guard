@@ -13,14 +13,15 @@ import (
 
 func CheckNaming(pkgs []*packages.Package, opts ...Option) []Violation {
 	cfg := NewConfig(opts...)
+	m := cfg.model()
 	var violations []Violation
 	for _, pkg := range pkgs {
 		violations = append(violations, checkStutter(pkg, cfg)...)
 		violations = append(violations, checkImplSuffix(pkg, cfg)...)
 		violations = append(violations, checkSnakeCaseFiles(pkg, cfg)...)
-		violations = append(violations, checkRepoFileInterface(pkg, cfg)...)
-		violations = append(violations, checkNoLayerSuffix(pkg, cfg)...)
-		violations = append(violations, checkDomainInterfaceRepoOnly(pkg, cfg)...)
+		violations = append(violations, checkRepoFileInterfaceWith(m, pkg, cfg)...)
+		violations = append(violations, checkNoLayerSuffixWith(m, pkg, cfg)...)
+		violations = append(violations, checkDomainInterfaceRepoOnlyWith(m, pkg, cfg)...)
 		violations = append(violations, checkNoHandMock(pkg, cfg)...)
 	}
 	return violations
@@ -165,14 +166,14 @@ func toSnakeCase(filename string) string {
 	return string(result) + ext
 }
 
-func checkRepoFileInterface(pkg *packages.Package, cfg Config) []Violation {
+func checkRepoFileInterfaceWith(m Model, pkg *packages.Package, cfg Config) []Violation {
+	if !hasRepoSublayer(m) {
+		return nil
+	}
 	if !isAnyRepoPackage(pkg.PkgPath) {
 		return nil
 	}
 
-	// Iterate Syntax directly instead of cross-referencing GoFiles indices;
-	// Syntax corresponds to CompiledGoFiles, which can differ from GoFiles
-	// when cgo or generated files are involved.
 	var violations []Violation
 	for _, astFile := range pkg.Syntax {
 		filename := pkg.Fset.Position(astFile.Pos()).Filename
@@ -197,6 +198,15 @@ func checkRepoFileInterface(pkg *packages.Package, cfg Config) []Violation {
 		})
 	}
 	return violations
+}
+
+func hasRepoSublayer(m Model) bool {
+	for _, sl := range m.Sublayers {
+		if sl == "repo" || strings.HasSuffix(sl, "/repo") {
+			return true
+		}
+	}
+	return false
 }
 
 func isAnyRepoPackage(pkgPath string) bool {
@@ -243,7 +253,7 @@ var bannedLayerSuffixes = []string{
 	"_store", "_persistence",
 }
 
-func checkNoLayerSuffix(pkg *packages.Package, cfg Config) []Violation {
+func checkNoLayerSuffixWith(m Model, pkg *packages.Package, cfg Config) []Violation {
 	var violations []Violation
 	seen := make(map[string]bool)
 	for _, f := range pkg.GoFiles {
@@ -260,7 +270,7 @@ func checkNoLayerSuffix(pkg *packages.Package, cfg Config) []Violation {
 			continue
 		}
 		dir := filepath.Base(filepath.Dir(f))
-		if !layerDirNames[dir] {
+		if !m.LayerDirNames[dir] {
 			continue
 		}
 		name := strings.TrimSuffix(base, ".go")
@@ -290,7 +300,10 @@ func isCoreRepoPackage(pkgPath string) bool {
 		strings.Contains(pkgPath, "/core/repo/")
 }
 
-func checkDomainInterfaceRepoOnly(pkg *packages.Package, cfg Config) []Violation {
+func checkDomainInterfaceRepoOnlyWith(m Model, pkg *packages.Package, cfg Config) []Violation {
+	if !m.RequireAlias {
+		return nil
+	}
 	if !isDomainPackage(pkg.PkgPath) || isCoreRepoPackage(pkg.PkgPath) {
 		return nil
 	}

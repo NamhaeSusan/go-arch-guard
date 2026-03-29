@@ -1,17 +1,20 @@
 package rules
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
 func CheckStructure(projectRoot string, opts ...Option) []Violation {
 	cfg := NewConfig(opts...)
+	m := cfg.model()
 	var violations []Violation
 
 	internalDir := filepath.Join(projectRoot, "internal")
@@ -19,27 +22,37 @@ func CheckStructure(projectRoot string, opts ...Option) []Violation {
 		return nil
 	}
 
-	violations = append(violations, checkInternalTopLevelPackages(internalDir, cfg)...)
-	violations = append(violations, checkPackageNames(internalDir, cfg)...)
-	violations = append(violations, checkMiddlewarePlacement(internalDir, cfg)...)
+	violations = append(violations, checkInternalTopLevelPackages(internalDir, m, cfg)...)
+	violations = append(violations, checkPackageNames(internalDir, m, cfg)...)
+	violations = append(violations, checkMiddlewarePlacement(internalDir, m, cfg)...)
 
-	domainDir := filepath.Join(internalDir, "domain")
-	violations = append(violations, checkDomainRootAliasRequired(domainDir, cfg)...)
-	violations = append(violations, checkDomainRootAliasPackage(domainDir, cfg)...)
-	violations = append(violations, checkDomainRootAliasOnly(domainDir, cfg)...)
-	violations = append(violations, checkDomainAliasNoInterface(domainDir, cfg)...)
-	violations = append(violations, checkDomainModelRequired(domainDir, cfg)...)
-	violations = append(violations, checkDTOPlacement(internalDir, cfg)...)
+	domainDir := filepath.Join(internalDir, m.DomainDir)
+	if m.RequireAlias {
+		violations = append(violations, checkDomainRootAliasRequired(domainDir, m, cfg)...)
+		violations = append(violations, checkDomainRootAliasPackage(domainDir, m, cfg)...)
+		violations = append(violations, checkDomainRootAliasOnly(domainDir, m, cfg)...)
+		violations = append(violations, checkDomainAliasNoInterface(domainDir, m, cfg)...)
+	}
+	if m.RequireModel {
+		violations = append(violations, checkDomainModelRequired(domainDir, m, cfg)...)
+	}
+	violations = append(violations, checkDTOPlacement(internalDir, m, cfg)...)
 
 	return violations
 }
 
-func checkInternalTopLevelPackages(internalDir string, cfg Config) []Violation {
+func checkInternalTopLevelPackages(internalDir string, m Model, cfg Config) []Violation {
 	var violations []Violation
 	entries, err := os.ReadDir(internalDir)
 	if err != nil {
 		return nil
 	}
+
+	var allowedNames []string
+	for name := range m.InternalTopLevel {
+		allowedNames = append(allowedNames, "internal/"+name+"/")
+	}
+
 	for _, entry := range entries {
 		relPath := filepath.ToSlash(filepath.Join("internal", entry.Name()))
 
@@ -47,14 +60,14 @@ func checkInternalTopLevelPackages(internalDir string, cfg Config) []Violation {
 			if cfg.IsExcluded(relPath + "/") {
 				continue
 			}
-			if allowedInternalTopLevel[entry.Name()] {
+			if m.InternalTopLevel[entry.Name()] {
 				continue
 			}
 			violations = append(violations, Violation{
 				File:     relPath + "/",
 				Rule:     "structure.internal-top-level",
 				Message:  `internal/ top-level package "` + entry.Name() + `" is not allowed`,
-				Fix:      "use only internal/domain/, internal/orchestration/, or internal/pkg/ at the internal/ top level",
+				Fix:      fmt.Sprintf("use only %v at the internal/ top level", allowedNames),
 				Severity: cfg.Sev,
 			})
 			continue
@@ -70,14 +83,14 @@ func checkInternalTopLevelPackages(internalDir string, cfg Config) []Violation {
 			File:     relPath,
 			Rule:     "structure.internal-top-level",
 			Message:  `internal/ top-level Go file "` + entry.Name() + `" is not allowed`,
-			Fix:      "move code under internal/domain/, internal/orchestration/, or internal/pkg/",
+			Fix:      fmt.Sprintf("move code under %v", allowedNames),
 			Severity: cfg.Sev,
 		})
 	}
 	return violations
 }
 
-func checkDomainRootAliasRequired(domainDir string, cfg Config) []Violation {
+func checkDomainRootAliasRequired(domainDir string, m Model, cfg Config) []Violation {
 	var violations []Violation
 	entries, err := os.ReadDir(domainDir)
 	if err != nil {
@@ -87,26 +100,26 @@ func checkDomainRootAliasRequired(domainDir string, cfg Config) []Violation {
 		if !e.IsDir() {
 			continue
 		}
-		relPath := filepath.ToSlash(filepath.Join("internal", "domain", e.Name()))
+		relPath := filepath.ToSlash(filepath.Join("internal", m.DomainDir, e.Name()))
 		if cfg.IsExcluded(relPath + "/") {
 			continue
 		}
-		aliasPath := filepath.Join(domainDir, e.Name(), "alias.go")
+		aliasPath := filepath.Join(domainDir, e.Name(), m.AliasFileName)
 		if _, err := os.Stat(aliasPath); err == nil {
 			continue
 		}
 		violations = append(violations, Violation{
 			File:     relPath + "/",
 			Rule:     "structure.domain-root-alias-required",
-			Message:  `domain root "` + e.Name() + `" must define alias.go`,
-			Fix:      "add alias.go as the single public surface file for the domain root package",
+			Message:  `domain root "` + e.Name() + `" must define ` + m.AliasFileName,
+			Fix:      "add " + m.AliasFileName + " as the single public surface file for the domain root package",
 			Severity: cfg.Sev,
 		})
 	}
 	return violations
 }
 
-func checkDomainRootAliasPackage(domainDir string, cfg Config) []Violation {
+func checkDomainRootAliasPackage(domainDir string, m Model, cfg Config) []Violation {
 	var violations []Violation
 	entries, err := os.ReadDir(domainDir)
 	if err != nil {
@@ -116,11 +129,11 @@ func checkDomainRootAliasPackage(domainDir string, cfg Config) []Violation {
 		if !e.IsDir() {
 			continue
 		}
-		relPath := filepath.ToSlash(filepath.Join("internal", "domain", e.Name()))
+		relPath := filepath.ToSlash(filepath.Join("internal", m.DomainDir, e.Name()))
 		if cfg.IsExcluded(relPath + "/") {
 			continue
 		}
-		aliasPath := filepath.Join(domainDir, e.Name(), "alias.go")
+		aliasPath := filepath.Join(domainDir, e.Name(), m.AliasFileName)
 		if _, err := os.Stat(aliasPath); err != nil {
 			continue
 		}
@@ -132,17 +145,17 @@ func checkDomainRootAliasPackage(domainDir string, cfg Config) []Violation {
 			continue
 		}
 		violations = append(violations, Violation{
-			File:     relPath + "/alias.go",
+			File:     relPath + "/" + m.AliasFileName,
 			Rule:     "structure.domain-root-alias-package",
-			Message:  `alias.go package name must match domain root "` + e.Name() + `"`,
-			Fix:      `set "package ` + e.Name() + `" in alias.go`,
+			Message:  m.AliasFileName + ` package name must match domain root "` + e.Name() + `"`,
+			Fix:      `set "package ` + e.Name() + `" in ` + m.AliasFileName,
 			Severity: cfg.Sev,
 		})
 	}
 	return violations
 }
 
-func checkDomainRootAliasOnly(domainDir string, cfg Config) []Violation {
+func checkDomainRootAliasOnly(domainDir string, m Model, cfg Config) []Violation {
 	var violations []Violation
 	entries, err := os.ReadDir(domainDir)
 	if err != nil {
@@ -162,18 +175,18 @@ func checkDomainRootAliasOnly(domainDir string, cfg Config) []Violation {
 				continue
 			}
 			name := rootEntry.Name()
-			if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") || name == "alias.go" {
+			if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") || name == m.AliasFileName {
 				continue
 			}
-			relPath := filepath.ToSlash(filepath.Join("internal", "domain", e.Name(), name))
+			relPath := filepath.ToSlash(filepath.Join("internal", m.DomainDir, e.Name(), name))
 			if cfg.IsExcluded(relPath) {
 				continue
 			}
 			violations = append(violations, Violation{
 				File:     relPath,
 				Rule:     "structure.domain-root-alias-only",
-				Message:  `domain root "` + e.Name() + `" must expose its public API from alias.go only`,
-				Fix:      `move "` + name + `" into a sub-package or merge the public API into alias.go`,
+				Message:  `domain root "` + e.Name() + `" must expose its public API from ` + m.AliasFileName + ` only`,
+				Fix:      `move "` + name + `" into a sub-package or merge the public API into ` + m.AliasFileName,
 				Severity: cfg.Sev,
 			})
 		}
@@ -181,7 +194,7 @@ func checkDomainRootAliasOnly(domainDir string, cfg Config) []Violation {
 	return violations
 }
 
-func checkDomainAliasNoInterface(domainDir string, cfg Config) []Violation {
+func checkDomainAliasNoInterface(domainDir string, m Model, cfg Config) []Violation {
 	var violations []Violation
 	entries, err := os.ReadDir(domainDir)
 	if err != nil {
@@ -191,11 +204,11 @@ func checkDomainAliasNoInterface(domainDir string, cfg Config) []Violation {
 		if !e.IsDir() {
 			continue
 		}
-		relPath := filepath.ToSlash(filepath.Join("internal", "domain", e.Name()))
+		relPath := filepath.ToSlash(filepath.Join("internal", m.DomainDir, e.Name()))
 		if cfg.IsExcluded(relPath + "/") {
 			continue
 		}
-		aliasPath := filepath.Join(domainDir, e.Name(), "alias.go")
+		aliasPath := filepath.Join(domainDir, e.Name(), m.AliasFileName)
 		if _, err := os.Stat(aliasPath); err != nil {
 			continue
 		}
@@ -214,21 +227,16 @@ func checkDomainAliasNoInterface(domainDir string, cfg Config) []Violation {
 				if !ok {
 					continue
 				}
-				// type alias: ts.Assign != 0, check if the underlying type is interface
-				// direct interface definition: ts.Type is *ast.InterfaceType
 				if _, isIface := ts.Type.(*ast.InterfaceType); isIface {
 					violations = append(violations, Violation{
-						File:     relPath + "/alias.go",
+						File:     relPath + "/" + m.AliasFileName,
 						Line:     fset.Position(ts.Name.Pos()).Line,
 						Rule:     "structure.domain-alias-no-interface",
-						Message:  `alias.go re-exports interface "` + ts.Name.Name + `" — suspected cross-domain dependency; use orchestration/ instead`,
-						Fix:      "move cross-domain coordination to orchestration/handler/ or orchestration/",
+						Message:  m.AliasFileName + ` re-exports interface "` + ts.Name.Name + `" — suspected cross-domain dependency; use ` + m.OrchestrationDir + `/ instead`,
+						Fix:      "move cross-domain coordination to " + m.OrchestrationDir + "/handler/ or " + m.OrchestrationDir + "/",
 						Severity: cfg.Sev,
 					})
 				}
-				// type alias to an interface from another package (e.g., type AdminOps = svc.AdminOps)
-				// This is a SelectorExpr, not InterfaceType — we can't know if it's an interface
-				// from AST alone. But we CAN flag all type aliases that reference core/svc/
 				if ts.Assign != 0 {
 					if sel, ok := ts.Type.(*ast.SelectorExpr); ok {
 						if ident, ok := sel.X.(*ast.Ident); ok {
@@ -241,11 +249,11 @@ func checkDomainAliasNoInterface(domainDir string, cfg Config) []Violation {
 									src = "core/repo"
 								}
 								violations = append(violations, Violation{
-									File:     relPath + "/alias.go",
+									File:     relPath + "/" + m.AliasFileName,
 									Line:     fset.Position(ts.Name.Pos()).Line,
 									Rule:     "structure.domain-alias-no-interface",
-									Message:  `alias.go re-exports "` + ts.Name.Name + `" from ` + src + ` — suspected cross-domain dependency; use orchestration/ instead`,
-									Fix:      "move cross-domain coordination to orchestration/handler/ or orchestration/",
+									Message:  m.AliasFileName + ` re-exports "` + ts.Name.Name + `" from ` + src + ` — suspected cross-domain dependency; use ` + m.OrchestrationDir + `/ instead`,
+									Fix:      "move cross-domain coordination to " + m.OrchestrationDir + "/handler/ or " + m.OrchestrationDir + "/",
 									Severity: cfg.Sev,
 								})
 							}
@@ -258,7 +266,7 @@ func checkDomainAliasNoInterface(domainDir string, cfg Config) []Violation {
 	return violations
 }
 
-func checkPackageNames(internalDir string, cfg Config) []Violation {
+func checkPackageNames(internalDir string, m Model, cfg Config) []Violation {
 	var violations []Violation
 	_ = filepath.WalkDir(internalDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil || !d.IsDir() {
@@ -280,36 +288,36 @@ func checkPackageNames(internalDir string, cfg Config) []Violation {
 		}
 
 		name := d.Name()
-		for _, banned := range bannedPackageNames {
+		for _, banned := range m.BannedPkgNames {
 			if name == banned {
 				violations = append(violations, Violation{
 					File:     rel + "/",
 					Rule:     "structure.banned-package",
 					Message:  `package "` + name + `" is banned`,
-					Fix:      "move to specific domain or pkg/",
+					Fix:      fmt.Sprintf("move to specific domain or %s/", m.SharedDir),
 					Severity: cfg.Sev,
 				})
 			}
 		}
 
-		for _, legacy := range legacyPackageNames {
+		for _, legacy := range m.LegacyPkgNames {
 			if name == legacy {
 				violations = append(violations, Violation{
 					File:     rel + "/",
 					Rule:     "structure.legacy-package",
 					Message:  `legacy package "` + name + `" should be migrated`,
-					Fix:      "move app-specific wiring to cmd/ and shared helpers to internal/pkg/",
+					Fix:      fmt.Sprintf("move app-specific wiring to cmd/ and shared helpers to internal/%s/", m.SharedDir),
 					Severity: cfg.Sev,
 				})
 			}
 		}
 
-		if isMisplacedLayerDir(rel, name) {
+		if isMisplacedLayerDirWith(m, rel, name) {
 			violations = append(violations, Violation{
 				File:     rel + "/",
 				Rule:     "structure.misplaced-layer",
 				Message:  `layer package "` + name + `" is misplaced`,
-				Fix:      "place app/handler/infra only in domain slices or orchestration handler",
+				Fix:      fmt.Sprintf("place app/handler/infra only in domain slices or %s handler", m.OrchestrationDir),
 				Severity: cfg.Sev,
 			})
 		}
@@ -318,7 +326,8 @@ func checkPackageNames(internalDir string, cfg Config) []Violation {
 	return violations
 }
 
-func checkMiddlewarePlacement(internalDir string, cfg Config) []Violation {
+func checkMiddlewarePlacement(internalDir string, m Model, cfg Config) []Violation {
+	allowedPath := filepath.ToSlash(filepath.Join("internal", m.SharedDir, "middleware"))
 	var violations []Violation
 	_ = filepath.WalkDir(internalDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil || !d.IsDir() {
@@ -335,14 +344,14 @@ func checkMiddlewarePlacement(internalDir string, cfg Config) []Violation {
 		if cfg.IsExcluded(rel + "/") {
 			return nil
 		}
-		if rel == "internal/pkg/middleware" {
+		if rel == allowedPath {
 			return nil
 		}
 		violations = append(violations, Violation{
 			File:     rel + "/",
 			Rule:     "structure.middleware-placement",
 			Message:  `middleware found at "` + rel + `"`,
-			Fix:      "move middleware to internal/pkg/middleware/",
+			Fix:      "move middleware to " + allowedPath + "/",
 			Severity: cfg.Sev,
 		})
 		return nil
@@ -350,7 +359,7 @@ func checkMiddlewarePlacement(internalDir string, cfg Config) []Violation {
 	return violations
 }
 
-func checkDomainModelRequired(domainDir string, cfg Config) []Violation {
+func checkDomainModelRequired(domainDir string, m Model, cfg Config) []Violation {
 	var violations []Violation
 	entries, err := os.ReadDir(domainDir)
 	if err != nil {
@@ -360,29 +369,28 @@ func checkDomainModelRequired(domainDir string, cfg Config) []Violation {
 		if !e.IsDir() {
 			continue
 		}
-		relPath := filepath.ToSlash(filepath.Join("internal", "domain", e.Name()))
+		relPath := filepath.ToSlash(filepath.Join("internal", m.DomainDir, e.Name()))
 		if cfg.IsExcluded(relPath + "/") {
 			continue
 		}
-		modelDir := filepath.Join(domainDir, e.Name(), "core", "model")
+		modelDir := filepath.Join(domainDir, e.Name(), filepath.FromSlash(m.ModelPath))
 		if hasNonTestGoFiles(modelDir) {
 			continue
 		}
 		violations = append(violations, Violation{
 			File:     relPath + "/",
 			Rule:     "structure.domain-model-required",
-			Message:  `domain "` + e.Name() + `" missing a direct non-test Go file in core/model/`,
-			Fix:      "add at least one non-test Go file directly under core/model/",
+			Message:  `domain "` + e.Name() + `" missing a direct non-test Go file in ` + m.ModelPath + `/`,
+			Fix:      "add at least one non-test Go file directly under " + m.ModelPath + "/",
 			Severity: cfg.Sev,
 		})
 	}
 	return violations
 }
 
-func checkDTOPlacement(internalDir string, cfg Config) []Violation {
+func checkDTOPlacement(internalDir string, m Model, cfg Config) []Violation {
 	var violations []Violation
-	// Only domain/ is walked; internal/infra/ cannot exist (blocked by structure.internal-top-level).
-	domainDir := filepath.Join(internalDir, "domain")
+	domainDir := filepath.Join(internalDir, m.DomainDir)
 	if _, err := os.Stat(domainDir); err != nil {
 		return nil
 	}
@@ -400,14 +408,14 @@ func checkDTOPlacement(internalDir string, cfg Config) []Violation {
 			if cfg.IsExcluded(rel) {
 				return nil
 			}
-			if isDTOAllowedSublayer(rel) {
+			if isDTOAllowedSublayerWith(m, rel) {
 				return nil
 			}
 			violations = append(violations, Violation{
 				File:     rel,
 				Rule:     "structure.dto-placement",
 				Message:  `"` + name + `" found in forbidden layer`,
-				Fix:      "DTOs belong in handler/ or app/",
+				Fix:      fmt.Sprintf("DTOs belong in %v", m.DTOAllowedLayers),
 				Severity: cfg.Sev,
 			})
 		}
@@ -416,30 +424,29 @@ func checkDTOPlacement(internalDir string, cfg Config) []Violation {
 	return violations
 }
 
-func isDTOAllowedSublayer(relPath string) bool {
-	// relPath: "internal/domain/<name>/<sublayer>/..."
+func isDTOAllowedSublayerWith(m Model, relPath string) bool {
 	parts := strings.Split(relPath, "/")
 	if len(parts) < 4 {
 		return false
 	}
 	sublayer := parts[3]
-	return sublayer == "handler" || sublayer == "app"
+	return slices.Contains(m.DTOAllowedLayers, sublayer)
 }
 
-func isMisplacedLayerDir(rel, name string) bool {
+func isMisplacedLayerDirWith(m Model, rel, name string) bool {
 	switch name {
 	case "app", "infra":
-		return !matchesDomainLayer(rel, name)
+		return !matchesDomainLayerWith(m, rel, name)
 	case "handler":
-		return !matchesDomainLayer(rel, name) && rel != "internal/orchestration/handler"
+		return !matchesDomainLayerWith(m, rel, name) && rel != filepath.ToSlash(filepath.Join("internal", m.OrchestrationDir, "handler"))
 	default:
 		return false
 	}
 }
 
-func matchesDomainLayer(rel, name string) bool {
+func matchesDomainLayerWith(m Model, rel, name string) bool {
 	parts := strings.Split(rel, "/")
-	return len(parts) == 4 && parts[0] == "internal" && parts[1] == "domain" && parts[2] != "" && parts[3] == name
+	return len(parts) == 4 && parts[0] == "internal" && parts[1] == m.DomainDir && parts[2] != "" && parts[3] == name
 }
 
 func hasNonTestGoFiles(dir string) bool {

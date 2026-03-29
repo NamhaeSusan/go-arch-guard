@@ -134,6 +134,62 @@ t.Run("layer direction", func(t *testing.T) {
 
 If the module cannot be determined (e.g. packages loaded without module metadata), a `meta.no-matching-packages` warning is emitted.
 
+## Architecture Model Customization
+
+go-arch-guard ships with presets and supports full customization:
+
+```go
+// 1. Default DDD model (current behavior — no change needed)
+m := rules.DDD()
+
+// 2. Clean Architecture
+m := rules.CleanArch()
+
+// 3. Custom model (starts from DDD defaults, then applies overrides)
+m := rules.NewModel(
+    rules.WithDomainDir("module"),
+    rules.WithSharedDir("lib"),
+    rules.WithSublayers([]string{"api", "logic", "data"}),
+    rules.WithDirection(map[string][]string{
+        "api":   {"logic"},
+        "logic": {"data"},
+        "data":  {},
+    }),
+)
+
+// Apply to any check via WithModel
+violations := rules.CheckLayerDirection(pkgs, module, root, rules.WithModel(m))
+violations = append(violations, rules.CheckDomainIsolation(pkgs, module, root, rules.WithModel(m))...)
+violations = append(violations, rules.CheckStructure(root, rules.WithModel(m))...)
+violations = append(violations, rules.CheckNaming(pkgs, rules.WithModel(m))...)
+```
+
+When no `WithModel` option is provided, all checks use `DDD()` — existing behavior is fully preserved.
+
+### Available Presets
+
+| Preset | Sublayers | Alias Required | Domain Model Required |
+|--------|-----------|---------------|----------------------|
+| `DDD()` | handler, app, core/model, core/repo, core/svc, event, infra | Yes | Yes (core/model/) |
+| `CleanArch()` | handler, usecase, entity, gateway, infra | No | No |
+
+### Model Options
+
+| Option | Description |
+|--------|-------------|
+| `WithSublayers([]string{...})` | Set recognized sublayer names |
+| `WithDirection(map[string][]string{...})` | Set allowed import direction matrix |
+| `WithPkgRestricted(map[string]bool{...})` | Sublayers that must not import shared pkg |
+| `WithDomainDir("domain")` | Top-level directory name for domains |
+| `WithOrchestrationDir("orchestration")` | Top-level directory name for orchestration |
+| `WithSharedDir("pkg")` | Top-level directory name for shared packages |
+| `WithRequireAlias(bool)` | Whether domain roots must define alias.go |
+| `WithRequireModel(bool)` | Whether domains must have a model directory |
+| `WithModelPath("core/model")` | Path to domain model directory |
+| `WithDTOAllowedLayers([]string{...})` | Sublayers where DTOs are allowed |
+| `WithBannedPkgNames([]string{...})` | Package names banned under internal/ |
+| `WithLayerDirNames(map[string]bool{...})` | Directory names considered "layer-like" for naming checks |
+
 ## Target Architecture
 
 `go-arch-guard` assumes a domain-centric vertical-slice layout.
@@ -469,6 +525,10 @@ Features:
 | `report.AssertNoViolations(t, violations)` | fail test on `Error` violations |
 | `rules.WithSeverity(rules.Warning)` | downgrade violations to warnings |
 | `rules.WithExclude("internal/path/...")` | skip a project-relative subtree or file |
+| `rules.WithModel(m)` | use a custom architecture model |
+| `rules.DDD()` | default DDD architecture model |
+| `rules.CleanArch()` | Clean Architecture model |
+| `rules.NewModel(opts...)` | custom model builder (starts from DDD defaults) |
 
 ## External Import Hygiene — Enforce via AI Tool Instructions, Not This Library
 
