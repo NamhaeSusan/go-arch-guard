@@ -1,1 +1,0 @@
-plugins/go-arch-guard/skills/go-arch-guard/SKILL.md
