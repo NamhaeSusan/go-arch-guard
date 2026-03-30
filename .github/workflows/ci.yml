@@ -22,4 +22,9 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - run: python3 -m unittest scripts/test_bump_plugin_version.py -v
       - run: go vet ./...
-      - run: go test ./...
+      - run: go test ./... -coverprofile=coverage.out
+      - uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.out
+          fail_ci_if_error: false

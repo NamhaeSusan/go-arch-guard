@@ -1,5 +1,9 @@
 # go-arch-guard
 
+[![CI](https://github.com/NamhaeSusan/go-arch-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/NamhaeSusan/go-arch-guard/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/NamhaeSusan/go-arch-guard/branch/main/graph/badge.svg)](https://codecov.io/gh/NamhaeSusan/go-arch-guard)
+[![Go Report Card](https://goreportcard.com/badge/github.com/NamhaeSusan/go-arch-guard)](https://goreportcard.com/report/github.com/NamhaeSusan/go-arch-guard)
+
 `go test`로 Go 프로젝트의 아키텍처 가드레일을 적용합니다.
 
 격리, 레이어 방향, 구조, 네이밍 규칙을 정의하고, 프로젝트 형태가 벗어나면 일반 테스트에서 실패시킵니다. 별도 CLI나 설정 포맷 없이, Go 테스트만으로 동작합니다.
