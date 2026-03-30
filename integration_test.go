@@ -653,6 +653,311 @@ func TestIntegration_RealWorldCleanArch_Violations(t *testing.T) {
 	})
 }
 
+func TestIntegration_RealWorldLayered(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/layeredshop"
+	m := rules.Layered()
+
+	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.25.0\n")
+
+	// --- domain: order ---
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "handler", "http.go"),
+		"package handler\n\nimport _ \""+module+"/internal/domain/order/service\"\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "service", "order.go"),
+		"package service\n\nimport (\n\t_ \""+module+"/internal/domain/order/repository\"\n\t_ \""+module+"/internal/domain/order/model\"\n)\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "repository", "order.go"),
+		"package repository\n\nimport _ \""+module+"/internal/domain/order/model\"\n\ntype Order struct{}\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "model", "order.go"),
+		"package model\n\ntype Order struct{ ID string }\n")
+
+	// --- pkg ---
+	writeIntegrationFile(t, filepath.Join(root, "internal", "pkg", "logger", "logger.go"),
+		"package logger\n\nfunc Log(_ string) {}\n")
+
+	pkgs, err := analyzer.Load(root, "internal/...")
+	if err != nil {
+		t.Log("partial load:", err)
+	}
+	if len(pkgs) == 0 {
+		t.Fatal("no packages loaded")
+	}
+
+	opts := []rules.Option{rules.WithModel(m)}
+
+	t.Run("layer direction", func(t *testing.T) {
+		violations := rules.CheckLayerDirection(pkgs, module, root, opts...)
+		for _, v := range violations {
+			t.Log(v.String())
+		}
+		report.AssertNoViolations(t, violations)
+	})
+	t.Run("domain isolation", func(t *testing.T) {
+		violations := rules.CheckDomainIsolation(pkgs, module, root, opts...)
+		for _, v := range violations {
+			t.Log(v.String())
+		}
+		report.AssertNoViolations(t, violations)
+	})
+	t.Run("structure", func(t *testing.T) {
+		violations := rules.CheckStructure(root, opts...)
+		for _, v := range violations {
+			t.Log(v.String())
+		}
+		report.AssertNoViolations(t, violations)
+	})
+	t.Run("naming", func(t *testing.T) {
+		violations := rules.CheckNaming(pkgs, opts...)
+		for _, v := range violations {
+			t.Log(v.String())
+		}
+		report.AssertNoViolations(t, violations)
+	})
+}
+
+func TestIntegration_Layered_Violations(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/layeredinvalid"
+	m := rules.Layered()
+
+	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.25.0\n")
+
+	// repository imports handler — direction violation
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "handler", "handler.go"),
+		"package handler\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "repository", "order.go"),
+		"package repository\n\nimport _ \""+module+"/internal/domain/order/handler\"\n")
+	// model imports service — direction violation
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "model", "order.go"),
+		"package model\n\nimport _ \""+module+"/internal/domain/order/service\"\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "service", "service.go"),
+		"package service\n")
+	// model imports pkg — pkg-restricted violation
+	writeIntegrationFile(t, filepath.Join(root, "internal", "pkg", "logger", "logger.go"),
+		"package logger\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "model", "with_logger.go"),
+		"package model\n\nimport _ \""+module+"/internal/pkg/logger\"\n")
+
+	pkgs, err := analyzer.Load(root, "internal/...")
+	if err != nil {
+		t.Log("partial load:", err)
+	}
+
+	opts := []rules.Option{rules.WithModel(m)}
+
+	t.Run("detects direction violation", func(t *testing.T) {
+		violations := rules.CheckLayerDirection(pkgs, module, root, opts...)
+		assertHasRule(t, violations, "layer.direction")
+	})
+	t.Run("detects model importing pkg", func(t *testing.T) {
+		violations := rules.CheckLayerDirection(pkgs, module, root, opts...)
+		assertHasRule(t, violations, "layer.inner-imports-pkg")
+	})
+}
+
+func TestIntegration_RealWorldHexagonal(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/hexshop"
+	m := rules.Hexagonal()
+
+	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.25.0\n")
+
+	// --- domain: order ---
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "handler", "http.go"),
+		"package handler\n\nimport _ \""+module+"/internal/domain/order/usecase\"\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "usecase", "create_order.go"),
+		"package usecase\n\nimport (\n\t_ \""+module+"/internal/domain/order/port\"\n\t_ \""+module+"/internal/domain/order/domain\"\n)\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "port", "repository.go"),
+		"package port\n\nimport _ \""+module+"/internal/domain/order/domain\"\n\ntype OrderRepo interface{ Save(id string) error }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "domain", "order.go"),
+		"package domain\n\ntype Order struct{ ID string }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "adapter", "pg_order.go"),
+		"package adapter\n\nimport (\n\t_ \""+module+"/internal/domain/order/port\"\n\t_ \""+module+"/internal/domain/order/domain\"\n)\n\ntype PgOrder struct{}\n")
+
+	// --- pkg ---
+	writeIntegrationFile(t, filepath.Join(root, "internal", "pkg", "logger", "logger.go"),
+		"package logger\n")
+
+	pkgs, err := analyzer.Load(root, "internal/...")
+	if err != nil {
+		t.Log("partial load:", err)
+	}
+	if len(pkgs) == 0 {
+		t.Fatal("no packages loaded")
+	}
+
+	opts := []rules.Option{rules.WithModel(m)}
+
+	t.Run("layer direction", func(t *testing.T) {
+		violations := rules.CheckLayerDirection(pkgs, module, root, opts...)
+		for _, v := range violations {
+			t.Log(v.String())
+		}
+		report.AssertNoViolations(t, violations)
+	})
+	t.Run("domain isolation", func(t *testing.T) {
+		violations := rules.CheckDomainIsolation(pkgs, module, root, opts...)
+		for _, v := range violations {
+			t.Log(v.String())
+		}
+		report.AssertNoViolations(t, violations)
+	})
+	t.Run("structure", func(t *testing.T) {
+		violations := rules.CheckStructure(root, opts...)
+		for _, v := range violations {
+			t.Log(v.String())
+		}
+		report.AssertNoViolations(t, violations)
+	})
+	t.Run("naming", func(t *testing.T) {
+		violations := rules.CheckNaming(pkgs, opts...)
+		for _, v := range violations {
+			t.Log(v.String())
+		}
+		report.AssertNoViolations(t, violations)
+	})
+}
+
+func TestIntegration_Hexagonal_Violations(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/hexinvalid"
+	m := rules.Hexagonal()
+
+	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.25.0\n")
+
+	// domain imports usecase — direction violation
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "domain", "order.go"),
+		"package domain\n\nimport _ \""+module+"/internal/domain/order/usecase\"\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "usecase", "uc.go"),
+		"package usecase\n")
+	// adapter imports handler — direction violation
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "adapter", "bad.go"),
+		"package adapter\n\nimport _ \""+module+"/internal/domain/order/handler\"\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "handler", "handler.go"),
+		"package handler\n")
+	// domain imports pkg — pkg-restricted violation
+	writeIntegrationFile(t, filepath.Join(root, "internal", "pkg", "logger", "logger.go"),
+		"package logger\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "domain", "with_logger.go"),
+		"package domain\n\nimport _ \""+module+"/internal/pkg/logger\"\n")
+
+	pkgs, err := analyzer.Load(root, "internal/...")
+	if err != nil {
+		t.Log("partial load:", err)
+	}
+
+	opts := []rules.Option{rules.WithModel(m)}
+
+	t.Run("detects direction violation", func(t *testing.T) {
+		violations := rules.CheckLayerDirection(pkgs, module, root, opts...)
+		assertHasRule(t, violations, "layer.direction")
+	})
+	t.Run("detects domain importing pkg", func(t *testing.T) {
+		violations := rules.CheckLayerDirection(pkgs, module, root, opts...)
+		assertHasRule(t, violations, "layer.inner-imports-pkg")
+	})
+}
+
+func TestIntegration_RealWorldModularMonolith(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/modshop"
+	m := rules.ModularMonolith()
+
+	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.25.0\n")
+
+	// --- domain: order ---
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "api", "handler.go"),
+		"package api\n\nimport _ \""+module+"/internal/domain/order/application\"\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "application", "create_order.go"),
+		"package application\n\nimport _ \""+module+"/internal/domain/order/domain\"\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "domain", "order.go"),
+		"package domain\n\ntype Order struct{ ID string }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "infrastructure", "pg_order.go"),
+		"package infrastructure\n\nimport _ \""+module+"/internal/domain/order/domain\"\n\ntype PgOrder struct{}\n")
+
+	// --- pkg ---
+	writeIntegrationFile(t, filepath.Join(root, "internal", "pkg", "logger", "logger.go"),
+		"package logger\n")
+
+	pkgs, err := analyzer.Load(root, "internal/...")
+	if err != nil {
+		t.Log("partial load:", err)
+	}
+	if len(pkgs) == 0 {
+		t.Fatal("no packages loaded")
+	}
+
+	opts := []rules.Option{rules.WithModel(m)}
+
+	t.Run("layer direction", func(t *testing.T) {
+		violations := rules.CheckLayerDirection(pkgs, module, root, opts...)
+		for _, v := range violations {
+			t.Log(v.String())
+		}
+		report.AssertNoViolations(t, violations)
+	})
+	t.Run("domain isolation", func(t *testing.T) {
+		violations := rules.CheckDomainIsolation(pkgs, module, root, opts...)
+		for _, v := range violations {
+			t.Log(v.String())
+		}
+		report.AssertNoViolations(t, violations)
+	})
+	t.Run("structure", func(t *testing.T) {
+		violations := rules.CheckStructure(root, opts...)
+		for _, v := range violations {
+			t.Log(v.String())
+		}
+		report.AssertNoViolations(t, violations)
+	})
+	t.Run("naming", func(t *testing.T) {
+		violations := rules.CheckNaming(pkgs, opts...)
+		for _, v := range violations {
+			t.Log(v.String())
+		}
+		report.AssertNoViolations(t, violations)
+	})
+}
+
+func TestIntegration_ModularMonolith_Violations(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/modinvalid"
+	m := rules.ModularMonolith()
+
+	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.25.0\n")
+
+	// domain imports api — direction violation
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "domain", "order.go"),
+		"package domain\n\nimport _ \""+module+"/internal/domain/order/api\"\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "api", "handler.go"),
+		"package api\n")
+	// infrastructure imports application — direction violation
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "infrastructure", "bad.go"),
+		"package infrastructure\n\nimport _ \""+module+"/internal/domain/order/application\"\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "application", "service.go"),
+		"package application\n")
+	// cross-domain: order imports user
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "application", "cross.go"),
+		"package application\n\nimport _ \""+module+"/internal/domain/user/domain\"\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "user", "domain", "user.go"),
+		"package domain\n")
+
+	pkgs, err := analyzer.Load(root, "internal/...")
+	if err != nil {
+		t.Log("partial load:", err)
+	}
+
+	opts := []rules.Option{rules.WithModel(m)}
+
+	t.Run("detects direction violation", func(t *testing.T) {
+		violations := rules.CheckLayerDirection(pkgs, module, root, opts...)
+		assertHasRule(t, violations, "layer.direction")
+	})
+	t.Run("detects cross-domain import", func(t *testing.T) {
+		violations := rules.CheckDomainIsolation(pkgs, module, root, opts...)
+		assertHasRule(t, violations, "isolation.cross-domain")
+	})
+}
+
 func writeIntegrationFile(t *testing.T, path string, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
