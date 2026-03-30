@@ -1,7 +1,7 @@
 package rules
 
 // Model defines the architecture model used by all rule checks.
-// Use DDD(), CleanArch(), or NewModel() to create one.
+// Use DDD(), CleanArch(), Layered(), Hexagonal(), ModularMonolith(), or NewModel() to create one.
 type Model struct {
 	Sublayers        []string
 	Direction        map[string][]string
@@ -102,6 +102,117 @@ func CleanArch() Model {
 			"gateway": true, "infra": true,
 			"service": true, "controller": true,
 			"store": true, "persistence": true, "domain": true,
+		},
+	}
+}
+
+// Layered returns a Spring-style layered architecture model.
+func Layered() Model {
+	return Model{
+		Sublayers: []string{
+			"handler", "service", "repository", "model",
+		},
+		Direction: map[string][]string{
+			"handler":    {"service"},
+			"service":    {"repository", "model"},
+			"repository": {"model"},
+			"model":      {},
+		},
+		PkgRestricted: map[string]bool{
+			"model": true,
+		},
+		InternalTopLevel: map[string]bool{
+			"domain": true, "orchestration": true, "pkg": true,
+		},
+		DomainDir:        "domain",
+		OrchestrationDir: "orchestration",
+		SharedDir:        "pkg",
+		RequireAlias:     false,
+		AliasFileName:    "alias.go",
+		RequireModel:     false,
+		ModelPath:        "model",
+		DTOAllowedLayers: []string{"handler", "service"},
+		BannedPkgNames:   []string{"util", "common", "misc", "helper", "shared", "services"},
+		LegacyPkgNames:   []string{"router", "bootstrap"},
+		LayerDirNames: map[string]bool{
+			"handler": true, "service": true, "repository": true, "model": true,
+			"controller": true, "entity": true, "store": true,
+			"persistence": true, "domain": true,
+		},
+	}
+}
+
+// Hexagonal returns a Ports & Adapters architecture model.
+func Hexagonal() Model {
+	return Model{
+		Sublayers: []string{
+			"handler", "usecase", "port", "domain", "adapter",
+		},
+		Direction: map[string][]string{
+			"handler": {"usecase"},
+			"usecase": {"port", "domain"},
+			"port":    {"domain"},
+			"domain":  {},
+			"adapter": {"port", "domain"},
+		},
+		PkgRestricted: map[string]bool{
+			"domain": true,
+		},
+		InternalTopLevel: map[string]bool{
+			"domain": true, "orchestration": true, "pkg": true,
+		},
+		DomainDir:        "domain",
+		OrchestrationDir: "orchestration",
+		SharedDir:        "pkg",
+		RequireAlias:     false,
+		AliasFileName:    "alias.go",
+		RequireModel:     false,
+		ModelPath:        "domain",
+		DTOAllowedLayers: []string{"handler", "usecase"},
+		BannedPkgNames:   []string{"util", "common", "misc", "helper", "shared", "services"},
+		LegacyPkgNames:   []string{"router", "bootstrap"},
+		LayerDirNames: map[string]bool{
+			"handler": true, "usecase": true, "port": true,
+			"domain": true, "adapter": true,
+			"controller": true, "service": true, "entity": true,
+			"store": true, "persistence": true,
+		},
+	}
+}
+
+// ModularMonolith returns a module-based layered architecture model.
+func ModularMonolith() Model {
+	return Model{
+		Sublayers: []string{
+			"api", "application", "domain", "infrastructure",
+		},
+		Direction: map[string][]string{
+			"api":            {"application"},
+			"application":    {"domain"},
+			"domain":         {},
+			"infrastructure": {"domain"},
+		},
+		PkgRestricted: map[string]bool{
+			"domain": true,
+		},
+		InternalTopLevel: map[string]bool{
+			"domain": true, "orchestration": true, "pkg": true,
+		},
+		DomainDir:        "domain",
+		OrchestrationDir: "orchestration",
+		SharedDir:        "pkg",
+		RequireAlias:     false,
+		AliasFileName:    "alias.go",
+		RequireModel:     false,
+		ModelPath:        "domain",
+		DTOAllowedLayers: []string{"api", "application"},
+		BannedPkgNames:   []string{"util", "common", "misc", "helper", "shared", "services"},
+		LegacyPkgNames:   []string{"router", "bootstrap"},
+		LayerDirNames: map[string]bool{
+			"api": true, "application": true, "domain": true,
+			"infrastructure": true,
+			"controller":     true, "service": true, "entity": true,
+			"store": true, "persistence": true,
 		},
 	}
 }

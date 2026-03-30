@@ -46,6 +46,77 @@ func TestCleanArch_ReturnsValidModel(t *testing.T) {
 	}
 }
 
+func TestLayered_ReturnsValidModel(t *testing.T) {
+	m := Layered()
+	if len(m.Sublayers) != 4 {
+		t.Fatalf("Layered model sublayer count = %d, want 4", len(m.Sublayers))
+	}
+	if m.RequireAlias {
+		t.Error("Layered should not require alias")
+	}
+	if m.RequireModel {
+		t.Error("Layered should not require domain model")
+	}
+	if m.ModelPath != "model" {
+		t.Errorf("ModelPath = %q, want %q", m.ModelPath, "model")
+	}
+	if !m.PkgRestricted["model"] {
+		t.Error("model sublayer must be pkg-restricted")
+	}
+	if m.DomainDir != "domain" {
+		t.Errorf("DomainDir = %q, want %q", m.DomainDir, "domain")
+	}
+}
+
+func TestHexagonal_ReturnsValidModel(t *testing.T) {
+	m := Hexagonal()
+	if len(m.Sublayers) != 5 {
+		t.Fatalf("Hexagonal model sublayer count = %d, want 5", len(m.Sublayers))
+	}
+	if m.RequireAlias {
+		t.Error("Hexagonal should not require alias")
+	}
+	if m.RequireModel {
+		t.Error("Hexagonal should not require domain model")
+	}
+	if m.ModelPath != "domain" {
+		t.Errorf("ModelPath = %q, want %q", m.ModelPath, "domain")
+	}
+	if !m.PkgRestricted["domain"] {
+		t.Error("domain sublayer must be pkg-restricted")
+	}
+	allowed := m.Direction["adapter"]
+	if len(allowed) != 2 {
+		t.Errorf("adapter allowed imports = %v, want [port domain]", allowed)
+	}
+}
+
+func TestModularMonolith_ReturnsValidModel(t *testing.T) {
+	m := ModularMonolith()
+	if len(m.Sublayers) != 4 {
+		t.Fatalf("ModularMonolith model sublayer count = %d, want 4", len(m.Sublayers))
+	}
+	if m.RequireAlias {
+		t.Error("ModularMonolith should not require alias")
+	}
+	if m.RequireModel {
+		t.Error("ModularMonolith should not require domain model")
+	}
+	if m.ModelPath != "domain" {
+		t.Errorf("ModelPath = %q, want %q", m.ModelPath, "domain")
+	}
+	if !m.PkgRestricted["domain"] {
+		t.Error("domain sublayer must be pkg-restricted")
+	}
+	if m.DomainDir != "domain" {
+		t.Errorf("DomainDir = %q, want %q", m.DomainDir, "domain")
+	}
+	allowed := m.Direction["infrastructure"]
+	if len(allowed) != 1 || allowed[0] != "domain" {
+		t.Errorf("infrastructure allowed = %v, want [domain]", allowed)
+	}
+}
+
 func TestNewModel_CustomOverrides(t *testing.T) {
 	m := NewModel(
 		WithDomainDir("module"),
@@ -128,6 +199,9 @@ func TestModelConsistency(t *testing.T) {
 	}{
 		{"DDD", DDD()},
 		{"CleanArch", CleanArch()},
+		{"Layered", Layered()},
+		{"Hexagonal", Hexagonal()},
+		{"ModularMonolith", ModularMonolith()},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			validateModelConsistency(t, tc.model)
