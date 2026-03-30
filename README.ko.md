@@ -6,7 +6,7 @@
 
 `go test`로 Go 프로젝트의 아키텍처 가드레일을 적용합니다.
 
-격리, 레이어 방향, 구조, 네이밍, 블래스트 반경 규칙을 정의하고, 프로젝트 형태가 벗어나면 일반 테스트에서 실패시킵니다. **DDD**와 **Clean Architecture** 프리셋을 기본 제공하며, 완전한 커스텀 아키텍처 모델도 지원합니다. 별도 CLI나 설정 포맷 없이, Go 테스트만으로 동작합니다.
+격리, 레이어 방향, 구조, 네이밍, 블래스트 반경 규칙을 정의하고, 프로젝트 형태가 벗어나면 일반 테스트에서 실패시킵니다. **DDD**, **Clean Architecture**, **Layered**, **Hexagonal**, **Modular Monolith** 프리셋을 기본 제공하며, 완전한 커스텀 아키텍처 모델도 지원합니다. 별도 CLI나 설정 포맷 없이, Go 테스트만으로 동작합니다.
 
 ## 왜 필요한가
 
@@ -69,6 +69,42 @@ t.Run("layer direction", func(t *testing.T) {
 // ... 나머지 체크도 동일하게 opts... 전달
 ```
 
+### Layered (Spring 스타일)
+
+```go
+m := rules.Layered()
+opts := []rules.Option{rules.WithModel(m)}
+
+t.Run("layer direction", func(t *testing.T) {
+    report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, "", "", opts...))
+})
+// ... 나머지 체크도 동일하게 opts... 전달
+```
+
+### Hexagonal (포트 & 어댑터)
+
+```go
+m := rules.Hexagonal()
+opts := []rules.Option{rules.WithModel(m)}
+
+t.Run("layer direction", func(t *testing.T) {
+    report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, "", "", opts...))
+})
+// ... 나머지 체크도 동일하게 opts... 전달
+```
+
+### Modular Monolith
+
+```go
+m := rules.ModularMonolith()
+opts := []rules.Option{rules.WithModel(m)}
+
+t.Run("layer direction", func(t *testing.T) {
+    report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, "", "", opts...))
+})
+// ... 나머지 체크도 동일하게 opts... 전달
+```
+
 ### 커스텀 모델
 
 ```go
@@ -101,6 +137,9 @@ go test -run TestArchitecture -v
 |--------|-----------|------|:-:|:-:|
 | `DDD()` | handler, app, core/model, core/repo, core/svc, event, infra | handler→app→core/\*, infra→core/repo | O | O |
 | `CleanArch()` | handler, usecase, entity, gateway, infra | handler→usecase→entity+gateway, infra→gateway | X | X |
+| `Layered()` | handler, service, repository, model | handler→service→repository+model, repository→model | X | X |
+| `Hexagonal()` | handler, usecase, port, domain, adapter | handler→usecase→port+domain, adapter→port+domain | X | X |
+| `ModularMonolith()` | api, application, domain, infrastructure | api→application→domain, infrastructure→domain | X | X |
 
 ### DDD 레이아웃
 
@@ -158,6 +197,77 @@ Clean Architecture 레이어 방향:
 | `entity` | 없음 |
 | `gateway` | `entity` |
 | `infra` | `gateway`, `entity` |
+
+### Layered (Spring 스타일) 레이아웃
+
+```text
+internal/
+├── domain/
+│   └── order/
+│       ├── handler/              # HTTP/gRPC 핸들러
+│       ├── service/              # 비즈니스 로직
+│       ├── repository/           # 데이터 접근
+│       └── model/                # 도메인 모델
+├── orchestration/
+└── pkg/
+```
+
+Layered 레이어 방향:
+
+| 출발 | import 가능 대상 |
+|------|-----------------|
+| `handler` | `service` |
+| `service` | `repository`, `model` |
+| `repository` | `model` |
+| `model` | 없음 |
+
+### Hexagonal (포트 & 어댑터) 레이아웃
+
+```text
+internal/
+├── domain/
+│   └── order/
+│       ├── handler/              # 드라이빙 어댑터 (HTTP, gRPC)
+│       ├── usecase/              # 애플리케이션 로직
+│       ├── port/                 # 인터페이스 (인바운드 + 아웃바운드)
+│       ├── domain/               # 엔티티, 값 객체
+│       └── adapter/              # 드리븐 어댑터 (DB, 메시징)
+├── orchestration/
+└── pkg/
+```
+
+Hexagonal 레이어 방향:
+
+| 출발 | import 가능 대상 |
+|------|-----------------|
+| `handler` | `usecase` |
+| `usecase` | `port`, `domain` |
+| `port` | `domain` |
+| `domain` | 없음 |
+| `adapter` | `port`, `domain` |
+
+### Modular Monolith 레이아웃
+
+```text
+internal/
+├── domain/
+│   └── order/
+│       ├── api/                  # 모듈 공개 인터페이스
+│       ├── application/          # 유즈케이스
+│       ├── domain/               # 엔티티, 값 객체
+│       └── infrastructure/       # DB, 외부 서비스
+├── orchestration/
+└── pkg/
+```
+
+Modular Monolith 레이어 방향:
+
+| 출발 | import 가능 대상 |
+|------|-----------------|
+| `api` | `application` |
+| `application` | `domain` |
+| `domain` | 없음 |
+| `infrastructure` | `domain` |
 
 ### 커스텀 모델
 
@@ -311,6 +421,9 @@ go run github.com/NamhaeSusan/go-arch-guard/cmd/tui .
 | `report.AssertNoViolations(t, violations)` | Error 위반 시 테스트 실패 |
 | `rules.DDD()` | DDD 아키텍처 모델 (기본값) |
 | `rules.CleanArch()` | Clean Architecture 모델 |
+| `rules.Layered()` | Spring 스타일 레이어드 모델 |
+| `rules.Hexagonal()` | 포트 & 어댑터 모델 |
+| `rules.ModularMonolith()` | 모듈 기반 레이어드 모델 |
 | `rules.NewModel(opts...)` | 커스텀 모델 빌더 |
 | `rules.WithModel(m)` | 커스텀 모델 적용 |
 | `rules.WithSeverity(rules.Warning)` | 경고로 다운그레이드 |

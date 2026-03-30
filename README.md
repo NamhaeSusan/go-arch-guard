@@ -8,7 +8,7 @@
 
 Architecture guardrails for Go projects via `go test`.
 
-Define isolation, layer-direction, structure, naming, and blast-radius rules, then fail regular tests when the project shape drifts. Ships with **DDD** and **Clean Architecture** presets, and supports fully custom architecture models. No CLI to learn. No separate config format. Just Go tests.
+Define isolation, layer-direction, structure, naming, and blast-radius rules, then fail regular tests when the project shape drifts. Ships with **DDD**, **Clean Architecture**, **Layered**, **Hexagonal**, and **Modular Monolith** presets, and supports fully custom architecture models. No CLI to learn. No separate config format. Just Go tests.
 
 ## Why
 
@@ -89,6 +89,96 @@ func TestArchitecture(t *testing.T) {
 }
 ```
 
+### Layered (Spring-style)
+
+```go
+func TestArchitecture(t *testing.T) {
+    pkgs, err := analyzer.Load(".", "internal/...", "cmd/...")
+    if err != nil {
+        t.Log(err)
+    }
+    if len(pkgs) == 0 {
+        t.Fatalf("no packages loaded: %v", err)
+    }
+
+    m := rules.Layered()
+    opts := []rules.Option{rules.WithModel(m)}
+
+    t.Run("domain isolation", func(t *testing.T) {
+        report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, "", "", opts...))
+    })
+    t.Run("layer direction", func(t *testing.T) {
+        report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, "", "", opts...))
+    })
+    t.Run("naming", func(t *testing.T) {
+        report.AssertNoViolations(t, rules.CheckNaming(pkgs, opts...))
+    })
+    t.Run("structure", func(t *testing.T) {
+        report.AssertNoViolations(t, rules.CheckStructure(".", opts...))
+    })
+}
+```
+
+### Hexagonal (Ports & Adapters)
+
+```go
+func TestArchitecture(t *testing.T) {
+    pkgs, err := analyzer.Load(".", "internal/...", "cmd/...")
+    if err != nil {
+        t.Log(err)
+    }
+    if len(pkgs) == 0 {
+        t.Fatalf("no packages loaded: %v", err)
+    }
+
+    m := rules.Hexagonal()
+    opts := []rules.Option{rules.WithModel(m)}
+
+    t.Run("domain isolation", func(t *testing.T) {
+        report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, "", "", opts...))
+    })
+    t.Run("layer direction", func(t *testing.T) {
+        report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, "", "", opts...))
+    })
+    t.Run("naming", func(t *testing.T) {
+        report.AssertNoViolations(t, rules.CheckNaming(pkgs, opts...))
+    })
+    t.Run("structure", func(t *testing.T) {
+        report.AssertNoViolations(t, rules.CheckStructure(".", opts...))
+    })
+}
+```
+
+### Modular Monolith
+
+```go
+func TestArchitecture(t *testing.T) {
+    pkgs, err := analyzer.Load(".", "internal/...", "cmd/...")
+    if err != nil {
+        t.Log(err)
+    }
+    if len(pkgs) == 0 {
+        t.Fatalf("no packages loaded: %v", err)
+    }
+
+    m := rules.ModularMonolith()
+    opts := []rules.Option{rules.WithModel(m)}
+
+    t.Run("domain isolation", func(t *testing.T) {
+        report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, "", "", opts...))
+    })
+    t.Run("layer direction", func(t *testing.T) {
+        report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, "", "", opts...))
+    })
+    t.Run("naming", func(t *testing.T) {
+        report.AssertNoViolations(t, rules.CheckNaming(pkgs, opts...))
+    })
+    t.Run("structure", func(t *testing.T) {
+        report.AssertNoViolations(t, rules.CheckStructure(".", opts...))
+    })
+}
+```
+
 ### Custom Model
 
 ```go
@@ -132,6 +222,9 @@ Pass empty strings for `module` and `root` to auto-extract from loaded packages.
 |--------|-----------|-----------|:-:|:-:|
 | `DDD()` | handler, app, core/model, core/repo, core/svc, event, infra | handler→app→core/\*, infra→core/repo | Yes | Yes |
 | `CleanArch()` | handler, usecase, entity, gateway, infra | handler→usecase→entity+gateway, infra→gateway | No | No |
+| `Layered()` | handler, service, repository, model | handler→service→repository+model, repository→model | No | No |
+| `Hexagonal()` | handler, usecase, port, domain, adapter | handler→usecase→port+domain, adapter→port+domain | No | No |
+| `ModularMonolith()` | api, application, domain, infrastructure | api→application→domain, infrastructure→domain | No | No |
 
 ### DDD Layout
 
@@ -189,6 +282,77 @@ Clean Architecture layer direction:
 | `entity` | nothing |
 | `gateway` | `entity` |
 | `infra` | `gateway`, `entity` |
+
+### Layered (Spring-style) Layout
+
+```text
+internal/
+├── domain/
+│   └── order/
+│       ├── handler/              # HTTP/gRPC handlers
+│       ├── service/              # business logic
+│       ├── repository/           # data access
+│       └── model/                # domain models
+├── orchestration/
+└── pkg/
+```
+
+Layered direction:
+
+| from | allowed to import |
+|------|-------------------|
+| `handler` | `service` |
+| `service` | `repository`, `model` |
+| `repository` | `model` |
+| `model` | nothing |
+
+### Hexagonal (Ports & Adapters) Layout
+
+```text
+internal/
+├── domain/
+│   └── order/
+│       ├── handler/              # driving adapters (HTTP, gRPC)
+│       ├── usecase/              # application logic
+│       ├── port/                 # interfaces (inbound + outbound)
+│       ├── domain/               # entities, value objects
+│       └── adapter/              # driven adapters (DB, messaging)
+├── orchestration/
+└── pkg/
+```
+
+Hexagonal direction:
+
+| from | allowed to import |
+|------|-------------------|
+| `handler` | `usecase` |
+| `usecase` | `port`, `domain` |
+| `port` | `domain` |
+| `domain` | nothing |
+| `adapter` | `port`, `domain` |
+
+### Modular Monolith Layout
+
+```text
+internal/
+├── domain/
+│   └── order/
+│       ├── api/                  # module public interface
+│       ├── application/          # use cases
+│       ├── domain/               # entities, value objects
+│       └── infrastructure/       # DB, external services
+├── orchestration/
+└── pkg/
+```
+
+Modular Monolith direction:
+
+| from | allowed to import |
+|------|-------------------|
+| `api` | `application` |
+| `application` | `domain` |
+| `domain` | nothing |
+| `infrastructure` | `domain` |
 
 ### Custom Model
 
@@ -366,6 +530,9 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `report.AssertNoViolations(t, violations)` | fail test on Error violations |
 | `rules.DDD()` | DDD architecture model (default) |
 | `rules.CleanArch()` | Clean Architecture model |
+| `rules.Layered()` | Spring-style layered model |
+| `rules.Hexagonal()` | Ports & Adapters model |
+| `rules.ModularMonolith()` | Module-based layered model |
 | `rules.NewModel(opts...)` | custom model builder |
 | `rules.WithModel(m)` | apply custom model to checks |
 | `rules.WithSeverity(rules.Warning)` | downgrade to warnings |
