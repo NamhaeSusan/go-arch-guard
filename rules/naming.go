@@ -141,6 +141,10 @@ func checkSnakeCaseFiles(pkg *packages.Package, cfg Config) []Violation {
 func isSnakeCase(filename string) bool {
 	name := strings.TrimSuffix(filename, ".go")
 	name = strings.TrimSuffix(name, "_test")
+	// Strip compound extensions like .sql, .pb, .gen (e.g. queries.sql.go → queries)
+	if idx := strings.IndexByte(name, '.'); idx > 0 {
+		name = name[:idx]
+	}
 	for _, r := range name {
 		if !unicode.IsLower(r) && !unicode.IsDigit(r) && r != '_' {
 			return false
