@@ -102,18 +102,18 @@ func TestModularMonolith_ReturnsValidModel(t *testing.T) {
 	if m.RequireModel {
 		t.Error("ModularMonolith should not require domain model")
 	}
-	if m.ModelPath != "domain" {
-		t.Errorf("ModelPath = %q, want %q", m.ModelPath, "domain")
+	if m.ModelPath != "core" {
+		t.Errorf("ModelPath = %q, want %q", m.ModelPath, "core")
 	}
-	if !m.PkgRestricted["domain"] {
-		t.Error("domain sublayer must be pkg-restricted")
+	if !m.PkgRestricted["core"] {
+		t.Error("core sublayer must be pkg-restricted")
 	}
 	if m.DomainDir != "domain" {
 		t.Errorf("DomainDir = %q, want %q", m.DomainDir, "domain")
 	}
 	allowed := m.Direction["infrastructure"]
-	if len(allowed) != 1 || allowed[0] != "domain" {
-		t.Errorf("infrastructure allowed = %v, want [domain]", allowed)
+	if len(allowed) != 1 || allowed[0] != "core" {
+		t.Errorf("infrastructure allowed = %v, want [core]", allowed)
 	}
 }
 

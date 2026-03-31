@@ -184,16 +184,16 @@ func Hexagonal() Model {
 func ModularMonolith() Model {
 	return Model{
 		Sublayers: []string{
-			"api", "application", "domain", "infrastructure",
+			"api", "application", "core", "infrastructure",
 		},
 		Direction: map[string][]string{
 			"api":            {"application"},
-			"application":    {"domain"},
-			"domain":         {},
-			"infrastructure": {"domain"},
+			"application":    {"core"},
+			"core":           {},
+			"infrastructure": {"core"},
 		},
 		PkgRestricted: map[string]bool{
-			"domain": true,
+			"core": true,
 		},
 		InternalTopLevel: map[string]bool{
 			"domain": true, "orchestration": true, "pkg": true,
@@ -204,12 +204,12 @@ func ModularMonolith() Model {
 		RequireAlias:     false,
 		AliasFileName:    "alias.go",
 		RequireModel:     false,
-		ModelPath:        "domain",
+		ModelPath:        "core",
 		DTOAllowedLayers: []string{"api", "application"},
 		BannedPkgNames:   []string{"util", "common", "misc", "helper", "shared", "services"},
 		LegacyPkgNames:   []string{"router", "bootstrap"},
 		LayerDirNames: map[string]bool{
-			"api": true, "application": true, "domain": true,
+			"api": true, "application": true, "core": true,
 			"infrastructure": true,
 			"controller":     true, "service": true, "entity": true,
 			"store": true, "persistence": true,

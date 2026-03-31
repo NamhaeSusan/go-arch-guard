@@ -30,7 +30,7 @@ Go 프로젝트에 아키텍처 가드레일을 `go test`로 적용.
 | Clean Architecture | `CleanArch()` | handler→usecase→entity+gateway; infra→gateway |
 | Layered | `Layered()` | handler→service→repository+model; repository→model |
 | Hexagonal | `Hexagonal()` | handler→usecase→port+domain; adapter→port+domain |
-| Modular Monolith | `ModularMonolith()` | api→application→domain; infrastructure→domain |
+| Modular Monolith | `ModularMonolith()` | api→application→core; infrastructure→core |
 
 ### Step 2: 스캐폴딩
 
@@ -178,11 +178,11 @@ internal/domain/{domain}/
 internal/domain/{domain}/
 ├── api/              # 모듈 공개 인터페이스
 ├── application/      # 유즈케이스
-├── domain/           # 엔티티, 값 객체
+├── core/             # 엔티티, 값 객체
 └── infrastructure/   # DB, 외부 서비스
 ```
 
-- `domain`은 `internal/pkg` import 금지
+- `core`는 `internal/pkg` import 금지
 - DTO는 `api/`, `application/`만 허용
 
 ### Custom

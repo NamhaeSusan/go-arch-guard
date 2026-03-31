@@ -139,7 +139,7 @@ go test -run TestArchitecture -v
 | `CleanArch()` | handler, usecase, entity, gateway, infra | handler→usecase→entity+gateway, infra→gateway | X | X |
 | `Layered()` | handler, service, repository, model | handler→service→repository+model, repository→model | X | X |
 | `Hexagonal()` | handler, usecase, port, domain, adapter | handler→usecase→port+domain, adapter→port+domain | X | X |
-| `ModularMonolith()` | api, application, domain, infrastructure | api→application→domain, infrastructure→domain | X | X |
+| `ModularMonolith()` | api, application, core, infrastructure | api→application→core, infrastructure→core | X | X |
 
 ### DDD 레이아웃
 
@@ -254,7 +254,7 @@ internal/
 │   └── order/
 │       ├── api/                  # 모듈 공개 인터페이스
 │       ├── application/          # 유즈케이스
-│       ├── domain/               # 엔티티, 값 객체
+│       ├── core/                 # 엔티티, 값 객체
 │       └── infrastructure/       # DB, 외부 서비스
 ├── orchestration/
 └── pkg/
@@ -265,9 +265,9 @@ Modular Monolith 레이어 방향:
 | 출발 | import 가능 대상 |
 |------|-----------------|
 | `api` | `application` |
-| `application` | `domain` |
-| `domain` | 없음 |
-| `infrastructure` | `domain` |
+| `application` | `core` |
+| `core` | 없음 |
+| `infrastructure` | `core` |
 
 ### 커스텀 모델
 

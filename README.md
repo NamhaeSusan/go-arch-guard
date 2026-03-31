@@ -224,7 +224,7 @@ Pass empty strings for `module` and `root` to auto-extract from loaded packages.
 | `CleanArch()` | handler, usecase, entity, gateway, infra | handler→usecase→entity+gateway, infra→gateway | No | No |
 | `Layered()` | handler, service, repository, model | handler→service→repository+model, repository→model | No | No |
 | `Hexagonal()` | handler, usecase, port, domain, adapter | handler→usecase→port+domain, adapter→port+domain | No | No |
-| `ModularMonolith()` | api, application, domain, infrastructure | api→application→domain, infrastructure→domain | No | No |
+| `ModularMonolith()` | api, application, core, infrastructure | api→application→core, infrastructure→core | No | No |
 
 ### DDD Layout
 
@@ -339,7 +339,7 @@ internal/
 │   └── order/
 │       ├── api/                  # module public interface
 │       ├── application/          # use cases
-│       ├── domain/               # entities, value objects
+│       ├── core/                 # entities, value objects
 │       └── infrastructure/       # DB, external services
 ├── orchestration/
 └── pkg/
@@ -350,9 +350,9 @@ Modular Monolith direction:
 | from | allowed to import |
 |------|-------------------|
 | `api` | `application` |
-| `application` | `domain` |
-| `domain` | nothing |
-| `infrastructure` | `domain` |
+| `application` | `core` |
+| `core` | nothing |
+| `infrastructure` | `core` |
 
 ### Custom Model
 

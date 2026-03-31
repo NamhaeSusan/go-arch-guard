@@ -868,11 +868,11 @@ func TestIntegration_RealWorldModularMonolith(t *testing.T) {
 	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "api", "handler.go"),
 		"package api\n\nimport _ \""+module+"/internal/domain/order/application\"\n")
 	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "application", "create_order.go"),
-		"package application\n\nimport _ \""+module+"/internal/domain/order/domain\"\n")
-	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "domain", "order.go"),
-		"package domain\n\ntype Order struct{ ID string }\n")
+		"package application\n\nimport _ \""+module+"/internal/domain/order/core\"\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "core", "order.go"),
+		"package core\n\ntype Order struct{ ID string }\n")
 	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "infrastructure", "pg_order.go"),
-		"package infrastructure\n\nimport _ \""+module+"/internal/domain/order/domain\"\n\ntype PgOrder struct{}\n")
+		"package infrastructure\n\nimport _ \""+module+"/internal/domain/order/core\"\n\ntype PgOrder struct{}\n")
 
 	// --- pkg ---
 	writeIntegrationFile(t, filepath.Join(root, "internal", "pkg", "logger", "logger.go"),
@@ -925,9 +925,9 @@ func TestIntegration_ModularMonolith_Violations(t *testing.T) {
 
 	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.25.0\n")
 
-	// domain imports api — direction violation
-	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "domain", "order.go"),
-		"package domain\n\nimport _ \""+module+"/internal/domain/order/api\"\n")
+	// core imports api — direction violation
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "core", "order.go"),
+		"package core\n\nimport _ \""+module+"/internal/domain/order/api\"\n")
 	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "api", "handler.go"),
 		"package api\n")
 	// infrastructure imports application — direction violation
@@ -937,9 +937,9 @@ func TestIntegration_ModularMonolith_Violations(t *testing.T) {
 		"package application\n")
 	// cross-domain: order imports user
 	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "application", "cross.go"),
-		"package application\n\nimport _ \""+module+"/internal/domain/user/domain\"\n")
-	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "user", "domain", "user.go"),
-		"package domain\n")
+		"package application\n\nimport _ \""+module+"/internal/domain/user/core\"\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "user", "core", "user.go"),
+		"package core\n")
 
 	pkgs, err := analyzer.Load(root, "internal/...")
 	if err != nil {
