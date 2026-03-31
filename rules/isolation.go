@@ -26,6 +26,10 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 
 		// Check cmd/ packages: they must only import domain aliases, not sub-packages
 		if pkg.PkgPath == cmdPrefix || strings.HasPrefix(pkg.PkgPath, cmdPrefix+"/") {
+			// When alias is not required, cmd/ may import any domain sub-package.
+			if !m.RequireAlias {
+				continue
+			}
 			for impPath := range pkg.Imports {
 				if !strings.HasPrefix(impPath, internalPrefix) {
 					continue
@@ -78,6 +82,11 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 			// Orchestration rules
 			if srcIsOrchestration {
 				if impDomain == "" {
+					continue
+				}
+				// When alias is not required, orchestration may import
+				// any sub-package within domains (composition root pattern).
+				if !m.RequireAlias {
 					continue
 				}
 				if isDomainAliasWith(m, impPath, internalPrefix, impDomain) {
