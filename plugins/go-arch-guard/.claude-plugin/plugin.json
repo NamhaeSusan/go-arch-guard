@@ -1,5 +1,5 @@
 {
   "name": "go-arch-guard",
   "description": "Adds the go-arch-guard skill for applying Go architecture guardrails.",
-  "version": "0.0.7"
+  "version": "0.0.8"
 }
