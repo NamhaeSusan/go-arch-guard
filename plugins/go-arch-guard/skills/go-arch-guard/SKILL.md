@@ -1,12 +1,12 @@
 ---
 name: go-arch-guard
-description: Use when user explicitly mentions go-arch-guard, architecture guardrails, or architecture_test.go in a Go project. Handles initial scaffolding and preset configuration.
+description: Use when user explicitly mentions go-arch-guard, architecture guardrails, or architecture_test.go in a Go project. Handles AI-agent-friendly scaffolding, preset configuration, and automation-oriented setup.
 user_invocable: true
 ---
 
 # go-arch-guard
 
-Go 프로젝트에 아키텍처 가드레일을 `go test`로 적용.
+Go 프로젝트에 아키텍처 가드레일을 `go test`로 적용하고, AI 에이전트가 바로 스캐폴딩하고 유지하기 쉬운 형태로 안내한다.
 
 ## Decision Flow
 
@@ -42,56 +42,39 @@ mkdir -p internal/domain internal/orchestration internal/pkg
 ### Step 3: architecture_test.go 생성
 
 파일이 이미 존재하면 덮어쓰지 않고 유저에게 확인한다.
-패키지명은 go.mod module의 마지막 세그먼트. 예: `module github.com/user/myapp` → `package myapp_test`
+패키지명은 **유효한 Go 패키지 식별자**여야 한다. 예: `myapp_test`
+하이픈이 있는 module basename(예: `go-arch-guard`)을 그대로 쓰면 안 된다.
 
-#### DDD (WithModel 불필요)
+우선 `scaffold.ArchitectureTest(...)`로 프리셋별 템플릿을 생성하는 것을 우선한다.
 
 ```go
-package {project}_test
+import "github.com/NamhaeSusan/go-arch-guard/scaffold"
 
-import (
-    "testing"
-
-    "github.com/NamhaeSusan/go-arch-guard/analyzer"
-    "github.com/NamhaeSusan/go-arch-guard/report"
-    "github.com/NamhaeSusan/go-arch-guard/rules"
+src, err := scaffold.ArchitectureTest(
+    scaffold.PresetDDD, // or PresetCleanArch / PresetLayered / PresetHexagonal / PresetModularMonolith
+    scaffold.ArchitectureTestOptions{PackageName: "myapp_test"},
 )
-
-func TestArchitecture(t *testing.T) {
-    pkgs, err := analyzer.Load(".", "internal/...", "cmd/...")
-    if err != nil {
-        t.Log(err)
-    }
-    if len(pkgs) == 0 {
-        t.Fatalf("no packages loaded: %v", err)
-    }
-
-    t.Run("domain isolation", func(t *testing.T) {
-        report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, "", ""))
-    })
-    t.Run("layer direction", func(t *testing.T) {
-        report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, "", ""))
-    })
-    t.Run("naming", func(t *testing.T) {
-        report.AssertNoViolations(t, rules.CheckNaming(pkgs))
-    })
-    t.Run("structure", func(t *testing.T) {
-        report.AssertNoViolations(t, rules.CheckStructure("."))
-    })
-    t.Run("blast radius", func(t *testing.T) {
-        report.AssertNoViolations(t, rules.AnalyzeBlastRadius(pkgs, "", ""))
-    })
+if err != nil {
+    return err
 }
 ```
 
-#### 그 외 프리셋 (CleanArch / Layered / Hexagonal / ModularMonolith)
+생성된 결과를 `architecture_test.go`에 저장한다. 생성 템플릿은 내부에서
+`rules.RunAll(...)`을 사용해 권장 rule 묶음을 한 번에 실행한다.
 
-DDD 템플릿에서 아래 2줄만 추가하고, 각 체크 함수에 `opts...` 전달:
+가장 간단한 통합은 `rules.RunAll(pkgs, "", "")`를 쓰는 방식이다.
+기본값이 아닌 모델이나 severity/exclude 옵션이 필요할 때만 `opts...`를 넘기고,
+세부 rule을 개별로 다뤄야 할 때만 `Check*` 함수를 직접 조합한다.
 
-```go
-m := rules.{Preset}()  // CleanArch, Layered, Hexagonal, or ModularMonolith
-opts := []rules.Option{rules.WithModel(m)}
-```
+프리셋 매핑:
+
+| 프리셋 | scaffold 상수 |
+|--------|----------------|
+| DDD | `scaffold.PresetDDD` |
+| Clean Architecture | `scaffold.PresetCleanArch` |
+| Layered | `scaffold.PresetLayered` |
+| Hexagonal | `scaffold.PresetHexagonal` |
+| Modular Monolith | `scaffold.PresetModularMonolith` |
 
 `{Preset}`을 선택한 함수명으로 치환. `opts...`가 있는 전체 템플릿은 README.md Quick Start 참조.
 
@@ -220,6 +203,18 @@ m := rules.NewModel(
 ```go
 rules.WithExclude("internal/legacy/...")  // 마이그레이션 중 경로 제외
 rules.WithSeverity(rules.Warning)         // 실패 없이 로그만
+```
+
+## Machine-readable Output
+
+AI 에이전트나 CI 봇이 violation을 후처리해야 하면 JSON 출력을 우선한다.
+
+```go
+data, err := report.MarshalJSONReport(violations)
+if err != nil {
+    return err
+}
+fmt.Println(string(data))
 ```
 
 ---

@@ -22,11 +22,15 @@ type Violation struct {
 	Severity Severity
 }
 
-func (v Violation) String() string {
-	sev := "ERROR"
-	if v.Severity == Warning {
-		sev = "WARNING"
+func (s Severity) String() string {
+	if s == Warning {
+		return "WARNING"
 	}
+	return "ERROR"
+}
+
+func (v Violation) String() string {
+	sev := v.Severity.String()
 	fileStr := v.File
 	if v.Line > 0 {
 		fileStr = fmt.Sprintf("%s:%d", v.File, v.Line)
