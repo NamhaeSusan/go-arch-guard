@@ -2,7 +2,12 @@
 
 ## Concept
 
-Go 프로젝트의 아키텍처 규칙(의존성, 네이밍, 구조)을 정적 분석으로 검증하는 라이브러리.
+Go 프로젝트의 아키텍처 규칙(의존성, 네이밍, 구조)을 정적 분석으로 검증하는 라이브러리이며, AI 코딩 에이전트가 쉽게 스캐폴딩하고 유지할 수 있는 표면을 제공한다.
+
+AI 에이전트 친화적인 기본 surface:
+- `scaffold.ArchitectureTest(...)` — 프리셋별 `architecture_test.go` 생성
+- `report.BuildJSONReport(...)` / `report.MarshalJSONReport(...)` — machine-readable violation 출력
+- `rules.RunAll(...)` — 권장 기본 rule 묶음 실행
 
 ---
 

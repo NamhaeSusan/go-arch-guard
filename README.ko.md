@@ -4,9 +4,15 @@
 [![codecov](https://codecov.io/gh/NamhaeSusan/go-arch-guard/branch/main/graph/badge.svg)](https://codecov.io/gh/NamhaeSusan/go-arch-guard)
 [![Go Report Card](https://goreportcard.com/badge/github.com/NamhaeSusan/go-arch-guard)](https://goreportcard.com/report/github.com/NamhaeSusan/go-arch-guard)
 
-`go test`로 Go 프로젝트의 아키텍처 가드레일을 적용합니다.
+`go test`로 Go 프로젝트의 아키텍처 가드레일을 적용하는 도구이며, 특히 AI 코딩 에이전트와 빠르게 움직이는 팀에 맞춰 설계되었습니다.
 
 격리, 레이어 방향, 구조, 네이밍, 블래스트 반경 규칙을 정의하고, 프로젝트 형태가 벗어나면 일반 테스트에서 실패시킵니다. **DDD**, **Clean Architecture**, **Layered**, **Hexagonal**, **Modular Monolith** 프리셋을 기본 제공하며, 완전한 커스텀 아키텍처 모델도 지원합니다. 별도 CLI나 설정 포맷 없이, Go 테스트만으로 동작합니다.
+
+AI 에이전트 친화적인 기본 surface:
+
+- `scaffold.ArchitectureTest(...)` — 바로 붙여 넣을 수 있는 `architecture_test.go` 생성
+- `rules.RunAll(...)` — 권장 rule 묶음을 한 번에 실행
+- `report.MarshalJSONReport(...)` — 봇과 자동 수정 루프가 읽기 쉬운 JSON 출력
 
 ## 왜 필요한가
 
@@ -17,7 +23,7 @@
 - 패키지 배치 드리프트
 - 의도한 프로젝트 형태를 깨는 네이밍
 
-`go-arch-guard`는 정적 분석으로 이런 큰 실수를 조기에 잡습니다.
+`go-arch-guard`는 정적 분석으로 이런 큰 실수를 조기에 잡습니다. AI 에이전트가 손쉽게 스캐폴딩하고 유지할 수 있을 만큼 단순하게 설계하면서도, 사람이 경계를 검토하기에 충분한 가드레일을 제공하는 데 초점을 둡니다.
 
 ## 설치
 
@@ -26,6 +32,32 @@ go get github.com/NamhaeSusan/go-arch-guard
 ```
 
 ## 빠른 시작
+
+### 프리셋 템플릿 생성
+
+AI 에이전트나 스캐폴딩 도구라면 아래 예제를 손으로 복사하기보다
+바로 `architecture_test.go` 템플릿을 생성할 수 있습니다:
+
+```go
+import "github.com/NamhaeSusan/go-arch-guard/scaffold"
+
+src, err := scaffold.ArchitectureTest(
+    scaffold.PresetHexagonal,
+    scaffold.ArchitectureTestOptions{PackageName: "myapp_test"},
+)
+```
+
+사용 가능한 프리셋: `PresetDDD`, `PresetCleanArch`, `PresetLayered`,
+`PresetHexagonal`, `PresetModularMonolith`.
+
+### 권장 shortcut
+
+각 rule을 직접 append 하지 않고 권장 기본 묶음을 한 번에 실행하려면:
+
+```go
+violations := rules.RunAll(pkgs, "", "", opts...)
+report.AssertNoViolations(t, violations)
+```
 
 ### DDD (기본값)
 
@@ -418,7 +450,12 @@ go run github.com/NamhaeSusan/go-arch-guard/cmd/tui .
 | `rules.CheckNaming(pkgs, opts...)` | 네이밍 검사 |
 | `rules.CheckStructure(root, opts...)` | 파일시스템 구조 검사 |
 | `rules.AnalyzeBlastRadius(pkgs, module, root, opts...)` | 커플링 이상치 탐지 |
+| `rules.RunAll(pkgs, module, root, opts...)` | 권장 기본 rule 묶음 실행 |
 | `report.AssertNoViolations(t, violations)` | Error 위반 시 테스트 실패 |
+| `report.BuildJSONReport(violations)` | 기계가 읽기 쉬운 JSON 리포트 구성 |
+| `report.MarshalJSONReport(violations)` | JSON 리포트 직렬화 |
+| `report.WriteJSONReport(w, violations)` | JSON 리포트 쓰기 |
+| `scaffold.ArchitectureTest(preset, opts)` | 프리셋별 `architecture_test.go` 템플릿 생성 |
 | `rules.DDD()` | DDD 아키텍처 모델 (기본값) |
 | `rules.CleanArch()` | Clean Architecture 모델 |
 | `rules.Layered()` | Spring 스타일 레이어드 모델 |
@@ -428,6 +465,20 @@ go run github.com/NamhaeSusan/go-arch-guard/cmd/tui .
 | `rules.WithModel(m)` | 커스텀 모델 적용 |
 | `rules.WithSeverity(rules.Warning)` | 경고로 다운그레이드 |
 | `rules.WithExclude("path/...")` | 하위 트리 건너뛰기 |
+
+## 기계 친화적인 JSON 출력
+
+CI, 봇, AI 수정 루프에서는 같은 위반 목록을 JSON으로 내보낼 수 있습니다:
+
+```go
+import "github.com/NamhaeSusan/go-arch-guard/report"
+
+data, err := report.MarshalJSONReport(violations)
+if err != nil {
+    return err
+}
+fmt.Println(string(data))
+```
 
 ## Claude Code 플러그인
 

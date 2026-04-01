@@ -6,9 +6,15 @@
 
 [한국어](README.ko.md)
 
-Architecture guardrails for Go projects via `go test`.
+Architecture guardrails for Go projects via `go test`, built for AI coding agents and fast-moving teams.
 
 Define isolation, layer-direction, structure, naming, and blast-radius rules, then fail regular tests when the project shape drifts. Ships with **DDD**, **Clean Architecture**, **Layered**, **Hexagonal**, and **Modular Monolith** presets, and supports fully custom architecture models. No CLI to learn. No separate config format. Just Go tests.
+
+AI-agent-friendly by default:
+
+- `scaffold.ArchitectureTest(...)` generates a ready-to-copy `architecture_test.go`
+- `rules.RunAll(...)` runs the recommended rule bundle in one call
+- `report.MarshalJSONReport(...)` emits machine-readable violations for bots and remediation loops
 
 ## Why
 
@@ -19,7 +25,7 @@ Architecture usually decays through a few broad mistakes, not through deep theor
 - package placement drift
 - naming that breaks the intended project shape
 
-`go-arch-guard` catches those coarse mistakes early via static analysis. It does not try to model every semantic nuance inside Go packages, and if Go already rejects something by itself (such as import cycles), that is not a primary target here.
+`go-arch-guard` catches those coarse mistakes early via static analysis. It is designed to be simple enough for AI agents to scaffold and maintain, while still being useful for humans reviewing the resulting boundaries. It does not try to model every semantic nuance inside Go packages, and if Go already rejects something by itself (such as import cycles), that is not a primary target here.
 
 ## Install
 
@@ -28,6 +34,32 @@ go get github.com/NamhaeSusan/go-arch-guard
 ```
 
 ## Quick Start
+
+### Generate a preset template
+
+For AI agents or scaffolding tools, generate a ready-to-copy `architecture_test.go`
+instead of hand-copying the snippets below:
+
+```go
+import "github.com/NamhaeSusan/go-arch-guard/scaffold"
+
+src, err := scaffold.ArchitectureTest(
+    scaffold.PresetHexagonal,
+    scaffold.ArchitectureTestOptions{PackageName: "myapp_test"},
+)
+```
+
+Available presets: `PresetDDD`, `PresetCleanArch`, `PresetLayered`,
+`PresetHexagonal`, `PresetModularMonolith`.
+
+### Recommended shortcut
+
+If you want the recommended rule bundle without manually appending each check:
+
+```go
+violations := rules.RunAll(pkgs, "", "", opts...)
+report.AssertNoViolations(t, violations)
+```
 
 ### DDD (default)
 
@@ -527,7 +559,12 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `rules.CheckNaming(pkgs, opts...)` | naming convention checks |
 | `rules.CheckStructure(root, opts...)` | filesystem structure checks |
 | `rules.AnalyzeBlastRadius(pkgs, module, root, opts...)` | coupling outlier detection |
+| `rules.RunAll(pkgs, module, root, opts...)` | run the recommended built-in rule bundle |
 | `report.AssertNoViolations(t, violations)` | fail test on Error violations |
+| `report.BuildJSONReport(violations)` | build a machine-readable JSON-friendly report |
+| `report.MarshalJSONReport(violations)` | marshal a machine-readable JSON report |
+| `report.WriteJSONReport(w, violations)` | write a machine-readable JSON report |
+| `scaffold.ArchitectureTest(preset, opts)` | generate a preset-specific `architecture_test.go` template |
 | `rules.DDD()` | DDD architecture model (default) |
 | `rules.CleanArch()` | Clean Architecture model |
 | `rules.Layered()` | Spring-style layered model |
@@ -537,6 +574,20 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `rules.WithModel(m)` | apply custom model to checks |
 | `rules.WithSeverity(rules.Warning)` | downgrade to warnings |
 | `rules.WithExclude("path/...")` | skip a subtree |
+
+## Machine-readable JSON Output
+
+For CI, bots, or AI remediation loops, you can emit the same violations as JSON:
+
+```go
+import "github.com/NamhaeSusan/go-arch-guard/report"
+
+data, err := report.MarshalJSONReport(violations)
+if err != nil {
+    return err
+}
+fmt.Println(string(data))
+```
 
 ## Claude Code Plugin
 
