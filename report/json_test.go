@@ -49,6 +49,20 @@ func TestMarshalJSONReport(t *testing.T) {
 	}
 }
 
+func TestBuildJSONReport_NilViolations(t *testing.T) {
+	got := report.BuildJSONReport(nil)
+	if got.Summary.Total != 0 || got.Summary.Errors != 0 || got.Summary.Warnings != 0 {
+		t.Fatalf("nil input must produce zero counts: %+v", got.Summary)
+	}
+	data, err := json.Marshal(got)
+	if err != nil {
+		t.Fatalf("marshal error: %v", err)
+	}
+	if !bytes.Contains(data, []byte(`"violations":[]`)) {
+		t.Fatalf("nil violations must marshal as [] not null: %s", data)
+	}
+}
+
 func TestWriteJSONReport(t *testing.T) {
 	var buf bytes.Buffer
 	violations := []rules.Violation{{Rule: "test.rule", Message: "warn", Severity: rules.Warning}}
