@@ -56,15 +56,9 @@ func TestRunAll_EmptyModuleAndRootAutoExtract(t *testing.T) {
 	}
 
 	got := rules.RunAll(pkgs, "", "")
-
-	var want []rules.Violation
-	want = append(want, rules.CheckDomainIsolation(pkgs, "", "")...)
-	want = append(want, rules.CheckLayerDirection(pkgs, "", "")...)
-	want = append(want, rules.CheckNaming(pkgs)...)
-	want = append(want, rules.CheckStructure("../testdata/valid")...)
-	want = append(want, rules.AnalyzeBlastRadius(pkgs, "", "")...)
+	want := rules.RunAll(pkgs, "github.com/kimtaeyun/testproject-dc", "../testdata/valid")
 
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("RunAll() with empty module/root mismatch\n got: %#v\nwant: %#v", got, want)
+		t.Fatalf("RunAll() auto-extract must match explicit values\n got: %#v\nwant: %#v", got, want)
 	}
 }

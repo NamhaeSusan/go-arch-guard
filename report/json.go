@@ -17,7 +17,7 @@ type JSONSummary struct {
 	Errors   int      `json:"errors"`
 	Warnings int      `json:"warnings"`
 	Files    int      `json:"files"`
-	Rules    []string `json:"rules,omitempty"`
+	Rules    []string `json:"rules"`
 }
 
 // JSONViolation is a JSON-friendly view of a rules.Violation.
@@ -70,6 +70,7 @@ func BuildJSONReport(violations []rules.Violation) JSONReport {
 	}
 
 	report.Summary.Files = len(files)
+	report.Summary.Rules = make([]string, 0, len(ruleSet))
 	for rule := range ruleSet {
 		report.Summary.Rules = append(report.Summary.Rules, rule)
 	}
@@ -83,6 +84,7 @@ func MarshalJSONReport(violations []rules.Violation) ([]byte, error) {
 }
 
 // WriteJSONReport writes a machine-readable report with stable indentation.
+// Unlike MarshalJSONReport, the output includes a trailing newline.
 func WriteJSONReport(w io.Writer, violations []rules.Violation) error {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
