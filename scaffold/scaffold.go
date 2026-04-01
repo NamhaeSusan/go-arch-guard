@@ -3,6 +3,7 @@ package scaffold
 import (
 	"fmt"
 	"go/format"
+	"go/token"
 	"strings"
 )
 
@@ -23,11 +24,15 @@ type ArchitectureTestOptions struct {
 }
 
 // ArchitectureTest returns a ready-to-copy architecture_test.go source file
-// for the selected preset.
+// for the selected preset. PackageName must be a valid Go package identifier
+// such as "myapp_test".
 func ArchitectureTest(preset Preset, opts ArchitectureTestOptions) (string, error) {
 	packageName := strings.TrimSpace(opts.PackageName)
 	if packageName == "" {
 		return "", fmt.Errorf("package name is required")
+	}
+	if !token.IsIdentifier(packageName) {
+		return "", fmt.Errorf("package name must be a valid Go identifier: %q", packageName)
 	}
 
 	modelFunc, err := presetModelFunc(preset)
@@ -84,31 +89,11 @@ func TestArchitecture(t *testing.T) {
 		fmt.Fprintf(&b, "\n\tm := rules.%s()\n\topts := []rules.Option{rules.WithModel(m)}\n", modelFunc)
 	}
 	b.WriteString("\n")
-	writeCheckRun(&b, "domain isolation", fmt.Sprintf("rules.CheckDomainIsolation(pkgs, \"\", \"\"%s)", callOptionSuffix(modelFunc)))
-	writeCheckRun(&b, "layer direction", fmt.Sprintf("rules.CheckLayerDirection(pkgs, \"\", \"\"%s)", callOptionSuffix(modelFunc)))
-	writeCheckRun(&b, "naming", fmt.Sprintf("rules.CheckNaming(pkgs%s)", namingOptionSuffix(modelFunc)))
-	writeCheckRun(&b, "structure", fmt.Sprintf("rules.CheckStructure(\".\"%s)", callOptionSuffix(modelFunc)))
-	writeCheckRun(&b, "blast radius", fmt.Sprintf("rules.AnalyzeBlastRadius(pkgs, \"\", \"\"%s)", callOptionSuffix(modelFunc)))
+	if modelFunc == "" {
+		b.WriteString("\treport.AssertNoViolations(t, rules.RunAll(pkgs, \"\", \"\"))\n")
+	} else {
+		b.WriteString("\treport.AssertNoViolations(t, rules.RunAll(pkgs, \"\", \"\", opts...))\n")
+	}
 	b.WriteString("}\n")
 	return b.String()
-}
-
-func writeCheckRun(b *strings.Builder, name, call string) {
-	fmt.Fprintf(b, "\tt.Run(%q, func(t *testing.T) {\n", name)
-	fmt.Fprintf(b, "\t\treport.AssertNoViolations(t, %s)\n", call)
-	b.WriteString("\t})\n")
-}
-
-func callOptionSuffix(modelFunc string) string {
-	if modelFunc == "" {
-		return ""
-	}
-	return ", opts..."
-}
-
-func namingOptionSuffix(modelFunc string) string {
-	if modelFunc == "" {
-		return ""
-	}
-	return ", opts..."
 }

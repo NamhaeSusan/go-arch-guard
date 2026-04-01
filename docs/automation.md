@@ -18,6 +18,8 @@ src, err := scaffold.ArchitectureTest(
 )
 ```
 
+`PackageName` must be a valid Go package identifier.
+
 Available presets:
 
 - `scaffold.PresetDDD`
@@ -44,6 +46,7 @@ fmt.Println(string(data))
 
 The JSON report includes:
 
+- schema marker (`go-arch-guard.report.v1`)
 - summary counts (`total`, `errors`, `warnings`, `files`)
 - sorted rule ids
 - each violation with string severity (`error` / `warning`)

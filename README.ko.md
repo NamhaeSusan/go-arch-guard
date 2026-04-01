@@ -47,6 +47,9 @@ src, err := scaffold.ArchitectureTest(
 )
 ```
 
+`PackageName`은 유효한 Go 패키지 식별자여야 합니다. 하이픈이 있는
+module basename을 그대로 쓰면 안 됩니다.
+
 사용 가능한 프리셋: `PresetDDD`, `PresetCleanArch`, `PresetLayered`,
 `PresetHexagonal`, `PresetModularMonolith`.
 
@@ -55,9 +58,11 @@ src, err := scaffold.ArchitectureTest(
 각 rule을 직접 append 하지 않고 권장 기본 묶음을 한 번에 실행하려면:
 
 ```go
-violations := rules.RunAll(pkgs, "", "", opts...)
+violations := rules.RunAll(pkgs, "", "")
 report.AssertNoViolations(t, violations)
 ```
+
+기본값이 아닌 모델이나 severity/exclude 옵션이 필요할 때만 `opts...`를 넘기면 됩니다.
 
 ### DDD (기본값)
 

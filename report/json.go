@@ -9,6 +9,8 @@ import (
 	"github.com/NamhaeSusan/go-arch-guard/rules"
 )
 
+const jsonReportSchema = "go-arch-guard.report.v1"
+
 // JSONSummary captures aggregate counts for a machine-readable report.
 type JSONSummary struct {
 	Total    int      `json:"total"`
@@ -30,6 +32,7 @@ type JSONViolation struct {
 
 // JSONReport is a stable machine-readable report for automation and AI agents.
 type JSONReport struct {
+	Schema     string          `json:"schema"`
 	Summary    JSONSummary     `json:"summary"`
 	Violations []JSONViolation `json:"violations"`
 }
@@ -37,6 +40,7 @@ type JSONReport struct {
 // BuildJSONReport converts violations into a machine-readable report.
 func BuildJSONReport(violations []rules.Violation) JSONReport {
 	report := JSONReport{
+		Schema:     jsonReportSchema,
 		Violations: make([]JSONViolation, 0, len(violations)),
 	}
 	files := make(map[string]struct{})

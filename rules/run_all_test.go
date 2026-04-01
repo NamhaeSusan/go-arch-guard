@@ -48,3 +48,23 @@ func TestRunAll_WithModelMatchesManualComposition(t *testing.T) {
 		t.Fatalf("RunAll() mismatch\n got: %#v\nwant: %#v", got, want)
 	}
 }
+
+func TestRunAll_EmptyModuleAndRootAutoExtract(t *testing.T) {
+	pkgs, err := analyzer.Load("../testdata/valid", "internal/...", "cmd/...")
+	if err != nil {
+		t.Fatalf("load packages: %v", err)
+	}
+
+	got := rules.RunAll(pkgs, "", "")
+
+	var want []rules.Violation
+	want = append(want, rules.CheckDomainIsolation(pkgs, "", "")...)
+	want = append(want, rules.CheckLayerDirection(pkgs, "", "")...)
+	want = append(want, rules.CheckNaming(pkgs)...)
+	want = append(want, rules.CheckStructure("../testdata/valid")...)
+	want = append(want, rules.AnalyzeBlastRadius(pkgs, "", "")...)
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("RunAll() with empty module/root mismatch\n got: %#v\nwant: %#v", got, want)
+	}
+}

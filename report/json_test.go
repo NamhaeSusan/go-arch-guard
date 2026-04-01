@@ -16,6 +16,9 @@ func TestBuildJSONReport(t *testing.T) {
 	}
 
 	got := report.BuildJSONReport(violations)
+	if got.Schema != "go-arch-guard.report.v1" {
+		t.Fatalf("unexpected schema marker: %q", got.Schema)
+	}
 	if got.Summary.Total != 2 || got.Summary.Errors != 1 || got.Summary.Warnings != 1 {
 		t.Fatalf("unexpected summary counts: %+v", got.Summary)
 	}
@@ -41,7 +44,7 @@ func TestMarshalJSONReport(t *testing.T) {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("json output must decode: %v\n%s", err, data)
 	}
-	if decoded.Summary.Total != 1 || decoded.Violations[0].Severity != "error" {
+	if decoded.Schema != "go-arch-guard.report.v1" || decoded.Summary.Total != 1 || decoded.Violations[0].Severity != "error" {
 		t.Fatalf("unexpected decoded report: %+v", decoded)
 	}
 }

@@ -19,13 +19,13 @@ func TestArchitectureTest(t *testing.T) {
 		{
 			name:        "ddd",
 			preset:      scaffold.PresetDDD,
-			contains:    []string{"package myapp_test", "func TestArchitecture", "rules.AnalyzeBlastRadius(pkgs, \"\", \"\")"},
+			contains:    []string{"package myapp_test", "func TestArchitecture", "rules.RunAll(pkgs, \"\", \"\")"},
 			notContains: []string{"rules.WithModel(m)"},
 		},
 		{
 			name:     "clean arch",
 			preset:   scaffold.PresetCleanArch,
-			contains: []string{"m := rules.CleanArch()", "opts := []rules.Option{rules.WithModel(m)}", "rules.CheckLayerDirection(pkgs, \"\", \"\", opts...)"},
+			contains: []string{"m := rules.CleanArch()", "opts := []rules.Option{rules.WithModel(m)}", "rules.RunAll(pkgs, \"\", \"\", opts...)"},
 		},
 		{
 			name:     "layered",
@@ -70,6 +70,9 @@ func TestArchitectureTest(t *testing.T) {
 func TestArchitectureTestErrors(t *testing.T) {
 	if _, err := scaffold.ArchitectureTest(scaffold.PresetDDD, scaffold.ArchitectureTestOptions{}); err == nil {
 		t.Fatal("expected empty package name error")
+	}
+	if _, err := scaffold.ArchitectureTest(scaffold.PresetDDD, scaffold.ArchitectureTestOptions{PackageName: "go-arch-guard_test"}); err == nil {
+		t.Fatal("expected invalid package name error")
 	}
 	if _, err := scaffold.ArchitectureTest(scaffold.Preset("weird"), scaffold.ArchitectureTestOptions{PackageName: "myapp_test"}); err == nil {
 		t.Fatal("expected unknown preset error")

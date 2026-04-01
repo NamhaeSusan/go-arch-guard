@@ -42,7 +42,8 @@ mkdir -p internal/domain internal/orchestration internal/pkg
 ### Step 3: architecture_test.go 생성
 
 파일이 이미 존재하면 덮어쓰지 않고 유저에게 확인한다.
-패키지명은 go.mod module의 마지막 세그먼트. 예: `module github.com/user/myapp` → `package myapp_test`
+패키지명은 **유효한 Go 패키지 식별자**여야 한다. 예: `myapp_test`
+하이픈이 있는 module basename(예: `go-arch-guard`)을 그대로 쓰면 안 된다.
 
 우선 `scaffold.ArchitectureTest(...)`로 프리셋별 템플릿을 생성하는 것을 우선한다.
 
@@ -58,10 +59,11 @@ if err != nil {
 }
 ```
 
-생성된 결과를 `architecture_test.go`에 저장한다. 생성 템플릿은 모든 프리셋에 대해
-`domain isolation`, `layer direction`, `naming`, `structure`, `blast radius` 체크를 포함한다.
+생성된 결과를 `architecture_test.go`에 저장한다. 생성 템플릿은 내부에서
+`rules.RunAll(...)`을 사용해 권장 rule 묶음을 한 번에 실행한다.
 
-가장 간단한 통합은 `rules.RunAll(pkgs, "", "", opts...)`를 쓰는 방식이다.
+가장 간단한 통합은 `rules.RunAll(pkgs, "", "")`를 쓰는 방식이다.
+기본값이 아닌 모델이나 severity/exclude 옵션이 필요할 때만 `opts...`를 넘기고,
 세부 rule을 개별로 다뤄야 할 때만 `Check*` 함수를 직접 조합한다.
 
 프리셋 매핑:

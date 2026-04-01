@@ -49,6 +49,9 @@ src, err := scaffold.ArchitectureTest(
 )
 ```
 
+`PackageName` must be a valid Go package identifier. Do not derive it blindly
+from a hyphenated module basename.
+
 Available presets: `PresetDDD`, `PresetCleanArch`, `PresetLayered`,
 `PresetHexagonal`, `PresetModularMonolith`.
 
@@ -57,9 +60,11 @@ Available presets: `PresetDDD`, `PresetCleanArch`, `PresetLayered`,
 If you want the recommended rule bundle without manually appending each check:
 
 ```go
-violations := rules.RunAll(pkgs, "", "", opts...)
+violations := rules.RunAll(pkgs, "", "")
 report.AssertNoViolations(t, violations)
 ```
+
+Pass `opts...` only when you need a non-default model or severity/exclude options.
 
 ### DDD (default)
 
