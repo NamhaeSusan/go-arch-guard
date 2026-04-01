@@ -64,7 +64,9 @@ report.AssertNoViolations(t, violations)
 
 기본값이 아닌 모델이나 severity/exclude 옵션이 필요할 때만 `opts...`를 넘기면 됩니다.
 
-### DDD (기본값)
+### 개별 rule 제어 (DDD 예시)
+
+각 체크를 세밀하게 제어하려면 직접 조합합니다:
 
 ```go
 func TestArchitecture(t *testing.T) {
@@ -94,52 +96,15 @@ func TestArchitecture(t *testing.T) {
 }
 ```
 
-### Clean Architecture
+다른 프리셋을 쓸 때는 모델 함수만 교체하고 `opts...`를 전달합니다:
 
 ```go
-m := rules.CleanArch()
+m := rules.CleanArch() // 또는 Layered(), Hexagonal(), ModularMonolith()
 opts := []rules.Option{rules.WithModel(m)}
 
-t.Run("layer direction", func(t *testing.T) {
-    report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, "", "", opts...))
-})
-// ... 나머지 체크도 동일하게 opts... 전달
-```
-
-### Layered (Spring 스타일)
-
-```go
-m := rules.Layered()
-opts := []rules.Option{rules.WithModel(m)}
-
-t.Run("layer direction", func(t *testing.T) {
-    report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, "", "", opts...))
-})
-// ... 나머지 체크도 동일하게 opts... 전달
-```
-
-### Hexagonal (포트 & 어댑터)
-
-```go
-m := rules.Hexagonal()
-opts := []rules.Option{rules.WithModel(m)}
-
-t.Run("layer direction", func(t *testing.T) {
-    report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, "", "", opts...))
-})
-// ... 나머지 체크도 동일하게 opts... 전달
-```
-
-### Modular Monolith
-
-```go
-m := rules.ModularMonolith()
-opts := []rules.Option{rules.WithModel(m)}
-
-t.Run("layer direction", func(t *testing.T) {
-    report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, "", "", opts...))
-})
-// ... 나머지 체크도 동일하게 opts... 전달
+rules.CheckDomainIsolation(pkgs, "", "", opts...)
+rules.CheckLayerDirection(pkgs, "", "", opts...)
+// ... 모든 Check* 함수에 동일하게 opts... 전달
 ```
 
 ### 커스텀 모델
