@@ -66,7 +66,9 @@ report.AssertNoViolations(t, violations)
 
 Pass `opts...` only when you need a non-default model or severity/exclude options.
 
-### DDD (default)
+### Per-rule control (DDD example)
+
+For finer control over individual checks, compose them manually:
 
 ```go
 func TestArchitecture(t *testing.T) {
@@ -96,124 +98,15 @@ func TestArchitecture(t *testing.T) {
 }
 ```
 
-### Clean Architecture
+For other presets, add `opts` with the model function:
 
 ```go
-func TestArchitecture(t *testing.T) {
-    pkgs, err := analyzer.Load(".", "internal/...", "cmd/...")
-    if err != nil {
-        t.Log(err)
-    }
-    if len(pkgs) == 0 {
-        t.Fatalf("no packages loaded: %v", err)
-    }
+m := rules.CleanArch() // or Layered(), Hexagonal(), ModularMonolith()
+opts := []rules.Option{rules.WithModel(m)}
 
-    m := rules.CleanArch()
-    opts := []rules.Option{rules.WithModel(m)}
-
-    t.Run("domain isolation", func(t *testing.T) {
-        report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, "", "", opts...))
-    })
-    t.Run("layer direction", func(t *testing.T) {
-        report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, "", "", opts...))
-    })
-    t.Run("naming", func(t *testing.T) {
-        report.AssertNoViolations(t, rules.CheckNaming(pkgs, opts...))
-    })
-    t.Run("structure", func(t *testing.T) {
-        report.AssertNoViolations(t, rules.CheckStructure(".", opts...))
-    })
-}
-```
-
-### Layered (Spring-style)
-
-```go
-func TestArchitecture(t *testing.T) {
-    pkgs, err := analyzer.Load(".", "internal/...", "cmd/...")
-    if err != nil {
-        t.Log(err)
-    }
-    if len(pkgs) == 0 {
-        t.Fatalf("no packages loaded: %v", err)
-    }
-
-    m := rules.Layered()
-    opts := []rules.Option{rules.WithModel(m)}
-
-    t.Run("domain isolation", func(t *testing.T) {
-        report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, "", "", opts...))
-    })
-    t.Run("layer direction", func(t *testing.T) {
-        report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, "", "", opts...))
-    })
-    t.Run("naming", func(t *testing.T) {
-        report.AssertNoViolations(t, rules.CheckNaming(pkgs, opts...))
-    })
-    t.Run("structure", func(t *testing.T) {
-        report.AssertNoViolations(t, rules.CheckStructure(".", opts...))
-    })
-}
-```
-
-### Hexagonal (Ports & Adapters)
-
-```go
-func TestArchitecture(t *testing.T) {
-    pkgs, err := analyzer.Load(".", "internal/...", "cmd/...")
-    if err != nil {
-        t.Log(err)
-    }
-    if len(pkgs) == 0 {
-        t.Fatalf("no packages loaded: %v", err)
-    }
-
-    m := rules.Hexagonal()
-    opts := []rules.Option{rules.WithModel(m)}
-
-    t.Run("domain isolation", func(t *testing.T) {
-        report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, "", "", opts...))
-    })
-    t.Run("layer direction", func(t *testing.T) {
-        report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, "", "", opts...))
-    })
-    t.Run("naming", func(t *testing.T) {
-        report.AssertNoViolations(t, rules.CheckNaming(pkgs, opts...))
-    })
-    t.Run("structure", func(t *testing.T) {
-        report.AssertNoViolations(t, rules.CheckStructure(".", opts...))
-    })
-}
-```
-
-### Modular Monolith
-
-```go
-func TestArchitecture(t *testing.T) {
-    pkgs, err := analyzer.Load(".", "internal/...", "cmd/...")
-    if err != nil {
-        t.Log(err)
-    }
-    if len(pkgs) == 0 {
-        t.Fatalf("no packages loaded: %v", err)
-    }
-
-    m := rules.ModularMonolith()
-    opts := []rules.Option{rules.WithModel(m)}
-
-    t.Run("domain isolation", func(t *testing.T) {
-        report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, "", "", opts...))
-    })
-    t.Run("layer direction", func(t *testing.T) {
-        report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, "", "", opts...))
-    })
-    t.Run("naming", func(t *testing.T) {
-        report.AssertNoViolations(t, rules.CheckNaming(pkgs, opts...))
-    })
-    t.Run("structure", func(t *testing.T) {
-        report.AssertNoViolations(t, rules.CheckStructure(".", opts...))
-    })
-}
+rules.CheckDomainIsolation(pkgs, "", "", opts...)
+rules.CheckLayerDirection(pkgs, "", "", opts...)
+// ... same pattern for all Check* functions
 ```
 
 ### Custom Model
