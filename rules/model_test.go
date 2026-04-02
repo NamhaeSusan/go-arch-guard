@@ -168,6 +168,57 @@ func TestConsumerWorker_ReturnsValidModel(t *testing.T) {
 	}
 }
 
+func TestBatch_ReturnsValidModel(t *testing.T) {
+	m := Batch()
+	if len(m.Sublayers) != 4 {
+		t.Fatalf("Batch sublayer count = %d, want 4", len(m.Sublayers))
+	}
+	if m.DomainDir != "" {
+		t.Errorf("DomainDir = %q, want empty (flat layout)", m.DomainDir)
+	}
+	if m.OrchestrationDir != "" {
+		t.Errorf("OrchestrationDir = %q, want empty", m.OrchestrationDir)
+	}
+	if m.SharedDir != "pkg" {
+		t.Errorf("SharedDir = %q, want %q", m.SharedDir, "pkg")
+	}
+	if m.RequireAlias {
+		t.Error("Batch should not require alias")
+	}
+	if m.RequireModel {
+		t.Error("Batch should not require model")
+	}
+	if m.ModelPath != "model" {
+		t.Errorf("ModelPath = %q, want %q", m.ModelPath, "model")
+	}
+	if !m.PkgRestricted["model"] {
+		t.Error("model sublayer must be pkg-restricted")
+	}
+	for _, layer := range []string{"job", "service", "store", "model", "pkg"} {
+		if !m.InternalTopLevel[layer] {
+			t.Errorf("InternalTopLevel missing %q", layer)
+		}
+	}
+	if len(m.InternalTopLevel) != 5 {
+		t.Errorf("InternalTopLevel has %d entries, want 5", len(m.InternalTopLevel))
+	}
+	jobAllowed := m.Direction["job"]
+	if len(jobAllowed) != 2 {
+		t.Errorf("job allowed = %v, want [service model]", jobAllowed)
+	}
+	modelAllowed := m.Direction["model"]
+	if len(modelAllowed) != 0 {
+		t.Errorf("model allowed = %v, want []", modelAllowed)
+	}
+	if len(m.TypePatterns) != 1 {
+		t.Fatalf("TypePatterns count = %d, want 1", len(m.TypePatterns))
+	}
+	tp := m.TypePatterns[0]
+	if tp.Dir != "job" || tp.FilePrefix != "job" || tp.TypeSuffix != "Job" || tp.RequireMethod != "Run" {
+		t.Errorf("TypePattern = %+v, unexpected", tp)
+	}
+}
+
 func TestNewModel_CustomOverrides(t *testing.T) {
 	m := NewModel(
 		WithDomainDir("module"),
@@ -254,6 +305,7 @@ func TestModelConsistency(t *testing.T) {
 		{"Hexagonal", Hexagonal()},
 		{"ModularMonolith", ModularMonolith()},
 		{"ConsumerWorker", ConsumerWorker()},
+		{"Batch", Batch()},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			validateModelConsistency(t, tc.model)

@@ -1,7 +1,7 @@
 package rules
 
 // Model defines the architecture model used by all rule checks.
-// Use DDD(), CleanArch(), Layered(), Hexagonal(), ModularMonolith(), or NewModel() to create one.
+// Use DDD(), CleanArch(), Layered(), Hexagonal(), ModularMonolith(), ConsumerWorker(), Batch(), or NewModel() to create one.
 type Model struct {
 	Sublayers        []string
 	Direction        map[string][]string
@@ -258,6 +258,42 @@ func ConsumerWorker() Model {
 		},
 		TypePatterns: []TypePattern{
 			{Dir: "worker", FilePrefix: "worker", TypeSuffix: "Worker", RequireMethod: "Process"},
+		},
+	}
+}
+
+// Batch returns a flat-layout model for cron/scheduler batch job projects.
+// Flat layout means layers live directly under internal/ (no domain/ directory).
+func Batch() Model {
+	return Model{
+		Sublayers: []string{"job", "service", "store", "model"},
+		Direction: map[string][]string{
+			"job":     {"service", "model"},
+			"service": {"store", "model"},
+			"store":   {"model"},
+			"model":   {},
+		},
+		PkgRestricted: map[string]bool{"model": true},
+		InternalTopLevel: map[string]bool{
+			"job": true, "service": true,
+			"store": true, "model": true, "pkg": true,
+		},
+		DomainDir:        "",
+		OrchestrationDir: "",
+		SharedDir:        "pkg",
+		RequireAlias:     false,
+		AliasFileName:    "",
+		RequireModel:     false,
+		ModelPath:        "model",
+		DTOAllowedLayers: []string{"job", "service"},
+		BannedPkgNames:   []string{"util", "common", "misc", "helper", "shared", "services"},
+		LegacyPkgNames:   []string{"router", "bootstrap"},
+		LayerDirNames: map[string]bool{
+			"job": true, "service": true,
+			"store": true, "model": true,
+		},
+		TypePatterns: []TypePattern{
+			{Dir: "job", FilePrefix: "job", TypeSuffix: "Job", RequireMethod: "Run"},
 		},
 	}
 }
