@@ -1047,6 +1047,95 @@ func TestIntegration_ConsumerWorker_Violations(t *testing.T) {
 	assertHasRule(t, violations, "structure.internal-top-level")
 }
 
+func TestIntegration_Batch_Valid(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/batchapp"
+	m := rules.Batch()
+
+	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "job", "job_expire.go"),
+		"package job\n\nimport (\n\t\"context\"\n\t_ \""+module+"/internal/service\"\n)\n\ntype ExpireJob struct{}\nfunc (j *ExpireJob) Run(ctx context.Context) error { return nil }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "job", "job_cleanup.go"),
+		"package job\n\nimport (\n\t\"context\"\n\t_ \""+module+"/internal/model\"\n)\n\ntype CleanupJob struct{}\nfunc (j *CleanupJob) Run(ctx context.Context) error { return nil }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "service", "file.go"),
+		"package service\n\nimport _ \""+module+"/internal/store\"\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "store", "file.go"),
+		"package store\n\nimport _ \""+module+"/internal/model\"\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "model", "file.go"),
+		"package model\n\ntype File struct{ ID string }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "pkg", "batchutil", "util.go"),
+		"package batchutil\n")
+
+	pkgs, err := analyzer.Load(root, "internal/...")
+	if err != nil {
+		t.Log("partial load:", err)
+	}
+	if len(pkgs) == 0 {
+		t.Fatal("no packages loaded")
+	}
+
+	opts := []rules.Option{rules.WithModel(m)}
+
+	t.Run("layer direction", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, module, root, opts...))
+	})
+	t.Run("domain isolation skipped", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, module, root, opts...))
+	})
+	t.Run("structure", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckStructure(root, opts...))
+	})
+	t.Run("naming", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckNaming(pkgs, opts...))
+	})
+	t.Run("type patterns", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckTypePatterns(pkgs, opts...))
+	})
+	t.Run("run all", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.RunAll(pkgs, module, root, opts...))
+	})
+}
+
+func TestIntegration_Batch_Violations(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/batch-violations"
+	m := rules.Batch()
+
+	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+	// store imports job — layer direction violation
+	writeIntegrationFile(t, filepath.Join(root, "internal", "store", "bad.go"),
+		"package store\n\nimport _ \""+module+"/internal/job\"\n")
+	// model imports pkg — inner-imports-pkg violation
+	writeIntegrationFile(t, filepath.Join(root, "internal", "model", "bad.go"),
+		"package model\n\nimport _ \""+module+"/internal/pkg/batchutil\"\n")
+	// job file defines BadName instead of SyncJob — type mismatch
+	writeIntegrationFile(t, filepath.Join(root, "internal", "job", "job_sync.go"),
+		"package job\n\nimport \"context\"\n\ntype BadName struct{}\nfunc (j *BadName) Run(ctx context.Context) error { return nil }\n")
+	// unexpected top-level package
+	writeIntegrationFile(t, filepath.Join(root, "internal", "random", "stuff.go"),
+		"package random\n")
+	// needed for imports to resolve
+	writeIntegrationFile(t, filepath.Join(root, "internal", "job", "job_cleanup.go"),
+		"package job\n\nimport \"context\"\n\ntype CleanupJob struct{}\nfunc (j *CleanupJob) Run(ctx context.Context) error { return nil }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "pkg", "batchutil", "util.go"),
+		"package batchutil\n")
+
+	pkgs, err := analyzer.Load(root, "internal/...")
+	if err != nil {
+		t.Log("partial load:", err)
+	}
+
+	violations := rules.RunAll(pkgs, module, root, rules.WithModel(m))
+	if len(violations) == 0 {
+		t.Fatal("expected violations")
+	}
+
+	assertHasRule(t, violations, "layer.direction")
+	assertHasRule(t, violations, "layer.inner-imports-pkg")
+	assertHasRule(t, violations, "naming.worker-type-mismatch")
+	assertHasRule(t, violations, "structure.internal-top-level")
+}
+
 func writeIntegrationFile(t *testing.T, path string, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
