@@ -17,6 +17,7 @@ const (
 	PresetHexagonal       Preset = "hexagonal"
 	PresetModularMonolith Preset = "modular-monolith"
 	PresetConsumerWorker  Preset = "consumer-worker"
+	PresetBatch           Preset = "batch"
 )
 
 // ArchitectureTestOptions controls generated architecture_test.go output.
@@ -63,6 +64,8 @@ func presetModelFunc(preset Preset) (string, error) {
 		return "ModularMonolith", nil
 	case PresetConsumerWorker:
 		return "ConsumerWorker", nil
+	case PresetBatch:
+		return "Batch", nil
 	default:
 		return "", fmt.Errorf("unknown preset %q", preset)
 	}

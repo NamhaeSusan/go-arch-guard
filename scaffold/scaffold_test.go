@@ -47,6 +47,11 @@ func TestArchitectureTest(t *testing.T) {
 			preset:   scaffold.PresetConsumerWorker,
 			contains: []string{"m := rules.ConsumerWorker()"},
 		},
+		{
+			name:     "batch",
+			preset:   scaffold.PresetBatch,
+			contains: []string{"m := rules.Batch()"},
+		},
 	}
 
 	for _, tt := range tests {
