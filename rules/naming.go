@@ -277,6 +277,10 @@ func checkNoLayerSuffixWith(m Model, pkg *packages.Package, cfg Config) []Violat
 		if !m.LayerDirNames[dir] {
 			continue
 		}
+		// Skip files matching a TypePattern prefix (e.g. worker_xxx.go in worker/)
+		if isTypePatternFile(m, dir, base) {
+			continue
+		}
 		name := strings.TrimSuffix(base, ".go")
 		for _, suffix := range bannedLayerSuffixes {
 			if trimmed, ok := strings.CutSuffix(name, suffix); ok {
@@ -475,6 +479,16 @@ func isRepoImportPath(m Model, impPath string) bool {
 			if strings.Contains(impPath, "/"+sl) {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+func isTypePatternFile(m Model, dir, filename string) bool {
+	name := strings.TrimSuffix(filename, ".go")
+	for _, tp := range m.TypePatterns {
+		if tp.Dir == dir && strings.HasPrefix(name, tp.FilePrefix+"_") {
+			return true
 		}
 	}
 	return false

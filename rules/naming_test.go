@@ -133,3 +133,23 @@ func TestCheckNaming(t *testing.T) {
 		}
 	})
 }
+
+func TestCheckNaming_FlatLayout_WorkerFileAllowed(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/workernaming"
+	m := rules.ConsumerWorker()
+
+	writeTestFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+	// worker_service.go would normally trigger no-layer-suffix ("_service" is banned),
+	// but in ConsumerWorker preset the worker dir has TypePattern exemption.
+	writeTestFile(t, filepath.Join(root, "internal", "worker", "worker_service.go"),
+		"package worker\n\ntype ServiceWorker struct{}\n")
+
+	pkgs := loadTestPackages(t, root)
+	violations := rules.CheckNaming(pkgs, rules.WithModel(m))
+	for _, v := range violations {
+		if v.Rule == "naming.no-layer-suffix" {
+			t.Errorf("worker_service.go should be exempt from no-layer-suffix, got: %s", v.Message)
+		}
+	}
+}
