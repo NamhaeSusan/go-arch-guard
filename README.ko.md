@@ -6,7 +6,7 @@
 
 `go test`로 Go 프로젝트의 아키텍처 가드레일을 적용하는 도구이며, 특히 AI 코딩 에이전트와 빠르게 움직이는 팀에 맞춰 설계되었습니다.
 
-격리, 레이어 방향, 구조, 네이밍, 블래스트 반경 규칙을 정의하고, 프로젝트 형태가 벗어나면 일반 테스트에서 실패시킵니다. **DDD**, **Clean Architecture**, **Layered**, **Hexagonal**, **Modular Monolith**, **Consumer/Worker** 프리셋을 기본 제공하며, 완전한 커스텀 아키텍처 모델도 지원합니다. 별도 CLI나 설정 포맷 없이, Go 테스트만으로 동작합니다.
+격리, 레이어 방향, 구조, 네이밍, 블래스트 반경 규칙을 정의하고, 프로젝트 형태가 벗어나면 일반 테스트에서 실패시킵니다. **DDD**, **Clean Architecture**, **Layered**, **Hexagonal**, **Modular Monolith**, **Consumer/Worker**, **Batch** 프리셋을 기본 제공하며, 완전한 커스텀 아키텍처 모델도 지원합니다. 별도 CLI나 설정 포맷 없이, Go 테스트만으로 동작합니다.
 
 AI 에이전트 친화적인 기본 surface:
 
@@ -51,7 +51,7 @@ src, err := scaffold.ArchitectureTest(
 module basename을 그대로 쓰면 안 됩니다.
 
 사용 가능한 프리셋: `PresetDDD`, `PresetCleanArch`, `PresetLayered`,
-`PresetHexagonal`, `PresetModularMonolith`, `PresetConsumerWorker`.
+`PresetHexagonal`, `PresetModularMonolith`, `PresetConsumerWorker`, `PresetBatch`.
 
 ### 권장 shortcut
 
@@ -99,7 +99,7 @@ func TestArchitecture(t *testing.T) {
 다른 프리셋을 쓸 때는 모델 함수만 교체하고 `opts...`를 전달합니다:
 
 ```go
-m := rules.CleanArch() // 또는 Layered(), Hexagonal(), ModularMonolith(), ConsumerWorker()
+m := rules.CleanArch() // 또는 Layered(), Hexagonal(), ModularMonolith(), ConsumerWorker(), Batch()
 opts := []rules.Option{rules.WithModel(m)}
 
 rules.CheckDomainIsolation(pkgs, "", "", opts...)
@@ -143,6 +143,7 @@ go test -run TestArchitecture -v
 | `Hexagonal()` | handler, usecase, port, domain, adapter | handler→usecase→port+domain, adapter→port+domain | X | X |
 | `ModularMonolith()` | api, application, core, infrastructure | api→application→core, infrastructure→core | X | X |
 | `ConsumerWorker()` | worker, service, store, model | worker→service→store→model | X | X |
+| `Batch()` | job, service, store, model | job→service→store→model | X | X |
 
 ### DDD 레이아웃
 
@@ -302,6 +303,38 @@ Consumer/Worker 방향:
 `Process` 메서드를 반드시 정의해야 합니다:
 - `worker_order.go` → `OrderWorker` 타입 + `Process` 메서드 필수
 - `worker_payment.go` → `PaymentWorker` 타입 + `Process` 메서드 필수
+
+도메인 격리 규칙은 적용되지 않습니다.
+
+### Batch 레이아웃 (플랫)
+
+Batch 프리셋은 Consumer/Worker와 동일한 플랫 레이아웃을 사용하며,
+cron/스케줄러 기반 배치 처리의 진입점 레이어로 `job/`을 사용합니다.
+
+```text
+internal/
+├── job/               # job_expire_files.go, job_cleanup_trash.go
+├── service/           # 비즈니스 로직
+├── store/             # 영속성 (DB, 외부 API)
+├── model/             # 데이터 구조체
+└── pkg/               # 공유 인프라 (batchutil, 로깅)
+```
+
+Batch 방향:
+
+| from | 허용된 import |
+|------|--------------|
+| `job` | `service`, `model` |
+| `service` | `store`, `model` |
+| `store` | `model` |
+| `model` | 없음 |
+
+`model`을 제외한 모든 레이어는 `pkg/`를 import 할 수 있습니다.
+
+**타입 패턴 강제:** `job/` 내 `job_*.go` 파일은 대응하는 exported 타입과
+`Run` 메서드를 반드시 정의해야 합니다:
+- `job_expire_files.go` → `ExpireFilesJob` 타입 + `Run` 메서드 필수
+- `job_cleanup_trash.go` → `CleanupTrashJob` 타입 + `Run` 메서드 필수
 
 도메인 격리 규칙은 적용되지 않습니다.
 
@@ -475,6 +508,7 @@ go run github.com/NamhaeSusan/go-arch-guard/cmd/tui .
 | `rules.Hexagonal()` | 포트 & 어댑터 모델 |
 | `rules.ModularMonolith()` | 모듈 기반 레이어드 모델 |
 | `rules.ConsumerWorker()` | Consumer/Worker 플랫 레이아웃 모델 |
+| `rules.Batch()` | Batch 플랫 레이아웃 모델 |
 | `rules.CheckTypePatterns(pkgs, opts...)` | AST 기반 타입 패턴 강제 |
 | `rules.NewModel(opts...)` | 커스텀 모델 빌더 |
 | `rules.WithModel(m)` | 커스텀 모델 적용 |
