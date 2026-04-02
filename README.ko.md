@@ -6,7 +6,7 @@
 
 `go test`로 Go 프로젝트의 아키텍처 가드레일을 적용하는 도구이며, 특히 AI 코딩 에이전트와 빠르게 움직이는 팀에 맞춰 설계되었습니다.
 
-격리, 레이어 방향, 구조, 네이밍, 블래스트 반경 규칙을 정의하고, 프로젝트 형태가 벗어나면 일반 테스트에서 실패시킵니다. **DDD**, **Clean Architecture**, **Layered**, **Hexagonal**, **Modular Monolith**, **Consumer/Worker**, **Batch** 프리셋을 기본 제공하며, 완전한 커스텀 아키텍처 모델도 지원합니다. 별도 CLI나 설정 포맷 없이, Go 테스트만으로 동작합니다.
+격리, 레이어 방향, 구조, 네이밍, 블래스트 반경 규칙을 정의하고, 프로젝트 형태가 벗어나면 일반 테스트에서 실패시킵니다. **DDD**, **Clean Architecture**, **Layered**, **Hexagonal**, **Modular Monolith**, **Consumer/Worker**, **Batch**, **Event-Driven Pipeline** 프리셋을 기본 제공하며, 완전한 커스텀 아키텍처 모델도 지원합니다. 별도 CLI나 설정 포맷 없이, Go 테스트만으로 동작합니다.
 
 AI 에이전트 친화적인 기본 surface:
 
@@ -51,7 +51,8 @@ src, err := scaffold.ArchitectureTest(
 module basename을 그대로 쓰면 안 됩니다.
 
 사용 가능한 프리셋: `PresetDDD`, `PresetCleanArch`, `PresetLayered`,
-`PresetHexagonal`, `PresetModularMonolith`, `PresetConsumerWorker`, `PresetBatch`.
+`PresetHexagonal`, `PresetModularMonolith`, `PresetConsumerWorker`, `PresetBatch`,
+`PresetEventPipeline`.
 
 ### 권장 shortcut
 
@@ -99,7 +100,7 @@ func TestArchitecture(t *testing.T) {
 다른 프리셋을 쓸 때는 모델 함수만 교체하고 `opts...`를 전달합니다:
 
 ```go
-m := rules.CleanArch() // 또는 Layered(), Hexagonal(), ModularMonolith(), ConsumerWorker(), Batch()
+m := rules.CleanArch() // 또는 Layered(), Hexagonal(), ModularMonolith(), ConsumerWorker(), Batch(), EventPipeline()
 opts := []rules.Option{rules.WithModel(m)}
 
 rules.CheckDomainIsolation(pkgs, "", "", opts...)
@@ -144,6 +145,7 @@ go test -run TestArchitecture -v
 | `ModularMonolith()` | api, application, core, infrastructure | api→application→core, infrastructure→core | X | X |
 | `ConsumerWorker()` | worker, service, store, model | worker→service→store→model | X | X |
 | `Batch()` | job, service, store, model | job→service→store→model | X | X |
+| `EventPipeline()` | command, aggregate, event, projection, eventstore, readstore, model | command→aggregate→event/eventstore, projection→event/readstore | X | X |
 
 ### DDD 레이아웃
 
@@ -338,6 +340,47 @@ Batch 방향:
 
 도메인 격리 규칙은 적용되지 않습니다.
 
+### Event-Driven Pipeline 레이아웃 (플랫)
+
+Event-Driven Pipeline 프리셋은 이벤트 소싱 / CQRS 프로젝트를 위한 플랫 레이아웃을 사용하며,
+커맨드, 애그리거트, 이벤트, 프로젝션, 스토어를 위한 전용 디렉토리를 제공합니다.
+
+```text
+internal/
+├── command/          # 커맨드 핸들러 (command_create_order.go)
+├── aggregate/        # 애그리거트 루트 (aggregate_order.go)
+├── event/            # 도메인 이벤트
+├── projection/       # 읽기 모델 프로젝터
+├── eventstore/       # 이벤트 영속성
+├── readstore/        # 읽기 모델 영속성
+├── model/            # 공유 값 객체 / DTO
+└── pkg/              # 공유 인프라 (eventbus, 로깅)
+```
+
+Event-Driven Pipeline 방향:
+
+| from | 허용된 import |
+|------|--------------|
+| `command` | `aggregate`, `model` |
+| `aggregate` | `event`, `model` |
+| `event` | `model` |
+| `projection` | `event`, `readstore`, `model` |
+| `eventstore` | `event`, `model` |
+| `readstore` | `model` |
+| `model` | 없음 |
+
+`event`와 `model`을 제외한 모든 레이어는 `pkg/`를 import 할 수 있습니다.
+
+**타입 패턴 강제:** `command/` 내 `command_*.go` 파일은 대응하는 exported 타입과
+`Execute` 메서드를 반드시 정의해야 합니다:
+- `command_create_order.go` → `CreateOrderCommand` 타입 + `Execute` 메서드 필수
+
+`aggregate/` 내 `aggregate_*.go` 파일은 대응하는 exported 타입과
+`Apply` 메서드를 반드시 정의해야 합니다:
+- `aggregate_order.go` → `OrderAggregate` 타입 + `Apply` 메서드 필수
+
+도메인 격리 규칙은 적용되지 않습니다.
+
 ### 커스텀 모델
 
 DDD 기본값에서 시작하여 필요한 부분만 오버라이드:
@@ -509,6 +552,7 @@ go run github.com/NamhaeSusan/go-arch-guard/cmd/tui .
 | `rules.ModularMonolith()` | 모듈 기반 레이어드 모델 |
 | `rules.ConsumerWorker()` | Consumer/Worker 플랫 레이아웃 모델 |
 | `rules.Batch()` | Batch 플랫 레이아웃 모델 |
+| `rules.EventPipeline()` | 이벤트 소싱 / CQRS 플랫 레이아웃 모델 |
 | `rules.CheckTypePatterns(pkgs, opts...)` | AST 기반 타입 패턴 강제 |
 | `rules.NewModel(opts...)` | 커스텀 모델 빌더 |
 | `rules.WithModel(m)` | 커스텀 모델 적용 |

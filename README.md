@@ -8,7 +8,7 @@
 
 Architecture guardrails for Go projects via `go test`, built for AI coding agents and fast-moving teams.
 
-Define isolation, layer-direction, structure, naming, and blast-radius rules, then fail regular tests when the project shape drifts. Ships with **DDD**, **Clean Architecture**, **Layered**, **Hexagonal**, **Modular Monolith**, **Consumer/Worker**, and **Batch** presets, and supports fully custom architecture models. No CLI to learn. No separate config format. Just Go tests.
+Define isolation, layer-direction, structure, naming, and blast-radius rules, then fail regular tests when the project shape drifts. Ships with **DDD**, **Clean Architecture**, **Layered**, **Hexagonal**, **Modular Monolith**, **Consumer/Worker**, **Batch**, and **Event-Driven Pipeline** presets, and supports fully custom architecture models. No CLI to learn. No separate config format. Just Go tests.
 
 AI-agent-friendly by default:
 
@@ -53,7 +53,8 @@ src, err := scaffold.ArchitectureTest(
 from a hyphenated module basename.
 
 Available presets: `PresetDDD`, `PresetCleanArch`, `PresetLayered`,
-`PresetHexagonal`, `PresetModularMonolith`, `PresetConsumerWorker`, `PresetBatch`.
+`PresetHexagonal`, `PresetModularMonolith`, `PresetConsumerWorker`, `PresetBatch`,
+`PresetEventPipeline`.
 
 ### Recommended shortcut
 
@@ -101,7 +102,7 @@ func TestArchitecture(t *testing.T) {
 For other presets, add `opts` with the model function:
 
 ```go
-m := rules.CleanArch() // or Layered(), Hexagonal(), ModularMonolith(), ConsumerWorker(), Batch()
+m := rules.CleanArch() // or Layered(), Hexagonal(), ModularMonolith(), ConsumerWorker(), Batch(), EventPipeline()
 opts := []rules.Option{rules.WithModel(m)}
 
 rules.CheckDomainIsolation(pkgs, "", "", opts...)
@@ -157,6 +158,7 @@ Pass empty strings for `module` and `root` to auto-extract from loaded packages.
 | `ModularMonolith()` | api, application, core, infrastructure | api→application→core, infrastructure→core | No | No |
 | `ConsumerWorker()` | worker, service, store, model | worker→service→store→model | No | No |
 | `Batch()` | job, service, store, model | job→service→store→model | No | No |
+| `EventPipeline()` | command, aggregate, event, projection, eventstore, readstore, model | command→aggregate→event/eventstore, projection→event/readstore | No | No |
 
 ### DDD Layout
 
@@ -351,6 +353,48 @@ a corresponding exported type with a `Run` method:
 
 Domain isolation rules are not applicable and are skipped entirely.
 
+### Event-Driven Pipeline Layout (Flat)
+
+The Event-Driven Pipeline preset uses a flat layout for event-sourcing / CQRS
+projects, with dedicated directories for commands, aggregates, events,
+projections, and stores.
+
+```text
+internal/
+├── command/          # command handlers (command_create_order.go)
+├── aggregate/        # aggregate roots (aggregate_order.go)
+├── event/            # domain events
+├── projection/       # read-model projectors
+├── eventstore/       # event persistence
+├── readstore/        # read-model persistence
+├── model/            # shared value objects / DTOs
+└── pkg/              # shared infra (eventbus, logging)
+```
+
+Event-Driven Pipeline direction:
+
+| from | allowed to import |
+|------|-------------------|
+| `command` | `aggregate`, `model` |
+| `aggregate` | `event`, `model` |
+| `event` | `model` |
+| `projection` | `event`, `readstore`, `model` |
+| `eventstore` | `event`, `model` |
+| `readstore` | `model` |
+| `model` | nothing |
+
+All layers may import `pkg/` except `event` and `model` (restricted).
+
+**Type pattern enforcement:** Files matching `command_*.go` in `command/` must
+define a corresponding exported type with an `Execute` method:
+- `command_create_order.go` → must define `CreateOrderCommand` with `Execute` method
+
+Files matching `aggregate_*.go` in `aggregate/` must define a corresponding
+exported type with an `Apply` method:
+- `aggregate_order.go` → must define `OrderAggregate` with `Apply` method
+
+Domain isolation rules are not applicable and are skipped entirely.
+
 ### Custom Model
 
 Start from DDD defaults and override what you need:
@@ -539,6 +583,7 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `rules.ModularMonolith()` | Module-based layered model |
 | `rules.ConsumerWorker()` | Consumer/Worker flat-layout model |
 | `rules.Batch()` | Batch flat-layout model |
+| `rules.EventPipeline()` | Event-sourcing / CQRS flat-layout model |
 | `rules.CheckTypePatterns(pkgs, opts...)` | AST-based type pattern enforcement |
 | `rules.NewModel(opts...)` | custom model builder |
 | `rules.WithModel(m)` | apply custom model to checks |
