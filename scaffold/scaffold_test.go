@@ -52,6 +52,11 @@ func TestArchitectureTest(t *testing.T) {
 			preset:   scaffold.PresetBatch,
 			contains: []string{"m := rules.Batch()"},
 		},
+		{
+			name:     "event pipeline",
+			preset:   scaffold.PresetEventPipeline,
+			contains: []string{"m := rules.EventPipeline()"},
+		},
 	}
 
 	for _, tt := range tests {
