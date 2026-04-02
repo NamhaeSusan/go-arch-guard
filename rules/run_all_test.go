@@ -71,7 +71,7 @@ func TestRunAll_ConsumerWorker_IncludesTypePatterns(t *testing.T) {
 	module := "example.com/runall-cw"
 
 	writeTestFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
-	// worker_order.go without OrderWorker → naming.worker-type-mismatch
+	// worker_order.go without OrderWorker → naming.type-pattern-mismatch
 	writeTestFile(t, filepath.Join(root, "internal", "worker", "worker_order.go"),
 		"package worker\n\ntype BadName struct{}\n")
 	writeTestFile(t, filepath.Join(root, "internal", "model", "order.go"),
@@ -81,11 +81,11 @@ func TestRunAll_ConsumerWorker_IncludesTypePatterns(t *testing.T) {
 	violations := rules.RunAll(pkgs, module, root, rules.WithModel(rules.ConsumerWorker()))
 	found := false
 	for _, v := range violations {
-		if v.Rule == "naming.worker-type-mismatch" {
+		if v.Rule == "naming.type-pattern-mismatch" {
 			found = true
 		}
 	}
 	if !found {
-		t.Error("RunAll should include naming.worker-type-mismatch from CheckTypePatterns")
+		t.Error("RunAll should include naming.type-pattern-mismatch from CheckTypePatterns")
 	}
 }

@@ -58,7 +58,7 @@ func checkTypePattern(pkg *packages.Package, tp TypePattern, cfg Config) []Viola
 		if !hasExportedType(file, expectedType) {
 			violations = append(violations, Violation{
 				File:     relPath,
-				Rule:     "naming.worker-type-mismatch",
+				Rule:     "naming.type-pattern-mismatch",
 				Message:  fmt.Sprintf("file %q must define type %q", base, expectedType),
 				Fix:      fmt.Sprintf("add \"type %s struct { ... }\"", expectedType),
 				Severity: cfg.Sev,
@@ -69,7 +69,7 @@ func checkTypePattern(pkg *packages.Package, tp TypePattern, cfg Config) []Viola
 		if !methods[expectedType+"."+tp.RequireMethod] {
 			violations = append(violations, Violation{
 				File:     relPath,
-				Rule:     "naming.worker-missing-process",
+				Rule:     "naming.type-pattern-missing-method",
 				Message:  fmt.Sprintf("type %q must have a %s method", expectedType, tp.RequireMethod),
 				Fix:      fmt.Sprintf("add \"func (w *%s) %s(ctx context.Context) error { ... }\"", expectedType, tp.RequireMethod),
 				Severity: cfg.Sev,

@@ -488,8 +488,8 @@ Import 매트릭스:
 | `naming.no-layer-suffix` | 파일명이 레이어 이름 불필요 반복 |
 | `naming.domain-interface-repo-only` | repo 서브레이어 외부에서 도메인 interface 정의 (DDD만) |
 | `naming.no-handmock` | 테스트에서 hand-rolled mock/fake/stub 정의 |
-| `naming.worker-type-mismatch` | `worker_*.go` 파일에 매칭 타입 미정의 (ConsumerWorker만) |
-| `naming.worker-missing-process` | worker 타입에 `Process` 메서드 없음 (ConsumerWorker만) |
+| `naming.type-pattern-mismatch` | `worker_*.go`/`job_*.go` 파일에 매칭 타입 미정의 |
+| `naming.type-pattern-missing-method` | 타입에 필수 메서드 없음 (예: `Process`, `Run`, `Execute`, `Apply`) |
 
 ## 블래스트 반경
 

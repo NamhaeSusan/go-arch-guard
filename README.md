@@ -510,8 +510,8 @@ Notes:
 | `naming.no-layer-suffix` | file name redundantly repeats the layer name |
 | `naming.domain-interface-repo-only` | domain interface outside repo sublayer (DDD only) |
 | `naming.no-handmock` | test file defines hand-rolled mock/fake/stub |
-| `naming.worker-type-mismatch` | `worker_*.go` file must define matching type (ConsumerWorker only) |
-| `naming.worker-missing-process` | worker type must have `Process` method (ConsumerWorker only) |
+| `naming.type-pattern-mismatch` | `worker_*.go`/`job_*.go` file must define matching type |
+| `naming.type-pattern-missing-method` | type must have required method (e.g. `Process`, `Run`, `Execute`, `Apply`) |
 
 ## Blast Radius
 

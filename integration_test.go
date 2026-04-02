@@ -1043,7 +1043,7 @@ func TestIntegration_ConsumerWorker_Violations(t *testing.T) {
 
 	assertHasRule(t, violations, "layer.direction")
 	assertHasRule(t, violations, "layer.inner-imports-pkg")
-	assertHasRule(t, violations, "naming.worker-type-mismatch")
+	assertHasRule(t, violations, "naming.type-pattern-mismatch")
 	assertHasRule(t, violations, "structure.internal-top-level")
 }
 
@@ -1132,7 +1132,7 @@ func TestIntegration_Batch_Violations(t *testing.T) {
 
 	assertHasRule(t, violations, "layer.direction")
 	assertHasRule(t, violations, "layer.inner-imports-pkg")
-	assertHasRule(t, violations, "naming.worker-type-mismatch")
+	assertHasRule(t, violations, "naming.type-pattern-mismatch")
 	assertHasRule(t, violations, "structure.internal-top-level")
 }
 
@@ -1226,8 +1226,8 @@ func TestIntegration_EventPipeline_Violations(t *testing.T) {
 
 	assertHasRule(t, violations, "layer.direction")
 	assertHasRule(t, violations, "layer.inner-imports-pkg")
-	assertHasRule(t, violations, "naming.worker-type-mismatch")
-	assertHasRule(t, violations, "naming.worker-missing-process")
+	assertHasRule(t, violations, "naming.type-pattern-mismatch")
+	assertHasRule(t, violations, "naming.type-pattern-missing-method")
 	assertHasRule(t, violations, "structure.internal-top-level")
 }
 

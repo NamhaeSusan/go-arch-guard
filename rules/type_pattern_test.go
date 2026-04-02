@@ -54,8 +54,8 @@ type SomethingElse struct{}
 	if len(vs) != 1 {
 		t.Fatalf("expected 1 violation, got %d: %v", len(vs), vs)
 	}
-	if vs[0].Rule != "naming.worker-type-mismatch" {
-		t.Errorf("rule = %q, want naming.worker-type-mismatch", vs[0].Rule)
+	if vs[0].Rule != "naming.type-pattern-mismatch" {
+		t.Errorf("rule = %q, want naming.type-pattern-mismatch", vs[0].Rule)
 	}
 }
 
@@ -77,8 +77,8 @@ type OrderWorker struct{}
 	if len(vs) != 1 {
 		t.Fatalf("expected 1 violation, got %d: %v", len(vs), vs)
 	}
-	if vs[0].Rule != "naming.worker-missing-process" {
-		t.Errorf("rule = %q, want naming.worker-missing-process", vs[0].Rule)
+	if vs[0].Rule != "naming.type-pattern-missing-method" {
+		t.Errorf("rule = %q, want naming.type-pattern-missing-method", vs[0].Rule)
 	}
 }
 
