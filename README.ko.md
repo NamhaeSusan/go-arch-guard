@@ -6,7 +6,7 @@
 
 `go test`로 Go 프로젝트의 아키텍처 가드레일을 적용하는 도구이며, 특히 AI 코딩 에이전트와 빠르게 움직이는 팀에 맞춰 설계되었습니다.
 
-격리, 레이어 방향, 구조, 네이밍, 블래스트 반경 규칙을 정의하고, 프로젝트 형태가 벗어나면 일반 테스트에서 실패시킵니다. **DDD**, **Clean Architecture**, **Layered**, **Hexagonal**, **Modular Monolith** 프리셋을 기본 제공하며, 완전한 커스텀 아키텍처 모델도 지원합니다. 별도 CLI나 설정 포맷 없이, Go 테스트만으로 동작합니다.
+격리, 레이어 방향, 구조, 네이밍, 블래스트 반경 규칙을 정의하고, 프로젝트 형태가 벗어나면 일반 테스트에서 실패시킵니다. **DDD**, **Clean Architecture**, **Layered**, **Hexagonal**, **Modular Monolith**, **Consumer/Worker** 프리셋을 기본 제공하며, 완전한 커스텀 아키텍처 모델도 지원합니다. 별도 CLI나 설정 포맷 없이, Go 테스트만으로 동작합니다.
 
 AI 에이전트 친화적인 기본 surface:
 
@@ -51,7 +51,7 @@ src, err := scaffold.ArchitectureTest(
 module basename을 그대로 쓰면 안 됩니다.
 
 사용 가능한 프리셋: `PresetDDD`, `PresetCleanArch`, `PresetLayered`,
-`PresetHexagonal`, `PresetModularMonolith`.
+`PresetHexagonal`, `PresetModularMonolith`, `PresetConsumerWorker`.
 
 ### 권장 shortcut
 
@@ -99,7 +99,7 @@ func TestArchitecture(t *testing.T) {
 다른 프리셋을 쓸 때는 모델 함수만 교체하고 `opts...`를 전달합니다:
 
 ```go
-m := rules.CleanArch() // 또는 Layered(), Hexagonal(), ModularMonolith()
+m := rules.CleanArch() // 또는 Layered(), Hexagonal(), ModularMonolith(), ConsumerWorker()
 opts := []rules.Option{rules.WithModel(m)}
 
 rules.CheckDomainIsolation(pkgs, "", "", opts...)
@@ -142,6 +142,7 @@ go test -run TestArchitecture -v
 | `Layered()` | handler, service, repository, model | handler→service→repository+model, repository→model | X | X |
 | `Hexagonal()` | handler, usecase, port, domain, adapter | handler→usecase→port+domain, adapter→port+domain | X | X |
 | `ModularMonolith()` | api, application, core, infrastructure | api→application→core, infrastructure→core | X | X |
+| `ConsumerWorker()` | worker, service, store, model | worker→service→store→model | X | X |
 
 ### DDD 레이아웃
 
@@ -271,6 +272,39 @@ Modular Monolith 레이어 방향:
 | `core` | 없음 |
 | `infrastructure` | `core` |
 
+### Consumer/Worker 레이아웃 (플랫)
+
+도메인 중심 프리셋과 달리, Consumer/Worker 프리셋은 **플랫 레이아웃**을 사용합니다 —
+레이어가 `domain/` 디렉토리 없이 `internal/` 바로 아래에 위치합니다.
+
+```text
+internal/
+├── worker/            # worker_order.go, worker_payment.go
+├── service/           # 비즈니스 로직
+├── store/             # 영속성 (DB, 외부 API)
+├── model/             # 데이터 구조체
+└── pkg/               # 공유 인프라 (consumer 라이브러리, 로깅)
+    └── consumer/
+```
+
+Consumer/Worker 방향:
+
+| from | 허용된 import |
+|------|--------------|
+| `worker` | `service`, `model` |
+| `service` | `store`, `model` |
+| `store` | `model` |
+| `model` | 없음 |
+
+`model`을 제외한 모든 레이어는 `pkg/`를 import 할 수 있습니다.
+
+**타입 패턴 강제:** `worker/` 내 `worker_*.go` 파일은 대응하는 exported 타입과
+`Process` 메서드를 반드시 정의해야 합니다:
+- `worker_order.go` → `OrderWorker` 타입 + `Process` 메서드 필수
+- `worker_payment.go` → `PaymentWorker` 타입 + `Process` 메서드 필수
+
+도메인 격리 규칙은 적용되지 않습니다.
+
 ### 커스텀 모델
 
 DDD 기본값에서 시작하여 필요한 부분만 오버라이드:
@@ -378,6 +412,8 @@ Import 매트릭스:
 | `naming.no-layer-suffix` | 파일명이 레이어 이름 불필요 반복 |
 | `naming.domain-interface-repo-only` | repo 서브레이어 외부에서 도메인 interface 정의 (DDD만) |
 | `naming.no-handmock` | 테스트에서 hand-rolled mock/fake/stub 정의 |
+| `naming.worker-type-mismatch` | `worker_*.go` 파일에 매칭 타입 미정의 (ConsumerWorker만) |
+| `naming.worker-missing-process` | worker 타입에 `Process` 메서드 없음 (ConsumerWorker만) |
 
 ## 블래스트 반경
 
@@ -438,6 +474,8 @@ go run github.com/NamhaeSusan/go-arch-guard/cmd/tui .
 | `rules.Layered()` | Spring 스타일 레이어드 모델 |
 | `rules.Hexagonal()` | 포트 & 어댑터 모델 |
 | `rules.ModularMonolith()` | 모듈 기반 레이어드 모델 |
+| `rules.ConsumerWorker()` | Consumer/Worker 플랫 레이아웃 모델 |
+| `rules.CheckTypePatterns(pkgs, opts...)` | AST 기반 타입 패턴 강제 |
 | `rules.NewModel(opts...)` | 커스텀 모델 빌더 |
 | `rules.WithModel(m)` | 커스텀 모델 적용 |
 | `rules.WithSeverity(rules.Warning)` | 경고로 다운그레이드 |

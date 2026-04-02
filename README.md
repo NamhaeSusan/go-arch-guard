@@ -8,7 +8,7 @@
 
 Architecture guardrails for Go projects via `go test`, built for AI coding agents and fast-moving teams.
 
-Define isolation, layer-direction, structure, naming, and blast-radius rules, then fail regular tests when the project shape drifts. Ships with **DDD**, **Clean Architecture**, **Layered**, **Hexagonal**, and **Modular Monolith** presets, and supports fully custom architecture models. No CLI to learn. No separate config format. Just Go tests.
+Define isolation, layer-direction, structure, naming, and blast-radius rules, then fail regular tests when the project shape drifts. Ships with **DDD**, **Clean Architecture**, **Layered**, **Hexagonal**, **Modular Monolith**, and **Consumer/Worker** presets, and supports fully custom architecture models. No CLI to learn. No separate config format. Just Go tests.
 
 AI-agent-friendly by default:
 
@@ -53,7 +53,7 @@ src, err := scaffold.ArchitectureTest(
 from a hyphenated module basename.
 
 Available presets: `PresetDDD`, `PresetCleanArch`, `PresetLayered`,
-`PresetHexagonal`, `PresetModularMonolith`.
+`PresetHexagonal`, `PresetModularMonolith`, `PresetConsumerWorker`.
 
 ### Recommended shortcut
 
@@ -101,7 +101,7 @@ func TestArchitecture(t *testing.T) {
 For other presets, add `opts` with the model function:
 
 ```go
-m := rules.CleanArch() // or Layered(), Hexagonal(), ModularMonolith()
+m := rules.CleanArch() // or Layered(), Hexagonal(), ModularMonolith(), ConsumerWorker()
 opts := []rules.Option{rules.WithModel(m)}
 
 rules.CheckDomainIsolation(pkgs, "", "", opts...)
@@ -155,6 +155,7 @@ Pass empty strings for `module` and `root` to auto-extract from loaded packages.
 | `Layered()` | handler, service, repository, model | handler→service→repository+model, repository→model | No | No |
 | `Hexagonal()` | handler, usecase, port, domain, adapter | handler→usecase→port+domain, adapter→port+domain | No | No |
 | `ModularMonolith()` | api, application, core, infrastructure | api→application→core, infrastructure→core | No | No |
+| `ConsumerWorker()` | worker, service, store, model | worker→service→store→model | No | No |
 
 ### DDD Layout
 
@@ -284,6 +285,39 @@ Modular Monolith direction:
 | `core` | nothing |
 | `infrastructure` | `core` |
 
+### Consumer/Worker Layout (Flat)
+
+Unlike domain-centric presets, the Consumer/Worker preset uses a **flat layout** —
+layers live directly under `internal/` with no `domain/` directory.
+
+```text
+internal/
+├── worker/            # worker_order.go, worker_payment.go
+├── service/           # business logic
+├── store/             # persistence (DB, external APIs)
+├── model/             # data structures
+└── pkg/               # shared infra (consumer lib, logging)
+    └── consumer/
+```
+
+Consumer/Worker direction:
+
+| from | allowed to import |
+|------|-------------------|
+| `worker` | `service`, `model` |
+| `service` | `store`, `model` |
+| `store` | `model` |
+| `model` | nothing |
+
+All layers may import `pkg/` except `model` (restricted).
+
+**Type pattern enforcement:** Files matching `worker_*.go` in `worker/` must define
+a corresponding exported type with a `Process` method:
+- `worker_order.go` → must define `OrderWorker` with `Process` method
+- `worker_payment.go` → must define `PaymentWorker` with `Process` method
+
+Domain isolation rules are not applicable and are skipped entirely.
+
 ### Custom Model
 
 Start from DDD defaults and override what you need:
@@ -399,6 +433,8 @@ Notes:
 | `naming.no-layer-suffix` | file name redundantly repeats the layer name |
 | `naming.domain-interface-repo-only` | domain interface outside repo sublayer (DDD only) |
 | `naming.no-handmock` | test file defines hand-rolled mock/fake/stub |
+| `naming.worker-type-mismatch` | `worker_*.go` file must define matching type (ConsumerWorker only) |
+| `naming.worker-missing-process` | worker type must have `Process` method (ConsumerWorker only) |
 
 ## Blast Radius
 
@@ -468,6 +504,8 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `rules.Layered()` | Spring-style layered model |
 | `rules.Hexagonal()` | Ports & Adapters model |
 | `rules.ModularMonolith()` | Module-based layered model |
+| `rules.ConsumerWorker()` | Consumer/Worker flat-layout model |
+| `rules.CheckTypePatterns(pkgs, opts...)` | AST-based type pattern enforcement |
 | `rules.NewModel(opts...)` | custom model builder |
 | `rules.WithModel(m)` | apply custom model to checks |
 | `rules.WithSeverity(rules.Warning)` | downgrade to warnings |
