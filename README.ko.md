@@ -145,7 +145,7 @@ go test -run TestArchitecture -v
 | `ModularMonolith()` | api, application, core, infrastructure | api→application→core, infrastructure→core | X | X |
 | `ConsumerWorker()` | worker, service, store, model | worker→service→store→model | X | X |
 | `Batch()` | job, service, store, model | job→service→store→model | X | X |
-| `EventPipeline()` | command, aggregate, event, projection, eventstore, readstore, model | command→aggregate→event/eventstore, projection→event/readstore | X | X |
+| `EventPipeline()` | command, aggregate, event, projection, eventstore, readstore, model | command→aggregate+eventstore, aggregate→event, projection→event/readstore | X | X |
 
 ### DDD 레이아웃
 
@@ -361,7 +361,7 @@ Event-Driven Pipeline 방향:
 
 | from | 허용된 import |
 |------|--------------|
-| `command` | `aggregate`, `model` |
+| `command` | `aggregate`, `eventstore`, `model` |
 | `aggregate` | `event`, `model` |
 | `event` | `model` |
 | `projection` | `event`, `readstore`, `model` |

@@ -77,8 +77,8 @@ internal/
 
 | from | 허용된 import |
 |------|--------------|
-| `command` | `aggregate`, `model` |
-| `aggregate` | `event`, `eventstore`, `model` |
+| `command` | `aggregate`, `eventstore`, `model` |
+| `aggregate` | `event`, `model` |
 | `event` | `model` |
 | `projection` | `event`, `readstore`, `model` |
 | `eventstore` | `event`, `model` |
@@ -120,11 +120,13 @@ package command
 import "context"
 
 type CreateOrderCommand struct {
-    agg *aggregate.OrderAggregate
+    agg   *aggregate.OrderAggregate
+    store eventstore.Store
 }
 
 func (c *CreateOrderCommand) Execute(ctx context.Context) error {
-    return c.agg.Apply(ctx, event.OrderCreated{...})
+    evt := c.agg.Apply(ctx)
+    return c.store.Save(ctx, evt)
 }
 ```
 
@@ -134,12 +136,10 @@ package aggregate
 
 import "context"
 
-type OrderAggregate struct {
-    store eventstore.Store
-}
+type OrderAggregate struct{}
 
 func (a *OrderAggregate) Apply(ctx context.Context) error {
-    // 이벤트 적용 + 저장
+    // 비즈니스 규칙 검증 + 이벤트 생성
     return nil
 }
 ```
@@ -149,13 +149,14 @@ func (a *OrderAggregate) Apply(ctx context.Context) error {
 ## 데이터 흐름
 
 ```
-Command → Aggregate → Event → EventStore
-                                  ↓
-                            Projection → ReadStore
+Command → Aggregate → Event
+      ↘ EventStore ←──┘
+                  ↓
+            Projection → ReadStore
 ```
 
-1. **Command** 수신 → **Aggregate**에 위임
-2. **Aggregate**가 비즈니스 규칙 검증 → **Event** 생성 → **EventStore**에 저장
+1. **Command** 수신 → **Aggregate**에 위임 + **EventStore**에 저장
+2. **Aggregate**가 비즈니스 규칙 검증 → **Event** 생성 (저장소 의존 없음)
 3. **Projection**이 **Event**를 구독 → 읽기 모델 구축 → **ReadStore**에 저장
 
 ---

@@ -158,7 +158,7 @@ Pass empty strings for `module` and `root` to auto-extract from loaded packages.
 | `ModularMonolith()` | api, application, core, infrastructure | api→application→core, infrastructure→core | No | No |
 | `ConsumerWorker()` | worker, service, store, model | worker→service→store→model | No | No |
 | `Batch()` | job, service, store, model | job→service→store→model | No | No |
-| `EventPipeline()` | command, aggregate, event, projection, eventstore, readstore, model | command→aggregate→event/eventstore, projection→event/readstore | No | No |
+| `EventPipeline()` | command, aggregate, event, projection, eventstore, readstore, model | command→aggregate+eventstore, aggregate→event, projection→event/readstore | No | No |
 
 ### DDD Layout
 
@@ -375,7 +375,7 @@ Event-Driven Pipeline direction:
 
 | from | allowed to import |
 |------|-------------------|
-| `command` | `aggregate`, `model` |
+| `command` | `aggregate`, `eventstore`, `model` |
 | `aggregate` | `event`, `model` |
 | `event` | `model` |
 | `projection` | `event`, `readstore`, `model` |

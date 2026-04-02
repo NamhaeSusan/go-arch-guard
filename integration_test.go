@@ -1143,9 +1143,9 @@ func TestIntegration_EventPipeline_Valid(t *testing.T) {
 
 	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
 	writeIntegrationFile(t, filepath.Join(root, "internal", "command", "command_create_order.go"),
-		"package command\n\nimport (\n\t\"context\"\n\t_ \""+module+"/internal/aggregate\"\n)\n\ntype CreateOrderCommand struct{}\nfunc (c *CreateOrderCommand) Execute(ctx context.Context) error { return nil }\n")
+		"package command\n\nimport (\n\t\"context\"\n\t_ \""+module+"/internal/aggregate\"\n\t_ \""+module+"/internal/eventstore\"\n)\n\ntype CreateOrderCommand struct{}\nfunc (c *CreateOrderCommand) Execute(ctx context.Context) error { return nil }\n")
 	writeIntegrationFile(t, filepath.Join(root, "internal", "aggregate", "aggregate_order.go"),
-		"package aggregate\n\nimport (\n\t\"context\"\n\t_ \""+module+"/internal/event\"\n\t_ \""+module+"/internal/eventstore\"\n)\n\ntype OrderAggregate struct{}\nfunc (a *OrderAggregate) Apply(ctx context.Context) error { return nil }\n")
+		"package aggregate\n\nimport (\n\t\"context\"\n\t_ \""+module+"/internal/event\"\n)\n\ntype OrderAggregate struct{}\nfunc (a *OrderAggregate) Apply(ctx context.Context) error { return nil }\n")
 	writeIntegrationFile(t, filepath.Join(root, "internal", "event", "order_created.go"),
 		"package event\n\nimport _ \""+module+"/internal/model\"\n\ntype OrderCreated struct{ ID string }\n")
 	writeIntegrationFile(t, filepath.Join(root, "internal", "projection", "order_view.go"),

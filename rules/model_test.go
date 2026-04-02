@@ -257,8 +257,12 @@ func TestEventPipeline_ReturnsValidModel(t *testing.T) {
 		t.Errorf("InternalTopLevel has %d entries, want 8", len(m.InternalTopLevel))
 	}
 	cmdAllowed := m.Direction["command"]
-	if len(cmdAllowed) != 2 {
-		t.Errorf("command allowed = %v, want [aggregate model]", cmdAllowed)
+	if len(cmdAllowed) != 3 {
+		t.Errorf("command allowed = %v, want [aggregate eventstore model]", cmdAllowed)
+	}
+	aggAllowed := m.Direction["aggregate"]
+	if len(aggAllowed) != 2 {
+		t.Errorf("aggregate allowed = %v, want [event model]", aggAllowed)
 	}
 	modelAllowed := m.Direction["model"]
 	if len(modelAllowed) != 0 {

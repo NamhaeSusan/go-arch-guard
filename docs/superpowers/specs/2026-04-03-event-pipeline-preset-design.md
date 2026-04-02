@@ -27,8 +27,8 @@ internal/
 ## Layer Direction
 
 ```
-command    → aggregate, model, pkg
-aggregate  → event, eventstore, model, pkg
+command    → aggregate, eventstore, model, pkg
+aggregate  → event, model, pkg
 event      → model
 projection → event, readstore, model, pkg
 eventstore → event, model, pkg
@@ -70,8 +70,8 @@ func EventPipeline() Model {
             "eventstore", "readstore", "model",
         },
         Direction: map[string][]string{
-            "command":    {"aggregate", "model"},
-            "aggregate":  {"event", "eventstore", "model"},
+            "command":    {"aggregate", "eventstore", "model"},
+            "aggregate":  {"event", "model"},
             "event":      {"model"},
             "projection": {"event", "readstore", "model"},
             "eventstore": {"event", "model"},

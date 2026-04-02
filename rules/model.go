@@ -306,8 +306,8 @@ func EventPipeline() Model {
 			"eventstore", "readstore", "model",
 		},
 		Direction: map[string][]string{
-			"command":    {"aggregate", "model"},
-			"aggregate":  {"event", "eventstore", "model"},
+			"command":    {"aggregate", "eventstore", "model"},
+			"aggregate":  {"event", "model"},
 			"event":      {"model"},
 			"projection": {"event", "readstore", "model"},
 			"eventstore": {"event", "model"},
