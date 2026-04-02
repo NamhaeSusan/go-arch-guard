@@ -17,6 +17,7 @@ func RunAll(pkgs []*packages.Package, projectModule string, projectRoot string, 
 	violations = append(violations, CheckLayerDirection(pkgs, projectModule, projectRoot, opts...)...)
 	violations = append(violations, CheckNaming(pkgs, opts...)...)
 	violations = append(violations, CheckStructure(projectRoot, opts...)...)
+	violations = append(violations, CheckTypePatterns(pkgs, opts...)...)
 	violations = append(violations, AnalyzeBlastRadius(pkgs, projectModule, projectRoot, opts...)...)
 	return violations
 }
