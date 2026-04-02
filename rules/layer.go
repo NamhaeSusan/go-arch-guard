@@ -18,6 +18,10 @@ func CheckLayerDirection(pkgs []*packages.Package, projectModule string, project
 	}
 	internalPrefix := projectModule + "/internal/"
 
+	if m.DomainDir == "" {
+		return checkFlatLayerDirection(pkgs, m, cfg, projectModule, projectRoot, internalPrefix)
+	}
+
 	var violations []Violation
 	for _, pkg := range pkgs {
 		if isExcludedPackage(cfg, pkg.PkgPath, projectModule) {
@@ -155,6 +159,80 @@ func identifyDomainWith(m Model, pkgPath, internalPrefix string) string {
 		return ""
 	}
 	return parts[0]
+}
+
+func checkFlatLayerDirection(pkgs []*packages.Package, m Model, cfg Config, projectModule, projectRoot, internalPrefix string) []Violation {
+	var violations []Violation
+	for _, pkg := range pkgs {
+		if isExcludedPackage(cfg, pkg.PkgPath, projectModule) {
+			continue
+		}
+		if !strings.HasPrefix(pkg.PkgPath, internalPrefix) {
+			continue
+		}
+
+		srcSublayer := identifyFlatSublayer(m, pkg.PkgPath, internalPrefix)
+		if srcSublayer == "" {
+			continue
+		}
+
+		for impPath := range pkg.Imports {
+			if !strings.HasPrefix(impPath, internalPrefix) {
+				continue
+			}
+
+			if isPkgPkgWith(m, impPath, internalPrefix) {
+				if m.PkgRestricted[srcSublayer] {
+					file, line := findImportPosition(pkg, impPath, projectRoot)
+					violations = append(violations, Violation{
+						File:     file,
+						Line:     line,
+						Rule:     "layer.inner-imports-pkg",
+						Message:  fmt.Sprintf("inner sublayer %q must not import internal/%s", srcSublayer, m.SharedDir),
+						Fix:      "keep core and model layers self-contained; move shared concerns outward to worker or service",
+						Severity: cfg.Sev,
+					})
+				}
+				continue
+			}
+
+			impSublayer := identifyFlatSublayer(m, impPath, internalPrefix)
+			if impSublayer == "" || srcSublayer == impSublayer {
+				continue
+			}
+
+			allowed, known := m.Direction[srcSublayer]
+			if !known {
+				continue
+			}
+			if slices.Contains(allowed, impSublayer) {
+				continue
+			}
+
+			file, line := findImportPosition(pkg, impPath, projectRoot)
+			violations = append(violations, Violation{
+				File:     file,
+				Line:     line,
+				Rule:     "layer.direction",
+				Message:  fmt.Sprintf("sublayer %q must not import sublayer %q", srcSublayer, impSublayer),
+				Fix:      fmt.Sprintf("allowed imports for %q: %v", srcSublayer, allowed),
+				Severity: cfg.Sev,
+			})
+		}
+	}
+	return violations
+}
+
+func identifyFlatSublayer(m Model, pkgPath, internalPrefix string) string {
+	rel := strings.TrimPrefix(pkgPath, internalPrefix)
+	parts := strings.SplitN(rel, "/", 2)
+	if parts[0] == "" {
+		return ""
+	}
+	if slices.Contains(m.Sublayers, parts[0]) {
+		return parts[0]
+	}
+	return ""
 }
 
 func relativePackageFile(pkg *packages.Package) string {
