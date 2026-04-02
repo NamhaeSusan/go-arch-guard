@@ -219,6 +219,64 @@ func TestBatch_ReturnsValidModel(t *testing.T) {
 	}
 }
 
+func TestEventPipeline_ReturnsValidModel(t *testing.T) {
+	m := EventPipeline()
+	if len(m.Sublayers) != 7 {
+		t.Fatalf("EventPipeline sublayer count = %d, want 7", len(m.Sublayers))
+	}
+	if m.DomainDir != "" {
+		t.Errorf("DomainDir = %q, want empty (flat layout)", m.DomainDir)
+	}
+	if m.OrchestrationDir != "" {
+		t.Errorf("OrchestrationDir = %q, want empty", m.OrchestrationDir)
+	}
+	if m.SharedDir != "pkg" {
+		t.Errorf("SharedDir = %q, want %q", m.SharedDir, "pkg")
+	}
+	if m.RequireAlias {
+		t.Error("EventPipeline should not require alias")
+	}
+	if m.RequireModel {
+		t.Error("EventPipeline should not require model")
+	}
+	if m.ModelPath != "model" {
+		t.Errorf("ModelPath = %q, want %q", m.ModelPath, "model")
+	}
+	if !m.PkgRestricted["model"] {
+		t.Error("model sublayer must be pkg-restricted")
+	}
+	if !m.PkgRestricted["event"] {
+		t.Error("event sublayer must be pkg-restricted")
+	}
+	for _, layer := range []string{"command", "aggregate", "event", "projection", "eventstore", "readstore", "model", "pkg"} {
+		if !m.InternalTopLevel[layer] {
+			t.Errorf("InternalTopLevel missing %q", layer)
+		}
+	}
+	if len(m.InternalTopLevel) != 8 {
+		t.Errorf("InternalTopLevel has %d entries, want 8", len(m.InternalTopLevel))
+	}
+	cmdAllowed := m.Direction["command"]
+	if len(cmdAllowed) != 2 {
+		t.Errorf("command allowed = %v, want [aggregate model]", cmdAllowed)
+	}
+	modelAllowed := m.Direction["model"]
+	if len(modelAllowed) != 0 {
+		t.Errorf("model allowed = %v, want []", modelAllowed)
+	}
+	if len(m.TypePatterns) != 2 {
+		t.Fatalf("TypePatterns count = %d, want 2", len(m.TypePatterns))
+	}
+	tp0 := m.TypePatterns[0]
+	if tp0.Dir != "command" || tp0.FilePrefix != "command" || tp0.TypeSuffix != "Command" || tp0.RequireMethod != "Execute" {
+		t.Errorf("TypePattern[0] = %+v, unexpected", tp0)
+	}
+	tp1 := m.TypePatterns[1]
+	if tp1.Dir != "aggregate" || tp1.FilePrefix != "aggregate" || tp1.TypeSuffix != "Aggregate" || tp1.RequireMethod != "Apply" {
+		t.Errorf("TypePattern[1] = %+v, unexpected", tp1)
+	}
+}
+
 func TestNewModel_CustomOverrides(t *testing.T) {
 	m := NewModel(
 		WithDomainDir("module"),
@@ -306,6 +364,7 @@ func TestModelConsistency(t *testing.T) {
 		{"ModularMonolith", ModularMonolith()},
 		{"ConsumerWorker", ConsumerWorker()},
 		{"Batch", Batch()},
+		{"EventPipeline", EventPipeline()},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			validateModelConsistency(t, tc.model)

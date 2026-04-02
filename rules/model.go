@@ -1,7 +1,7 @@
 package rules
 
 // Model defines the architecture model used by all rule checks.
-// Use DDD(), CleanArch(), Layered(), Hexagonal(), ModularMonolith(), ConsumerWorker(), Batch(), or NewModel() to create one.
+// Use DDD(), CleanArch(), Layered(), Hexagonal(), ModularMonolith(), ConsumerWorker(), Batch(), EventPipeline(), or NewModel() to create one.
 type Model struct {
 	Sublayers        []string
 	Direction        map[string][]string
@@ -294,6 +294,50 @@ func Batch() Model {
 		},
 		TypePatterns: []TypePattern{
 			{Dir: "job", FilePrefix: "job", TypeSuffix: "Job", RequireMethod: "Run"},
+		},
+	}
+}
+
+// EventPipeline returns a flat-layout model for event-sourcing / CQRS projects.
+func EventPipeline() Model {
+	return Model{
+		Sublayers: []string{
+			"command", "aggregate", "event", "projection",
+			"eventstore", "readstore", "model",
+		},
+		Direction: map[string][]string{
+			"command":    {"aggregate", "model"},
+			"aggregate":  {"event", "eventstore", "model"},
+			"event":      {"model"},
+			"projection": {"event", "readstore", "model"},
+			"eventstore": {"event", "model"},
+			"readstore":  {"model"},
+			"model":      {},
+		},
+		PkgRestricted: map[string]bool{"model": true, "event": true},
+		InternalTopLevel: map[string]bool{
+			"command": true, "aggregate": true, "event": true,
+			"projection": true, "eventstore": true, "readstore": true,
+			"model": true, "pkg": true,
+		},
+		DomainDir:        "",
+		OrchestrationDir: "",
+		SharedDir:        "pkg",
+		RequireAlias:     false,
+		AliasFileName:    "",
+		RequireModel:     false,
+		ModelPath:        "model",
+		DTOAllowedLayers: []string{"command", "projection"},
+		BannedPkgNames:   []string{"util", "common", "misc", "helper", "shared", "services"},
+		LegacyPkgNames:   []string{"router", "bootstrap"},
+		LayerDirNames: map[string]bool{
+			"command": true, "aggregate": true, "event": true,
+			"projection": true, "eventstore": true, "readstore": true,
+			"model": true,
+		},
+		TypePatterns: []TypePattern{
+			{Dir: "command", FilePrefix: "command", TypeSuffix: "Command", RequireMethod: "Execute"},
+			{Dir: "aggregate", FilePrefix: "aggregate", TypeSuffix: "Aggregate", RequireMethod: "Apply"},
 		},
 	}
 }
