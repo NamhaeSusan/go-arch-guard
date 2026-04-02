@@ -189,7 +189,7 @@ func checkFlatLayerDirection(pkgs []*packages.Package, m Model, cfg Config, proj
 						Line:     line,
 						Rule:     "layer.inner-imports-pkg",
 						Message:  fmt.Sprintf("inner sublayer %q must not import internal/%s", srcSublayer, m.SharedDir),
-						Fix:      "keep core and model layers self-contained; move shared concerns outward to worker or service",
+						Fix:      "keep inner layers self-contained; move shared concerns to an outer layer",
 						Severity: cfg.Sev,
 					})
 				}
