@@ -117,6 +117,57 @@ func TestModularMonolith_ReturnsValidModel(t *testing.T) {
 	}
 }
 
+func TestConsumerWorker_ReturnsValidModel(t *testing.T) {
+	m := ConsumerWorker()
+	if len(m.Sublayers) != 4 {
+		t.Fatalf("ConsumerWorker sublayer count = %d, want 4", len(m.Sublayers))
+	}
+	if m.DomainDir != "" {
+		t.Errorf("DomainDir = %q, want empty (flat layout)", m.DomainDir)
+	}
+	if m.OrchestrationDir != "" {
+		t.Errorf("OrchestrationDir = %q, want empty", m.OrchestrationDir)
+	}
+	if m.SharedDir != "pkg" {
+		t.Errorf("SharedDir = %q, want %q", m.SharedDir, "pkg")
+	}
+	if m.RequireAlias {
+		t.Error("ConsumerWorker should not require alias")
+	}
+	if m.RequireModel {
+		t.Error("ConsumerWorker should not require model")
+	}
+	if m.ModelPath != "model" {
+		t.Errorf("ModelPath = %q, want %q", m.ModelPath, "model")
+	}
+	if !m.PkgRestricted["model"] {
+		t.Error("model sublayer must be pkg-restricted")
+	}
+	for _, layer := range []string{"worker", "service", "store", "model", "pkg"} {
+		if !m.InternalTopLevel[layer] {
+			t.Errorf("InternalTopLevel missing %q", layer)
+		}
+	}
+	if len(m.InternalTopLevel) != 5 {
+		t.Errorf("InternalTopLevel has %d entries, want 5", len(m.InternalTopLevel))
+	}
+	workerAllowed := m.Direction["worker"]
+	if len(workerAllowed) != 2 {
+		t.Errorf("worker allowed = %v, want [service model]", workerAllowed)
+	}
+	modelAllowed := m.Direction["model"]
+	if len(modelAllowed) != 0 {
+		t.Errorf("model allowed = %v, want []", modelAllowed)
+	}
+	if len(m.TypePatterns) != 1 {
+		t.Fatalf("TypePatterns count = %d, want 1", len(m.TypePatterns))
+	}
+	tp := m.TypePatterns[0]
+	if tp.Dir != "worker" || tp.FilePrefix != "worker" || tp.TypeSuffix != "Worker" || tp.RequireMethod != "Process" {
+		t.Errorf("TypePattern = %+v, unexpected", tp)
+	}
+}
+
 func TestNewModel_CustomOverrides(t *testing.T) {
 	m := NewModel(
 		WithDomainDir("module"),
@@ -202,6 +253,7 @@ func TestModelConsistency(t *testing.T) {
 		{"Layered", Layered()},
 		{"Hexagonal", Hexagonal()},
 		{"ModularMonolith", ModularMonolith()},
+		{"ConsumerWorker", ConsumerWorker()},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			validateModelConsistency(t, tc.model)
@@ -222,7 +274,7 @@ func validateModelConsistency(t *testing.T, m Model) {
 			t.Errorf("Direction key %q not in Sublayers", key)
 		}
 	}
-	if !m.InternalTopLevel[m.DomainDir] {
+	if m.DomainDir != "" && !m.InternalTopLevel[m.DomainDir] {
 		t.Errorf("InternalTopLevel missing DomainDir %q", m.DomainDir)
 	}
 	if !m.InternalTopLevel[m.SharedDir] {

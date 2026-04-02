@@ -18,6 +18,15 @@ type Model struct {
 	BannedPkgNames   []string
 	LegacyPkgNames   []string
 	LayerDirNames    map[string]bool
+	TypePatterns     []TypePattern
+}
+
+// TypePattern defines an AST-based naming/structure convention for a directory.
+type TypePattern struct {
+	Dir           string // target directory under internal/, e.g. "worker"
+	FilePrefix    string // required file prefix, e.g. "worker"
+	TypeSuffix    string // required exported type suffix, e.g. "Worker"
+	RequireMethod string // required method name, e.g. "Process"
 }
 
 // ModelOption configures a Model via NewModel.
@@ -213,6 +222,42 @@ func ModularMonolith() Model {
 			"infrastructure": true,
 			"controller":     true, "service": true, "entity": true,
 			"store": true, "persistence": true,
+		},
+	}
+}
+
+// ConsumerWorker returns a flat-layout model for Kafka/RabbitMQ consumer projects.
+// Flat layout means layers live directly under internal/ (no domain/ directory).
+func ConsumerWorker() Model {
+	return Model{
+		Sublayers: []string{"worker", "service", "store", "model"},
+		Direction: map[string][]string{
+			"worker":  {"service", "model"},
+			"service": {"store", "model"},
+			"store":   {"model"},
+			"model":   {},
+		},
+		PkgRestricted: map[string]bool{"model": true},
+		InternalTopLevel: map[string]bool{
+			"worker": true, "service": true,
+			"store": true, "model": true, "pkg": true,
+		},
+		DomainDir:        "",
+		OrchestrationDir: "",
+		SharedDir:        "pkg",
+		RequireAlias:     false,
+		AliasFileName:    "",
+		RequireModel:     false,
+		ModelPath:        "model",
+		DTOAllowedLayers: []string{"worker", "service"},
+		BannedPkgNames:   []string{"util", "common", "misc", "helper", "shared", "services"},
+		LegacyPkgNames:   []string{"router", "bootstrap"},
+		LayerDirNames: map[string]bool{
+			"worker": true, "service": true,
+			"store": true, "model": true,
+		},
+		TypePatterns: []TypePattern{
+			{Dir: "worker", FilePrefix: "worker", TypeSuffix: "Worker", RequireMethod: "Process"},
 		},
 	}
 }
