@@ -28,8 +28,8 @@ func CheckTypePatterns(pkgs []*packages.Package, opts ...Option) []Violation {
 }
 
 func checkTypePattern(pkg *packages.Package, tp TypePattern, cfg Config) []Violation {
-	parts := strings.Split(pkg.PkgPath, "/")
-	if len(parts) < 2 || parts[len(parts)-1] != tp.Dir || parts[len(parts)-2] != "internal" {
+	// TypePattern applies only to flat-layout packages directly under internal/ (e.g. internal/worker).
+	if !strings.HasSuffix(pkg.PkgPath, "/internal/"+tp.Dir) {
 		return nil
 	}
 

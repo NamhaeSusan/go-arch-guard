@@ -30,6 +30,11 @@ type TypePattern struct {
 	RequireMethod string // required method name, e.g. "Process"
 }
 
+var (
+	defaultBannedPkgNames = []string{"util", "common", "misc", "helper", "shared", "services"}
+	defaultLegacyPkgNames = []string{"router", "bootstrap"}
+)
+
 // ModelOption configures a Model via NewModel.
 type ModelOption func(*Model)
 
@@ -65,8 +70,8 @@ func DDD() Model {
 		RequireModel:     true,
 		ModelPath:        "core/model",
 		DTOAllowedLayers: []string{"handler", "app"},
-		BannedPkgNames:   []string{"util", "common", "misc", "helper", "shared", "services"},
-		LegacyPkgNames:   []string{"router", "bootstrap"},
+		BannedPkgNames:   defaultBannedPkgNames,
+		LegacyPkgNames:   defaultLegacyPkgNames,
 		LayerDirNames: map[string]bool{
 			"handler": true, "app": true, "core": true,
 			"model": true, "repo": true, "svc": true,
@@ -108,8 +113,8 @@ func CleanArch() Model {
 		RequireModel:     false,
 		ModelPath:        "entity",
 		DTOAllowedLayers: []string{"handler", "usecase"},
-		BannedPkgNames:   []string{"util", "common", "misc", "helper", "shared", "services"},
-		LegacyPkgNames:   []string{"router", "bootstrap"},
+		BannedPkgNames:   defaultBannedPkgNames,
+		LegacyPkgNames:   defaultLegacyPkgNames,
 		LayerDirNames: map[string]bool{
 			"handler": true, "usecase": true, "entity": true,
 			"gateway": true, "infra": true,
@@ -148,8 +153,8 @@ func Layered() Model {
 		RequireModel:     false,
 		ModelPath:        "model",
 		DTOAllowedLayers: []string{"handler", "service"},
-		BannedPkgNames:   []string{"util", "common", "misc", "helper", "shared", "services"},
-		LegacyPkgNames:   []string{"router", "bootstrap"},
+		BannedPkgNames:   defaultBannedPkgNames,
+		LegacyPkgNames:   defaultLegacyPkgNames,
 		LayerDirNames: map[string]bool{
 			"handler": true, "service": true, "repository": true, "model": true,
 			"controller": true, "entity": true, "store": true,
@@ -188,8 +193,8 @@ func Hexagonal() Model {
 		RequireModel:     false,
 		ModelPath:        "domain",
 		DTOAllowedLayers: []string{"handler", "usecase"},
-		BannedPkgNames:   []string{"util", "common", "misc", "helper", "shared", "services"},
-		LegacyPkgNames:   []string{"router", "bootstrap"},
+		BannedPkgNames:   defaultBannedPkgNames,
+		LegacyPkgNames:   defaultLegacyPkgNames,
 		LayerDirNames: map[string]bool{
 			"handler": true, "usecase": true, "port": true,
 			"domain": true, "adapter": true,
@@ -228,8 +233,8 @@ func ModularMonolith() Model {
 		RequireModel:     false,
 		ModelPath:        "core",
 		DTOAllowedLayers: []string{"api", "application"},
-		BannedPkgNames:   []string{"util", "common", "misc", "helper", "shared", "services"},
-		LegacyPkgNames:   []string{"router", "bootstrap"},
+		BannedPkgNames:   defaultBannedPkgNames,
+		LegacyPkgNames:   defaultLegacyPkgNames,
 		LayerDirNames: map[string]bool{
 			"api": true, "application": true, "core": true,
 			"infrastructure": true,
@@ -266,8 +271,8 @@ func ConsumerWorker() Model {
 		RequireModel:     false,
 		ModelPath:        "model",
 		DTOAllowedLayers: []string{"worker", "service"},
-		BannedPkgNames:   []string{"util", "common", "misc", "helper", "shared", "services"},
-		LegacyPkgNames:   []string{"router", "bootstrap"},
+		BannedPkgNames:   defaultBannedPkgNames,
+		LegacyPkgNames:   defaultLegacyPkgNames,
 		LayerDirNames: map[string]bool{
 			"worker": true, "service": true,
 			"store": true, "model": true,
@@ -305,8 +310,8 @@ func Batch() Model {
 		RequireModel:     false,
 		ModelPath:        "model",
 		DTOAllowedLayers: []string{"job", "service"},
-		BannedPkgNames:   []string{"util", "common", "misc", "helper", "shared", "services"},
-		LegacyPkgNames:   []string{"router", "bootstrap"},
+		BannedPkgNames:   defaultBannedPkgNames,
+		LegacyPkgNames:   defaultLegacyPkgNames,
 		LayerDirNames: map[string]bool{
 			"job": true, "service": true,
 			"store": true, "model": true,
@@ -350,8 +355,8 @@ func EventPipeline() Model {
 		RequireModel:     false,
 		ModelPath:        "model",
 		DTOAllowedLayers: []string{"command", "projection"},
-		BannedPkgNames:   []string{"util", "common", "misc", "helper", "shared", "services"},
-		LegacyPkgNames:   []string{"router", "bootstrap"},
+		BannedPkgNames:   defaultBannedPkgNames,
+		LegacyPkgNames:   defaultLegacyPkgNames,
 		LayerDirNames: map[string]bool{
 			"command": true, "aggregate": true, "event": true,
 			"projection": true, "eventstore": true, "readstore": true,
@@ -373,11 +378,17 @@ func NewModel(opts ...ModelOption) Model {
 	for _, o := range opts {
 		o(&m)
 	}
-	m.InternalTopLevel = map[string]bool{
-		m.DomainDir:        true,
-		m.OrchestrationDir: true,
-		m.SharedDir:        true,
+	tl := make(map[string]bool)
+	if m.DomainDir != "" {
+		tl[m.DomainDir] = true
 	}
+	if m.OrchestrationDir != "" {
+		tl[m.OrchestrationDir] = true
+	}
+	if m.SharedDir != "" {
+		tl[m.SharedDir] = true
+	}
+	m.InternalTopLevel = tl
 	return m
 }
 

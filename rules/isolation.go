@@ -200,11 +200,17 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 }
 
 func isOrchestrationPkgWith(m Model, pkgPath, internalPrefix string) bool {
+	if m.OrchestrationDir == "" {
+		return false
+	}
 	rel := strings.TrimPrefix(pkgPath, internalPrefix)
 	return rel == m.OrchestrationDir || strings.HasPrefix(rel, m.OrchestrationDir+"/")
 }
 
 func isPkgPkgWith(m Model, pkgPath, internalPrefix string) bool {
+	if m.SharedDir == "" {
+		return false
+	}
 	rel := strings.TrimPrefix(pkgPath, internalPrefix)
 	return rel == m.SharedDir || strings.HasPrefix(rel, m.SharedDir+"/")
 }
