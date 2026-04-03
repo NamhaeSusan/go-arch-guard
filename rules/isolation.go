@@ -159,7 +159,7 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 				violations = append(violations, Violation{
 					File:     file,
 					Line:     line,
-					Rule:     "isolation.internal-imports-orchestration",
+					Rule:     "isolation.stray-imports-orchestration",
 					Message:  fmt.Sprintf("package %q must not import %s", pkg.PkgPath, m.OrchestrationDir),
 					Fix:      fmt.Sprintf("only cmd/ and internal/%s may depend on %s", m.OrchestrationDir, m.OrchestrationDir),
 					Severity: cfg.Sev,
@@ -187,7 +187,7 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 				violations = append(violations, Violation{
 					File:     file,
 					Line:     line,
-					Rule:     "isolation.internal-imports-domain",
+					Rule:     "isolation.stray-imports-domain",
 					Message:  fmt.Sprintf("package %q must not import domain %q", pkg.PkgPath, impDomain),
 					Fix:      fmt.Sprintf("move domain orchestration to internal/%s or app wiring to cmd/", m.OrchestrationDir),
 					Severity: cfg.Sev,

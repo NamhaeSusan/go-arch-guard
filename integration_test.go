@@ -44,7 +44,7 @@ func TestIntegration_BlastRadius(t *testing.T) {
 	if len(violations) == 0 {
 		t.Error("expected blast radius violations for hub package")
 	}
-	assertHasRule(t, violations, "blast-radius.high-coupling")
+	assertHasRule(t, violations, "blast.high-coupling")
 }
 
 func TestIntegration_Invalid(t *testing.T) {
@@ -76,12 +76,12 @@ func TestIntegration_Invalid(t *testing.T) {
 		structureViolations := rules.CheckStructure("testdata/invalid")
 
 		assertHasRule(t, isolationViolations, "isolation.domain-imports-orchestration")
-		assertHasRule(t, isolationViolations, "isolation.internal-imports-orchestration")
+		assertHasRule(t, isolationViolations, "isolation.stray-imports-orchestration")
 		assertHasRule(t, isolationViolations, "isolation.pkg-imports-domain")
 		assertHasRule(t, layerViolations, "layer.unknown-sublayer")
 		assertHasRule(t, layerViolations, "layer.inner-imports-pkg")
 		assertHasRule(t, structureViolations, "structure.internal-top-level")
-		assertHasRule(t, structureViolations, "structure.domain-root-alias-required")
+		assertHasRule(t, structureViolations, "structure.domain-alias-exists")
 		assertHasRule(t, structureViolations, "structure.domain-model-required")
 		assertHasRule(t, structureViolations, "structure.dto-placement")
 		assertHasRule(t, structureViolations, "structure.misplaced-layer")
