@@ -101,3 +101,137 @@ type Order struct {
 		t.Errorf("expected 0 violations, got %d", len(vs))
 	}
 }
+
+func TestCheckInterfacePattern_ConstructorName(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/ip-ctor-name"
+
+	writeTestFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+
+	// store package: NewStore() instead of New() → constructor-name violation
+	writeTestFile(t, filepath.Join(root, "internal", "store", "store.go"),
+		`package store
+
+type Store interface {
+	Get(id string) string
+}
+
+type store struct{}
+
+func (s *store) Get(id string) string { return "" }
+
+func NewStore() Store { return &store{} }
+`)
+
+	pkgs := loadTestPackages(t, root)
+	vs := rules.CheckInterfacePattern(pkgs, rules.WithModel(rules.ConsumerWorker()))
+
+	found := false
+	for _, v := range vs {
+		if v.Rule == "interface.constructor-name" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected interface.constructor-name violation")
+	}
+}
+
+func TestCheckInterfacePattern_ConstructorNameValid(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/ip-ctor-name-valid"
+
+	writeTestFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+
+	// store package: exact New() → no constructor-name violation
+	writeTestFile(t, filepath.Join(root, "internal", "store", "store.go"),
+		`package store
+
+type Store interface {
+	Get(id string) string
+}
+
+type store struct{}
+
+func (s *store) Get(id string) string { return "" }
+
+func New() Store { return &store{} }
+`)
+
+	pkgs := loadTestPackages(t, root)
+	vs := rules.CheckInterfacePattern(pkgs, rules.WithModel(rules.ConsumerWorker()))
+
+	for _, v := range vs {
+		if v.Rule == "interface.constructor-name" {
+			t.Errorf("unexpected constructor-name violation: %s", v.String())
+		}
+	}
+}
+
+func TestCheckInterfacePattern_ConstructorReturnsConcrete(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/ip-ctor-concrete"
+
+	writeTestFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+
+	// store package: New() returns *store → constructor-returns-interface violation
+	writeTestFile(t, filepath.Join(root, "internal", "store", "store.go"),
+		`package store
+
+type Store interface {
+	Get(id string) string
+}
+
+type store struct{}
+
+func (s *store) Get(id string) string { return "" }
+
+func New() *store { return &store{} }
+`)
+
+	pkgs := loadTestPackages(t, root)
+	vs := rules.CheckInterfacePattern(pkgs, rules.WithModel(rules.ConsumerWorker()))
+
+	found := false
+	for _, v := range vs {
+		if v.Rule == "interface.constructor-returns-interface" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected interface.constructor-returns-interface violation")
+	}
+}
+
+func TestCheckInterfacePattern_ConstructorReturnsInterfaceValid(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/ip-ctor-iface-valid"
+
+	writeTestFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+
+	// store package: New() returns Store interface → no violation
+	writeTestFile(t, filepath.Join(root, "internal", "store", "store.go"),
+		`package store
+
+type Store interface {
+	Get(id string) string
+}
+
+type store struct{}
+
+func (s *store) Get(id string) string { return "" }
+
+func New() Store { return &store{} }
+`)
+
+	pkgs := loadTestPackages(t, root)
+	vs := rules.CheckInterfacePattern(pkgs, rules.WithModel(rules.ConsumerWorker()))
+
+	for _, v := range vs {
+		if v.Rule == "interface.constructor-returns-interface" {
+			t.Errorf("unexpected constructor-returns-interface violation: %s", v.String())
+		}
+	}
+}
