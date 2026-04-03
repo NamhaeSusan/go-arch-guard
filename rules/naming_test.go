@@ -58,9 +58,9 @@ func TestCheckNaming(t *testing.T) {
 
 	t.Run("detects non-snake-case filename and suggests fix", func(t *testing.T) {
 		root := t.TempDir()
-		writeFile(t, filepath.Join(root, "internal", "domain", "order", "app", "createOrder.go"),
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "app", "createOrder.go"),
 			"package app\n\ntype Request struct{}\n")
-		writeFile(t, filepath.Join(root, "go.mod"), "module example.com/snaketest\n\ngo 1.25.0\n")
+		writeTestFile(t, filepath.Join(root, "go.mod"), "module example.com/snaketest\n\ngo 1.25.0\n")
 
 		pkgs, err := analyzer.Load(root, "internal/...")
 		if err != nil {

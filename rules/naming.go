@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"path"
 	"path/filepath"
 	"strings"
 	"unicode"
@@ -214,7 +215,13 @@ func hasRepoSublayer(m Model) bool {
 }
 
 func isAnyRepoPackage(pkgPath string) bool {
-	return strings.HasSuffix(pkgPath, "/repo") || strings.Contains(pkgPath, "/repo/")
+	// Only match repo packages within the project's internal/ tree.
+	idx := strings.Index(pkgPath, "/internal/")
+	if idx < 0 {
+		return false
+	}
+	rel := pkgPath[idx+len("/internal/"):]
+	return strings.HasSuffix(rel, "/repo") || strings.Contains(rel, "/repo/")
 }
 
 func snakeToPascal(s string) string {
@@ -356,7 +363,7 @@ func checkDomainInterfaceRepoOnlyWith(m Model, pkg *packages.Package, cfg Config
 						File:     relativePathForPackage(pkg, pos.Filename),
 						Line:     pos.Line,
 						Rule:     "naming.domain-interface-repo-only",
-						Message:  `interface "` + ts.Name.Name + `" must be defined in ` + repoName + `/, not in ` + filepath.Base(filepath.Dir(pkg.PkgPath)) + `/`,
+						Message:  `interface "` + ts.Name.Name + `" must be defined in ` + repoName + `/, not in ` + path.Base(path.Dir(pkg.PkgPath)) + `/`,
 						Fix:      "move interface to " + repoName + "/",
 						Severity: cfg.Sev,
 					})

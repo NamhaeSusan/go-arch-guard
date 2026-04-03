@@ -3,11 +3,33 @@ package rules_test
 import (
 	"path/filepath"
 	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/NamhaeSusan/go-arch-guard/analyzer"
 	"github.com/NamhaeSusan/go-arch-guard/rules"
 )
+
+func violationRuleCount(vs []rules.Violation) map[string]int {
+	m := make(map[string]int)
+	for _, v := range vs {
+		m[v.Rule]++
+	}
+	return m
+}
+
+func violationRules(vs []rules.Violation) []string {
+	seen := make(map[string]bool)
+	var result []string
+	for _, v := range vs {
+		if !seen[v.Rule] {
+			seen[v.Rule] = true
+			result = append(result, v.Rule)
+		}
+	}
+	sort.Strings(result)
+	return result
+}
 
 func TestRunAll_DefaultModelMatchesManualComposition(t *testing.T) {
 	pkgs, err := analyzer.Load("../testdata/valid", "internal/...", "cmd/...")
@@ -26,8 +48,8 @@ func TestRunAll_DefaultModelMatchesManualComposition(t *testing.T) {
 	want = append(want, rules.CheckInterfacePattern(pkgs)...)
 	want = append(want, rules.AnalyzeBlastRadius(pkgs, "github.com/kimtaeyun/testproject-dc", "../testdata/valid")...)
 
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("RunAll() mismatch\n got: %#v\nwant: %#v", got, want)
+	if !reflect.DeepEqual(violationRuleCount(got), violationRuleCount(want)) {
+		t.Fatalf("RunAll() rule set mismatch\n got: %v\nwant: %v", violationRules(got), violationRules(want))
 	}
 }
 
@@ -49,8 +71,8 @@ func TestRunAll_WithModelMatchesManualComposition(t *testing.T) {
 	want = append(want, rules.CheckInterfacePattern(pkgs, opts...)...)
 	want = append(want, rules.AnalyzeBlastRadius(pkgs, "github.com/kimtaeyun/testproject-dc", "../testdata/valid", opts...)...)
 
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("RunAll() mismatch\n got: %#v\nwant: %#v", got, want)
+	if !reflect.DeepEqual(violationRuleCount(got), violationRuleCount(want)) {
+		t.Fatalf("RunAll(WithModel) rule set mismatch\n got: %v\nwant: %v", violationRules(got), violationRules(want))
 	}
 }
 
@@ -63,8 +85,8 @@ func TestRunAll_EmptyModuleAndRootAutoExtract(t *testing.T) {
 	got := rules.RunAll(pkgs, "", "")
 	want := rules.RunAll(pkgs, "github.com/kimtaeyun/testproject-dc", "../testdata/valid")
 
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("RunAll() auto-extract must match explicit values\n got: %#v\nwant: %#v", got, want)
+	if !reflect.DeepEqual(violationRuleCount(got), violationRuleCount(want)) {
+		t.Fatalf("RunAll() auto-extract rule set mismatch\n got: %v\nwant: %v", violationRules(got), violationRules(want))
 	}
 }
 

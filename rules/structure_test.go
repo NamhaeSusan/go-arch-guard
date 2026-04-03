@@ -70,9 +70,9 @@ func TestCheckStructure(t *testing.T) {
 
 	t.Run("detects middleware nested under non-root pkg path", func(t *testing.T) {
 		root := t.TempDir()
-		writeFile(t, filepath.Join(root, "internal", "domain", "billing", "alias.go"), "package billing\n")
-		writeFile(t, filepath.Join(root, "internal", "domain", "billing", "core", "model", "billing.go"), "package model\n")
-		writeFile(t, filepath.Join(root, "internal", "domain", "billing", "pkg", "middleware", "auth.go"), "package middleware\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "billing", "alias.go"), "package billing\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "billing", "core", "model", "billing.go"), "package model\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "billing", "pkg", "middleware", "auth.go"), "package middleware\n")
 
 		violations := rules.CheckStructure(root)
 		found := false
@@ -187,8 +187,8 @@ func TestCheckStructure(t *testing.T) {
 
 	t.Run("detects alias package name mismatch", func(t *testing.T) {
 		root := t.TempDir()
-		writeFile(t, filepath.Join(root, "internal", "domain", "billing", "alias.go"), "package billingapi\n")
-		writeFile(t, filepath.Join(root, "internal", "domain", "billing", "core", "model", "billing.go"), "package model\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "billing", "alias.go"), "package billingapi\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "billing", "core", "model", "billing.go"), "package model\n")
 
 		violations := rules.CheckStructure(root)
 		found := false
@@ -205,11 +205,11 @@ func TestCheckStructure(t *testing.T) {
 
 	t.Run("detects empty core model directory", func(t *testing.T) {
 		root := t.TempDir()
-		writeFile(t, filepath.Join(root, "internal", "domain", "billing", "alias.go"), "package billing\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "billing", "alias.go"), "package billing\n")
 		if err := os.MkdirAll(filepath.Join(root, "internal", "domain", "billing", "core", "model"), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		writeFile(t, filepath.Join(root, "internal", "domain", "billing", "core", "model", "README.md"), "# placeholder\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "billing", "core", "model", "README.md"), "# placeholder\n")
 
 		violations := rules.CheckStructure(root)
 		found := false
@@ -226,8 +226,8 @@ func TestCheckStructure(t *testing.T) {
 
 	t.Run("detects nested-only core model files", func(t *testing.T) {
 		root := t.TempDir()
-		writeFile(t, filepath.Join(root, "internal", "domain", "billing", "alias.go"), "package billing\n")
-		writeFile(t, filepath.Join(root, "internal", "domain", "billing", "core", "model", "types", "billing.go"), "package types\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "billing", "alias.go"), "package billing\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "billing", "core", "model", "types", "billing.go"), "package types\n")
 
 		violations := rules.CheckStructure(root)
 		found := false
@@ -244,8 +244,8 @@ func TestCheckStructure(t *testing.T) {
 
 	t.Run("root model file does not satisfy alias-only domain model requirement", func(t *testing.T) {
 		root := t.TempDir()
-		writeFile(t, filepath.Join(root, "internal", "domain", "billing", "alias.go"), "package billing\n")
-		writeFile(t, filepath.Join(root, "internal", "domain", "billing", "model.go"), "package billing\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "billing", "alias.go"), "package billing\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "billing", "model.go"), "package billing\n")
 
 		violations := rules.CheckStructure(root)
 		foundAliasOnly := false
@@ -268,9 +268,9 @@ func TestCheckStructure(t *testing.T) {
 
 	t.Run("allows dto in handler sublayer", func(t *testing.T) {
 		root := t.TempDir()
-		writeFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"), "package order\n")
-		writeFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"), "package model\n")
-		writeFile(t, filepath.Join(root, "internal", "domain", "order", "handler", "http", "dto.go"), "package http\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"), "package order\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"), "package model\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "handler", "http", "dto.go"), "package http\n")
 
 		violations := rules.CheckStructure(root)
 		for _, v := range violations {
@@ -282,9 +282,9 @@ func TestCheckStructure(t *testing.T) {
 
 	t.Run("allows dto in app sublayer", func(t *testing.T) {
 		root := t.TempDir()
-		writeFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"), "package order\n")
-		writeFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"), "package model\n")
-		writeFile(t, filepath.Join(root, "internal", "domain", "order", "app", "request_dto.go"), "package app\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"), "package order\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"), "package model\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "app", "request_dto.go"), "package app\n")
 
 		violations := rules.CheckStructure(root)
 		for _, v := range violations {
@@ -296,9 +296,9 @@ func TestCheckStructure(t *testing.T) {
 
 	t.Run("still rejects dto in core model", func(t *testing.T) {
 		root := t.TempDir()
-		writeFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"), "package order\n")
-		writeFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"), "package model\n")
-		writeFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order_dto.go"), "package model\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"), "package order\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"), "package model\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order_dto.go"), "package model\n")
 
 		violations := rules.CheckStructure(root)
 		found := false
@@ -315,7 +315,7 @@ func TestCheckStructure(t *testing.T) {
 
 	t.Run("detects services as banned package", func(t *testing.T) {
 		root := t.TempDir()
-		writeFile(t, filepath.Join(root, "internal", "services", "order.go"), "package services\n")
+		writeTestFile(t, filepath.Join(root, "internal", "services", "order.go"), "package services\n")
 
 		violations := rules.CheckStructure(root)
 		found := false
@@ -332,7 +332,7 @@ func TestCheckStructure(t *testing.T) {
 
 	t.Run("rejects unexpected internal top-level package", func(t *testing.T) {
 		root := t.TempDir()
-		writeFile(t, filepath.Join(root, "internal", "config", "config.go"), "package config\n")
+		writeTestFile(t, filepath.Join(root, "internal", "config", "config.go"), "package config\n")
 
 		violations := rules.CheckStructure(root)
 		found := false
@@ -349,7 +349,7 @@ func TestCheckStructure(t *testing.T) {
 
 	t.Run("rejects another unexpected internal top-level package", func(t *testing.T) {
 		root := t.TempDir()
-		writeFile(t, filepath.Join(root, "internal", "platform", "platform.go"), "package platform\n")
+		writeTestFile(t, filepath.Join(root, "internal", "platform", "platform.go"), "package platform\n")
 
 		violations := rules.CheckStructure(root)
 		found := false
@@ -366,7 +366,7 @@ func TestCheckStructure(t *testing.T) {
 
 	t.Run("rejects Go file at internal top level", func(t *testing.T) {
 		root := t.TempDir()
-		writeFile(t, filepath.Join(root, "internal", "helpers.go"), "package internal\n")
+		writeTestFile(t, filepath.Join(root, "internal", "helpers.go"), "package internal\n")
 
 		violations := rules.CheckStructure(root)
 		found := false
@@ -383,7 +383,7 @@ func TestCheckStructure(t *testing.T) {
 
 	t.Run("ignores test files at internal top level", func(t *testing.T) {
 		root := t.TempDir()
-		writeFile(t, filepath.Join(root, "internal", "helpers_test.go"), "package internal_test\n")
+		writeTestFile(t, filepath.Join(root, "internal", "helpers_test.go"), "package internal_test\n")
 
 		violations := rules.CheckStructure(root)
 		for _, v := range violations {
@@ -395,7 +395,7 @@ func TestCheckStructure(t *testing.T) {
 
 	t.Run("ignores non-Go files at internal top level", func(t *testing.T) {
 		root := t.TempDir()
-		writeFile(t, filepath.Join(root, "internal", "README.md"), "# internal\n")
+		writeTestFile(t, filepath.Join(root, "internal", "README.md"), "# internal\n")
 
 		violations := rules.CheckStructure(root)
 		for _, v := range violations {
@@ -407,8 +407,8 @@ func TestCheckStructure(t *testing.T) {
 
 	t.Run("ignores empty directory with banned name", func(t *testing.T) {
 		root := t.TempDir()
-		writeFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"), "package order\n")
-		writeFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"), "package model\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"), "package order\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"), "package model\n")
 		if err := os.MkdirAll(filepath.Join(root, "internal", "domain", "order", "shared"), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -423,8 +423,8 @@ func TestCheckStructure(t *testing.T) {
 
 	t.Run("ignores empty middleware directory", func(t *testing.T) {
 		root := t.TempDir()
-		writeFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"), "package order\n")
-		writeFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"), "package model\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"), "package order\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"), "package model\n")
 		if err := os.MkdirAll(filepath.Join(root, "internal", "domain", "order", "middleware"), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -453,40 +453,40 @@ func TestCheckStructure(t *testing.T) {
 
 	t.Run("detects type alias from core/svc in alias.go", func(t *testing.T) {
 		root := t.TempDir()
-		writeFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"),
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"),
 			`package order
 
 import "example.com/myapp/internal/domain/order/core/svc"
 
 type AdminOps = svc.AdminOps
 `)
-		writeFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"), "package model\n")
-		writeFile(t, filepath.Join(root, "internal", "domain", "order", "core", "svc", "admin.go"),
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"), "package model\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "core", "svc", "admin.go"),
 			"package svc\n\ntype AdminOps interface{ Do() }\n")
 
 		violations := rules.CheckStructure(root)
 		found := false
 		for _, v := range violations {
-			if v.Rule == "structure.domain-alias-no-interface" && strings.Contains(v.Message, "AdminOps") {
+			if v.Rule == "structure.domain-alias-contract-reexport" && strings.Contains(v.Message, "AdminOps") {
 				found = true
 				break
 			}
 		}
 		if !found {
-			t.Error("expected domain-alias-no-interface violation for type alias from core/svc")
+			t.Error("expected domain-alias-contract-reexport violation for type alias from core/svc")
 		}
 	})
 
 	t.Run("allows type alias from core/model in alias.go", func(t *testing.T) {
 		root := t.TempDir()
-		writeFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"),
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"),
 			`package order
 
 import "example.com/myapp/internal/domain/order/core/model"
 
 type Order = model.Order
 `)
-		writeFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"),
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"),
 			"package model\n\ntype Order struct{ ID string }\n")
 
 		violations := rules.CheckStructure(root)
@@ -508,11 +508,11 @@ type Order = model.Order
 
 	t.Run("flat layout valid structure has no violations", func(t *testing.T) {
 		root := t.TempDir()
-		writeFile(t, filepath.Join(root, "internal", "worker", "consume.go"), "package worker\n")
-		writeFile(t, filepath.Join(root, "internal", "service", "order.go"), "package service\n")
-		writeFile(t, filepath.Join(root, "internal", "store", "pg.go"), "package store\n")
-		writeFile(t, filepath.Join(root, "internal", "model", "order.go"), "package model\n")
-		writeFile(t, filepath.Join(root, "internal", "pkg", "logger.go"), "package pkg\n")
+		writeTestFile(t, filepath.Join(root, "internal", "worker", "consume.go"), "package worker\n")
+		writeTestFile(t, filepath.Join(root, "internal", "service", "order.go"), "package service\n")
+		writeTestFile(t, filepath.Join(root, "internal", "store", "pg.go"), "package store\n")
+		writeTestFile(t, filepath.Join(root, "internal", "model", "order.go"), "package model\n")
+		writeTestFile(t, filepath.Join(root, "internal", "pkg", "logger.go"), "package pkg\n")
 
 		violations := rules.CheckStructure(root, rules.WithModel(rules.ConsumerWorker()))
 		if len(violations) > 0 {
@@ -525,8 +525,8 @@ type Order = model.Order
 
 	t.Run("flat layout rejects unexpected top-level package", func(t *testing.T) {
 		root := t.TempDir()
-		writeFile(t, filepath.Join(root, "internal", "worker", "consume.go"), "package worker\n")
-		writeFile(t, filepath.Join(root, "internal", "randomstuff", "junk.go"), "package randomstuff\n")
+		writeTestFile(t, filepath.Join(root, "internal", "worker", "consume.go"), "package worker\n")
+		writeTestFile(t, filepath.Join(root, "internal", "randomstuff", "junk.go"), "package randomstuff\n")
 
 		violations := rules.CheckStructure(root, rules.WithModel(rules.ConsumerWorker()))
 		found := false
@@ -540,14 +540,4 @@ type Order = model.Order
 			t.Error("expected internal-top-level violation for randomstuff/ in flat layout")
 		}
 	})
-}
-
-func writeFile(t *testing.T, path string, content string) {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
 }

@@ -37,6 +37,10 @@ func main() {
 			break
 		}
 	}
+	if module == "" {
+		fmt.Fprintln(os.Stderr, "error: cannot determine module path; ensure go.mod is present")
+		os.Exit(1)
+	}
 
 	if err := tui.Run(pkgs, module, absDir); err != nil {
 		fmt.Fprintf(os.Stderr, "tui error: %v\n", err)

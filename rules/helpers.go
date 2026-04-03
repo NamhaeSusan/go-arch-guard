@@ -127,3 +127,18 @@ func projectRelativePackagePath(pkgPath, projectModule string) string {
 	}
 	return ""
 }
+
+func deduplicateMetaViolations(violations []Violation) []Violation {
+	seen := make(map[string]bool)
+	result := violations[:0]
+	for _, v := range violations {
+		if strings.HasPrefix(v.Rule, "meta.") {
+			if seen[v.Rule] {
+				continue
+			}
+			seen[v.Rule] = true
+		}
+		result = append(result, v)
+	}
+	return result
+}

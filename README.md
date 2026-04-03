@@ -390,7 +390,11 @@ Domain root directories may only contain `alias.go` --- all other code goes in s
 
 ### `structure.domain-alias-no-interface`
 
-Alias files must not re-export interfaces --- this leaks cross-domain contracts.
+Alias files must not directly define interfaces --- this leaks cross-domain contracts.
+
+### `structure.domain-alias-contract-reexport`
+
+Alias files must not re-export types from contract sublayers (repo/svc) --- this creates hidden cross-domain dependencies.
 
 ### `structure.domain-model-required` (DDD only)
 

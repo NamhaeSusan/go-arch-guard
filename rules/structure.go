@@ -248,7 +248,7 @@ func checkDomainAliasNoInterface(domainDir string, m Model, cfg Config) []Violat
 								violations = append(violations, Violation{
 									File:     relPath + "/" + m.AliasFileName,
 									Line:     fset.Position(ts.Name.Pos()).Line,
-									Rule:     "structure.domain-alias-no-interface",
+									Rule:     "structure.domain-alias-contract-reexport",
 									Message:  m.AliasFileName + ` re-exports "` + ts.Name.Name + `" from ` + src + ` — suspected cross-domain dependency; use ` + m.OrchestrationDir + `/ instead`,
 									Fix:      "move cross-domain coordination to " + m.OrchestrationDir + "/handler/ or " + m.OrchestrationDir + "/",
 									Severity: cfg.Sev,
@@ -422,12 +422,15 @@ func checkDTOPlacement(internalDir string, m Model, cfg Config) []Violation {
 }
 
 func isDTOAllowedSublayerWith(m Model, relPath string) bool {
+	// relPath = "internal/<domainDir>/<domainName>/<sublayer>/..."
+	domainDirDepth := len(strings.Split(m.DomainDir, "/"))
 	parts := strings.Split(relPath, "/")
-	if len(parts) < 4 {
+	// sublayer sits at: "internal"(1) + domainDir segments + domainName(1)
+	sublayerIdx := 1 + domainDirDepth + 1
+	if len(parts) <= sublayerIdx {
 		return false
 	}
-	sublayer := parts[3]
-	return slices.Contains(m.DTOAllowedLayers, sublayer)
+	return slices.Contains(m.DTOAllowedLayers, parts[sublayerIdx])
 }
 
 func isMisplacedLayerDirWith(m Model, rel, name string) bool {

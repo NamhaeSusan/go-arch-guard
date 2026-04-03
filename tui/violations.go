@@ -21,12 +21,7 @@ type ViolationIndex map[string][]rules.Violation
 
 // BuildViolationIndex runs all rules and indexes violations by package path.
 func BuildViolationIndex(pkgs []*packages.Package, module, root string) ViolationIndex {
-	var all []rules.Violation
-	all = append(all, rules.CheckDomainIsolation(pkgs, module, root)...)
-	all = append(all, rules.CheckLayerDirection(pkgs, module, root)...)
-	all = append(all, rules.CheckNaming(pkgs)...)
-	all = append(all, rules.CheckStructure(root)...)
-	all = append(all, rules.AnalyzeBlastRadius(pkgs, module, root)...)
+	all := rules.RunAll(pkgs, module, root)
 
 	idx := make(ViolationIndex)
 	for _, v := range all {

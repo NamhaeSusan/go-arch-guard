@@ -55,27 +55,19 @@ func TestIntegration_Invalid(t *testing.T) {
 
 	t.Run("domain isolation violations found", func(t *testing.T) {
 		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "testdata/invalid")
-		if len(violations) == 0 {
-			t.Error("expected domain isolation violations")
-		}
+		assertHasRule(t, violations, "isolation.cross-domain")
 	})
 	t.Run("layer direction violations found", func(t *testing.T) {
 		violations := rules.CheckLayerDirection(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "testdata/invalid")
-		if len(violations) == 0 {
-			t.Error("expected layer direction violations")
-		}
+		assertHasRule(t, violations, "layer.direction")
 	})
 	t.Run("naming violations found", func(t *testing.T) {
 		violations := rules.CheckNaming(pkgs)
-		if len(violations) == 0 {
-			t.Error("expected naming violations")
-		}
+		assertHasRule(t, violations, "naming.no-layer-suffix")
 	})
 	t.Run("structure violations found", func(t *testing.T) {
 		violations := rules.CheckStructure("testdata/invalid")
-		if len(violations) == 0 {
-			t.Error("expected structure violations")
-		}
+		assertHasRule(t, violations, "structure.banned-package")
 	})
 
 	t.Run("new rule ids are surfaced", func(t *testing.T) {

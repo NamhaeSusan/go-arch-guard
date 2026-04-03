@@ -53,8 +53,8 @@ func isExcludedInterfacePatternPkg(m Model, pkg *packages.Package) bool {
 
 	after := parts[internalIdx+1:]
 
-	// Always exclude pkg/ (SharedDir)
-	if after[0] == "pkg" {
+	// Always exclude SharedDir (e.g. "pkg")
+	if m.SharedDir != "" && after[0] == m.SharedDir {
 		return true
 	}
 
@@ -110,7 +110,7 @@ func interfaceMethodNames(iface *ast.InterfaceType) map[string]bool {
 }
 
 // checkSingleInterfacePerPackage warns when a package declares more than one
-// exported interface. Always uses Warning severity.
+// exported interface.
 func checkSingleInterfacePerPackage(pkg *packages.Package, ifaces map[string]*ast.InterfaceType, cfg Config) []Violation {
 	if len(ifaces) <= 1 {
 		return nil
@@ -125,7 +125,7 @@ func checkSingleInterfacePerPackage(pkg *packages.Package, ifaces map[string]*as
 		Rule:     "interface.single-per-package",
 		Message:  fmt.Sprintf("package has %d exported interfaces (%s), expected at most 1", len(ifaces), strings.Join(names, ", ")),
 		Fix:      "split into separate packages, one interface each",
-		Severity: Warning,
+		Severity: cfg.Sev,
 	}}
 }
 

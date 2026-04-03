@@ -159,7 +159,9 @@ func (d *DetailPanel) renderGroup(node *PkgNode) {
 			}
 			fmt.Fprintf(&b, "[red]  ✗ [%s] %s\n", vp.Rule, vp.File)
 			fmt.Fprintf(&b, "[gray]    %s\n", vp.Message)
-			fmt.Fprintf(&b, "[darkgray]    fix: %s\n", vp.Fix)
+			if vp.Fix != "" {
+				fmt.Fprintf(&b, "[darkgray]    fix: %s\n", vp.Fix)
+			}
 		}
 		b.WriteString("\n")
 	}
@@ -173,7 +175,9 @@ func (d *DetailPanel) renderGroup(node *PkgNode) {
 			}
 			fmt.Fprintf(&b, "[yellow]  ⚠ [%s] %s\n", vp.Rule, vp.File)
 			fmt.Fprintf(&b, "[gray]    %s\n", vp.Message)
-			fmt.Fprintf(&b, "[darkgray]    fix: %s\n", vp.Fix)
+			if vp.Fix != "" {
+				fmt.Fprintf(&b, "[darkgray]    fix: %s\n", vp.Fix)
+			}
 		}
 		b.WriteString("\n")
 	}
@@ -186,6 +190,12 @@ func (d *DetailPanel) writeViolations(b *strings.Builder, relPath string) {
 	if !ok || len(viols) == 0 {
 		return
 	}
+	sort.Slice(viols, func(i, j int) bool {
+		if viols[i].Severity != viols[j].Severity {
+			return viols[i].Severity < viols[j].Severity
+		}
+		return viols[i].File < viols[j].File
+	})
 	fmt.Fprintf(b, "[red::b]Violations (%d):\n", len(viols))
 	for _, v := range viols {
 		color := "red"
@@ -196,7 +206,9 @@ func (d *DetailPanel) writeViolations(b *strings.Builder, relPath string) {
 		}
 		fmt.Fprintf(b, "[%s]  [%s] %s\n", color, sev, v.Rule)
 		fmt.Fprintf(b, "[gray]    %s\n", v.Message)
-		fmt.Fprintf(b, "[darkgray]    fix: %s\n", v.Fix)
+		if v.Fix != "" {
+			fmt.Fprintf(b, "[darkgray]    fix: %s\n", v.Fix)
+		}
 	}
 	b.WriteString("\n")
 }

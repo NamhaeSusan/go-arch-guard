@@ -66,3 +66,29 @@ func TestOptions(t *testing.T) {
 		}
 	})
 }
+
+func TestIsExcluded(t *testing.T) {
+	tests := []struct {
+		name    string
+		pattern string
+		path    string
+		want    bool
+	}{
+		{"exact match", "internal/legacy", "internal/legacy", true},
+		{"wildcard matches dir", "internal/legacy/...", "internal/legacy", true},
+		{"wildcard matches subdir", "internal/legacy/...", "internal/legacy/old", true},
+		{"wildcard matches deep subdir", "internal/legacy/...", "internal/legacy/old/deep", true},
+		{"wildcard must respect boundary", "internal/domain/foo/...", "internal/domain/foobar", false},
+		{"wildcard must respect boundary subpath", "internal/domain/foo/...", "internal/domain/foobar/baz", false},
+		{"no match on different path", "internal/legacy/...", "internal/domain/user", false},
+		{"exact no partial", "internal/legacy", "internal/legacyv2", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := rules.NewConfig(rules.WithExclude(tt.pattern))
+			if got := cfg.IsExcluded(tt.path); got != tt.want {
+				t.Errorf("IsExcluded(%q, %q) = %v, want %v", tt.pattern, tt.path, got, tt.want)
+			}
+		})
+	}
+}
