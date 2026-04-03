@@ -181,3 +181,66 @@ func TestCheckNaming_FlatLayout_WorkerFileAllowed(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckNaming_RepoFileExtraInterface(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/repomulti"
+
+	writeTestFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+	writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"),
+		"package order\n")
+	writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"),
+		"package model\n\ntype Order struct{}\n")
+	// review.go defines Review (correct) plus an extra Helper interface
+	writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "core", "repo", "review.go"),
+		"package repo\n\ntype Review interface { Find() }\ntype Helper interface { Assist() }\n")
+
+	pkgs := loadTestPackages(t, root)
+	violations := rules.CheckNaming(pkgs)
+	found := false
+	for _, v := range violations {
+		if v.Rule == "naming.repo-file-extra-interface" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected naming.repo-file-extra-interface violation for extra interface in repo/review.go")
+	}
+}
+
+func TestCheckNaming_RepoInterfaceTooLarge(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/repobig"
+
+	writeTestFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+	writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"),
+		"package order\n")
+	writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"),
+		"package model\n\ntype Order struct{}\n")
+	// review.go has an interface with 11 methods
+	writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "core", "repo", "review.go"),
+		"package repo\n\ntype Review interface {\n"+
+			"\tA()\n\tB()\n\tC()\n\tD()\n\tE()\n"+
+			"\tF()\n\tG()\n\tH()\n\tI()\n\tJ()\n\tK()\n}\n")
+
+	pkgs := loadTestPackages(t, root)
+	violations := rules.CheckNaming(pkgs, rules.WithMaxRepoInterfaceMethods(10))
+
+	found := false
+	for _, v := range violations {
+		if v.Rule == "naming.repo-interface-too-large" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected naming.repo-interface-too-large violation for 11-method interface")
+	}
+
+	// Without option, no violation
+	violations2 := rules.CheckNaming(pkgs)
+	for _, v := range violations2 {
+		if v.Rule == "naming.repo-interface-too-large" {
+			t.Error("should not flag repo-interface-too-large without WithMaxRepoInterfaceMethods option")
+		}
+	}
+}

@@ -434,6 +434,31 @@ order_service.go  올바름
 type Order interface { ... }  // 파일명과 일치
 ```
 
+### `naming.repo-file-extra-interface`
+
+`repo/` 파일에는 인터페이스가 정확히 1개만 있어야 합니다. 추가 인터페이스는 별도 파일로 분리하세요.
+
+```go
+// repo/review.go
+type Review interface { Find() }   // 올바름
+type Helper interface { Assist() } // 위반: helper.go로 이동
+```
+
+### `naming.repo-interface-too-large`
+
+repo 인터페이스의 메서드 수가 `WithMaxRepoInterfaceMethods`로 설정한 상한을 초과하면 위반입니다. 기본 비활성.
+
+```go
+rules.CheckNaming(pkgs, rules.WithMaxRepoInterfaceMethods(10))
+```
+
+```go
+// repo/review.go
+type Review interface {
+    // 메서드 11개 --- 위반 (max 10)
+}
+```
+
 ### `naming.no-layer-suffix`
 
 파일명은 레이어 이름을 불필요하게 반복하면 안 됩니다.
@@ -587,6 +612,7 @@ go run github.com/NamhaeSusan/go-arch-guard/cmd/tui .
 | `rules.WithModel(m)` | 커스텀 모델 적용 |
 | `rules.WithSeverity(rules.Warning)` | 경고로 다운그레이드 |
 | `rules.WithExclude("path/...")` | 하위 트리 건너뛰기 |
+| `rules.WithMaxRepoInterfaceMethods(10)` | repo 인터페이스 메서드 수 제한 |
 
 ## 기계 친화적인 JSON 출력
 

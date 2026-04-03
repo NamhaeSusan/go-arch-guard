@@ -1,11 +1,13 @@
 package rules
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"unicode"
 
@@ -191,18 +193,75 @@ func checkRepoFileInterfaceWith(m Model, pkg *packages.Package, cfg Config) []Vi
 			continue
 		}
 		expected := snakeToPascal(strings.TrimSuffix(base, ".go"))
-		if hasInterface(astFile, expected) {
-			continue
+
+		ifaces := collectFileInterfaces(astFile)
+
+		// Check: expected interface must exist
+		if _, ok := ifaces[expected]; !ok {
+			violations = append(violations, Violation{
+				File:     relPath,
+				Rule:     "naming.repo-file-interface",
+				Message:  `file "` + base + `" in repo/ must contain interface "` + expected + `"`,
+				Fix:      `add "type ` + expected + ` interface { ... }" or rename the file`,
+				Severity: cfg.Sev,
+			})
 		}
-		violations = append(violations, Violation{
-			File:     relPath,
-			Rule:     "naming.repo-file-interface",
-			Message:  `file "` + base + `" in repo/ must contain interface "` + expected + `"`,
-			Fix:      `add "type ` + expected + ` interface { ... }" or rename the file`,
-			Severity: cfg.Sev,
-		})
+
+		// Check: only one interface per file
+		if len(ifaces) > 1 {
+			var extra []string
+			for name := range ifaces {
+				if name != expected {
+					extra = append(extra, name)
+				}
+			}
+			sort.Strings(extra)
+			violations = append(violations, Violation{
+				File:     relPath,
+				Rule:     "naming.repo-file-extra-interface",
+				Message:  `file "` + base + `" in repo/ must define only "` + expected + `", found extra: ` + strings.Join(extra, ", "),
+				Fix:      "move each extra interface to its own file (e.g. " + strings.ToLower(extra[0]) + ".go)",
+				Severity: cfg.Sev,
+			})
+		}
+
+		// Check: interface method count
+		if cfg.MaxRepoInterfaceMethods > 0 {
+			for name, iface := range ifaces {
+				methodCount := len(iface.Methods.List)
+				if methodCount > cfg.MaxRepoInterfaceMethods {
+					violations = append(violations, Violation{
+						File:     relPath,
+						Rule:     "naming.repo-interface-too-large",
+						Message:  fmt.Sprintf(`interface "%s" has %d methods (max %d)`, name, methodCount, cfg.MaxRepoInterfaceMethods),
+						Fix:      "split into smaller, focused interfaces",
+						Severity: cfg.Sev,
+					})
+				}
+			}
+		}
 	}
 	return violations
+}
+
+func collectFileInterfaces(file *ast.File) map[string]*ast.InterfaceType {
+	result := make(map[string]*ast.InterfaceType)
+	for _, decl := range file.Decls {
+		gd, ok := decl.(*ast.GenDecl)
+		if !ok {
+			continue
+		}
+		for _, spec := range gd.Specs {
+			ts, ok := spec.(*ast.TypeSpec)
+			if !ok {
+				continue
+			}
+			if iface, ok := ts.Type.(*ast.InterfaceType); ok {
+				result[ts.Name.Name] = iface
+			}
+		}
+	}
+	return result
 }
 
 func hasRepoSublayer(m Model) bool {
@@ -235,27 +294,6 @@ func snakeToPascal(s string) string {
 		b.WriteString(p[1:])
 	}
 	return b.String()
-}
-
-func hasInterface(file *ast.File, name string) bool {
-	for _, decl := range file.Decls {
-		gd, ok := decl.(*ast.GenDecl)
-		if !ok {
-			continue
-		}
-		for _, spec := range gd.Specs {
-			ts, ok := spec.(*ast.TypeSpec)
-			if !ok {
-				continue
-			}
-			if ts.Name.Name == name {
-				if _, isIface := ts.Type.(*ast.InterfaceType); isIface {
-					return true
-				}
-			}
-		}
-	}
-	return false
 }
 
 var bannedLayerSuffixes = []string{

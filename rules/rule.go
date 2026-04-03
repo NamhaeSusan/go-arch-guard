@@ -42,9 +42,10 @@ func (v Violation) String() string {
 type Option func(*Config)
 
 type Config struct {
-	Sev             Severity
-	ExcludePatterns []string
-	archModel       *Model
+	Sev                     Severity
+	ExcludePatterns         []string
+	archModel               *Model
+	MaxRepoInterfaceMethods int
 }
 
 func (c Config) model() Model {
@@ -68,6 +69,10 @@ func WithSeverity(s Severity) Option {
 
 func WithModel(m Model) Option {
 	return func(c *Config) { c.archModel = &m }
+}
+
+func WithMaxRepoInterfaceMethods(n int) Option {
+	return func(c *Config) { c.MaxRepoInterfaceMethods = n }
 }
 
 func WithExclude(patterns ...string) Option {
