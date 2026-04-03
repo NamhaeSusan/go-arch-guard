@@ -23,6 +23,7 @@ func TestRunAll_DefaultModelMatchesManualComposition(t *testing.T) {
 	want = append(want, rules.CheckNaming(pkgs)...)
 	want = append(want, rules.CheckStructure("../testdata/valid")...)
 	want = append(want, rules.CheckTypePatterns(pkgs)...)
+	want = append(want, rules.CheckInterfacePattern(pkgs)...)
 	want = append(want, rules.AnalyzeBlastRadius(pkgs, "github.com/kimtaeyun/testproject-dc", "../testdata/valid")...)
 
 	if !reflect.DeepEqual(got, want) {
@@ -45,6 +46,7 @@ func TestRunAll_WithModelMatchesManualComposition(t *testing.T) {
 	want = append(want, rules.CheckNaming(pkgs, opts...)...)
 	want = append(want, rules.CheckStructure("../testdata/valid", opts...)...)
 	want = append(want, rules.CheckTypePatterns(pkgs, opts...)...)
+	want = append(want, rules.CheckInterfacePattern(pkgs, opts...)...)
 	want = append(want, rules.AnalyzeBlastRadius(pkgs, "github.com/kimtaeyun/testproject-dc", "../testdata/valid", opts...)...)
 
 	if !reflect.DeepEqual(got, want) {
@@ -87,5 +89,34 @@ func TestRunAll_ConsumerWorker_IncludesTypePatterns(t *testing.T) {
 	}
 	if !found {
 		t.Error("RunAll should include naming.type-pattern-mismatch from CheckTypePatterns")
+	}
+}
+
+func TestRunAll_IncludesInterfacePattern(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/runall-ip"
+
+	writeTestFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+	writeTestFile(t, filepath.Join(root, "internal", "store", "store.go"),
+		`package store
+
+type Store interface {
+	Find() error
+}
+
+type StoreImpl struct{}
+func (s *StoreImpl) Find() error { return nil }
+`)
+
+	pkgs := loadTestPackages(t, root)
+	violations := rules.RunAll(pkgs, module, root, rules.WithModel(rules.ConsumerWorker()))
+	found := false
+	for _, v := range violations {
+		if v.Rule == "interface.exported-impl" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("RunAll should include interface.exported-impl from CheckInterfacePattern")
 	}
 }
