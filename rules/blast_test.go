@@ -24,12 +24,12 @@ func TestAnalyzeBlastRadius_DetectsOutlier(t *testing.T) {
 	violations := rules.AnalyzeBlastRadius(pkgs, "github.com/kimtaeyun/testproject-blast", "../testdata/blast")
 
 	if len(violations) == 0 {
-		t.Fatal("expected at least one blast-radius violation for the hub package")
+		t.Fatal("expected at least one blast.high-coupling violation for the hub package")
 	}
 
 	foundPkg := false
 	for _, v := range violations {
-		if v.Rule != "blast-radius.high-coupling" {
+		if v.Rule != "blast.high-coupling" {
 			t.Errorf("unexpected rule: %s", v.Rule)
 		}
 		if v.Severity != rules.Warning {

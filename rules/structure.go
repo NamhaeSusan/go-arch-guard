@@ -112,7 +112,7 @@ func checkDomainRootAliasRequired(domainDir string, m Model, cfg Config) []Viola
 		}
 		violations = append(violations, Violation{
 			File:     relPath + "/",
-			Rule:     "structure.domain-root-alias-required",
+			Rule:     "structure.domain-alias-exists",
 			Message:  `domain root "` + e.Name() + `" must define ` + m.AliasFileName,
 			Fix:      "add " + m.AliasFileName + " as the single public surface file for the domain root package",
 			Severity: cfg.Sev,
@@ -148,7 +148,7 @@ func checkDomainRootAliasPackage(domainDir string, m Model, cfg Config) []Violat
 		}
 		violations = append(violations, Violation{
 			File:     relPath + "/" + m.AliasFileName,
-			Rule:     "structure.domain-root-alias-package",
+			Rule:     "structure.domain-alias-package",
 			Message:  m.AliasFileName + ` package name must match domain root "` + e.Name() + `"`,
 			Fix:      `set "package ` + e.Name() + `" in ` + m.AliasFileName,
 			Severity: cfg.Sev,
@@ -186,7 +186,7 @@ func checkDomainRootAliasOnly(domainDir string, m Model, cfg Config) []Violation
 			}
 			violations = append(violations, Violation{
 				File:     relPath,
-				Rule:     "structure.domain-root-alias-only",
+				Rule:     "structure.domain-alias-exclusive",
 				Message:  `domain root "` + e.Name() + `" must expose its public API from ` + m.AliasFileName + ` only`,
 				Fix:      `move "` + name + `" into a sub-package or merge the public API into ` + m.AliasFileName,
 				Severity: cfg.Sev,

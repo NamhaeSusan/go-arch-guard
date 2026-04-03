@@ -302,7 +302,7 @@ fmt.Println(string(data))
 
 | 우회 시도 | 잡는 규칙 |
 |----------|----------|
-| handler/app/svc에서 interface 정의 | `naming.domain-interface-repo-only` |
+| handler/app/svc에서 interface 정의 | `structure.interface-placement` |
 | alias.go에서 interface 직접 정의 | `structure.domain-alias-no-interface` |
 | alias.go에서 repo/svc 타입 re-export | `structure.domain-alias-contract-reexport` |
 

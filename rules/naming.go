@@ -200,7 +200,7 @@ func checkRepoFileInterfaceWith(m Model, pkg *packages.Package, cfg Config) []Vi
 		if _, ok := ifaces[expected]; !ok {
 			violations = append(violations, Violation{
 				File:     relPath,
-				Rule:     "naming.repo-file-interface",
+				Rule:     "structure.repo-file-interface",
 				Message:  `file "` + base + `" in repo/ must contain interface "` + expected + `"`,
 				Fix:      `add "type ` + expected + ` interface { ... }" or rename the file`,
 				Severity: cfg.Sev,
@@ -218,7 +218,7 @@ func checkRepoFileInterfaceWith(m Model, pkg *packages.Package, cfg Config) []Vi
 			sort.Strings(extra)
 			violations = append(violations, Violation{
 				File:     relPath,
-				Rule:     "naming.repo-file-extra-interface",
+				Rule:     "structure.repo-file-extra-interface",
 				Message:  `file "` + base + `" in repo/ must define only "` + expected + `", found extra: ` + strings.Join(extra, ", "),
 				Fix:      "move each extra interface to its own file (e.g. " + strings.ToLower(extra[0]) + ".go)",
 				Severity: cfg.Sev,
@@ -232,7 +232,7 @@ func checkRepoFileInterfaceWith(m Model, pkg *packages.Package, cfg Config) []Vi
 				if methodCount > cfg.MaxRepoInterfaceMethods {
 					violations = append(violations, Violation{
 						File:     relPath,
-						Rule:     "naming.repo-interface-too-large",
+						Rule:     "interface.too-many-methods",
 						Message:  fmt.Sprintf(`interface "%s" has %d methods (max %d)`, name, methodCount, cfg.MaxRepoInterfaceMethods),
 						Fix:      "split into smaller, focused interfaces",
 						Severity: cfg.Sev,
@@ -336,7 +336,7 @@ func checkDomainInterfaceRepoOnlyWith(m Model, pkg *packages.Package, cfg Config
 				violations = append(violations, Violation{
 					File:     relFile,
 					Line:     info.Pos.Line,
-					Rule:     "naming.domain-interface-repo-only",
+					Rule:     "structure.interface-placement",
 					Message:  `interface "` + info.Name + `" must be defined in ` + repoName + `/, not in ` + path.Base(path.Dir(pkg.PkgPath)) + `/`,
 					Fix:      "move interface to " + repoName + "/",
 					Severity: cfg.Sev,
@@ -346,7 +346,7 @@ func checkDomainInterfaceRepoOnlyWith(m Model, pkg *packages.Package, cfg Config
 				violations = append(violations, Violation{
 					File:     relFile,
 					Line:     info.Pos.Line,
-					Rule:     "naming.domain-interface-repo-only",
+					Rule:     "structure.interface-placement",
 					Message:  `type alias "` + info.Name + `" re-exports interface from ` + repoName + ` — suspected cross-domain dependency; use ` + m.OrchestrationDir + `/ instead`,
 					Fix:      "remove alias and move cross-domain coordination to " + m.OrchestrationDir + "/",
 					Severity: cfg.Sev,
@@ -404,7 +404,7 @@ func checkNoHandMock(pkg *packages.Package, cfg Config) []Violation {
 				violations = append(violations, Violation{
 					File:     relPath,
 					Line:     line,
-					Rule:     "naming.no-handmock",
+					Rule:     "testing.no-handmock",
 					Message:  `test file "` + baseName + `" defines hand-rolled mock "` + recvName + `" with methods — use mockery instead`,
 					Fix:      "generate mock with mockery and import from mocks/ package",
 					Severity: cfg.Sev,

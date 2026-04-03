@@ -40,7 +40,7 @@ func TestCheckDomainIsolation(t *testing.T) {
 		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
 		found := false
 		for _, v := range violations {
-			if v.Rule == "isolation.internal-imports-domain" {
+			if v.Rule == "isolation.stray-imports-domain" {
 				found = true
 				break
 			}
@@ -100,7 +100,7 @@ func TestCheckDomainIsolation(t *testing.T) {
 		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
 		found := false
 		for _, v := range violations {
-			if v.Rule == "isolation.internal-imports-orchestration" {
+			if v.Rule == "isolation.stray-imports-orchestration" {
 				found = true
 				break
 			}
@@ -130,7 +130,7 @@ func TestCheckDomainIsolation(t *testing.T) {
 		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "../testdata/invalid")
 		found := false
 		for _, v := range violations {
-			if v.Rule == "isolation.internal-imports-domain" {
+			if v.Rule == "isolation.stray-imports-domain" {
 				found = true
 				break
 			}

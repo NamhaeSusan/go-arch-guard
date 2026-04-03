@@ -12,7 +12,7 @@ import (
 func TestBuildJSONReport(t *testing.T) {
 	violations := []rules.Violation{
 		{File: "internal/domain/order/app/service.go", Line: 12, Rule: "isolation.cross-domain", Message: "bad import", Fix: "move orchestration", Severity: rules.Error},
-		{File: "internal/domain/order/app/service.go", Rule: "blast-radius.high-coupling", Message: "too central", Fix: "extract boundary", Severity: rules.Warning},
+		{File: "internal/domain/order/app/service.go", Rule: "blast.high-coupling", Message: "too central", Fix: "extract boundary", Severity: rules.Warning},
 	}
 
 	got := report.BuildJSONReport(violations)
@@ -25,7 +25,7 @@ func TestBuildJSONReport(t *testing.T) {
 	if got.Summary.Files != 1 {
 		t.Fatalf("expected one unique file, got %d", got.Summary.Files)
 	}
-	if len(got.Summary.Rules) != 2 || got.Summary.Rules[0] != "blast-radius.high-coupling" || got.Summary.Rules[1] != "isolation.cross-domain" {
+	if len(got.Summary.Rules) != 2 || got.Summary.Rules[0] != "blast.high-coupling" || got.Summary.Rules[1] != "isolation.cross-domain" {
 		t.Fatalf("unexpected rules summary: %+v", got.Summary.Rules)
 	}
 	if got.Violations[0].Severity != "error" || got.Violations[1].Severity != "warning" {

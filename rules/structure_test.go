@@ -91,13 +91,13 @@ func TestCheckStructure(t *testing.T) {
 		violations := rules.CheckStructure("../testdata/invalid")
 		found := false
 		for _, v := range violations {
-			if v.Rule == "structure.domain-root-alias-only" {
+			if v.Rule == "structure.domain-alias-exclusive" {
 				found = true
 				break
 			}
 		}
 		if !found {
-			t.Error("expected domain-root-alias-only violation")
+			t.Error("expected domain-alias-exclusive violation")
 		}
 	})
 
@@ -105,13 +105,13 @@ func TestCheckStructure(t *testing.T) {
 		violations := rules.CheckStructure("../testdata/invalid")
 		found := false
 		for _, v := range violations {
-			if v.Rule == "structure.domain-root-alias-required" && v.File == "internal/domain/noalias/" {
+			if v.Rule == "structure.domain-alias-exists" && v.File == "internal/domain/noalias/" {
 				found = true
 				break
 			}
 		}
 		if !found {
-			t.Error("expected domain-root-alias-required violation")
+			t.Error("expected domain-alias-exists violation")
 		}
 	})
 
@@ -193,13 +193,13 @@ func TestCheckStructure(t *testing.T) {
 		violations := rules.CheckStructure(root)
 		found := false
 		for _, v := range violations {
-			if v.Rule == "structure.domain-root-alias-package" && v.File == "internal/domain/billing/alias.go" {
+			if v.Rule == "structure.domain-alias-package" && v.File == "internal/domain/billing/alias.go" {
 				found = true
 				break
 			}
 		}
 		if !found {
-			t.Error("expected domain-root-alias-package violation")
+			t.Error("expected domain-alias-package violation")
 		}
 	})
 
@@ -251,7 +251,7 @@ func TestCheckStructure(t *testing.T) {
 		foundAliasOnly := false
 		foundModelRequired := false
 		for _, v := range violations {
-			if v.Rule == "structure.domain-root-alias-only" && v.File == "internal/domain/billing/model.go" {
+			if v.Rule == "structure.domain-alias-exclusive" && v.File == "internal/domain/billing/model.go" {
 				foundAliasOnly = true
 			}
 			if v.Rule == "structure.domain-model-required" && v.File == "internal/domain/billing/" {
@@ -259,7 +259,7 @@ func TestCheckStructure(t *testing.T) {
 			}
 		}
 		if !foundAliasOnly {
-			t.Error("expected domain-root-alias-only violation for root model.go")
+			t.Error("expected domain-alias-exclusive violation for root model.go")
 		}
 		if !foundModelRequired {
 			t.Error("expected domain-model-required violation when core/model is missing")

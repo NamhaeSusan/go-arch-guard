@@ -8,7 +8,7 @@
 
 Architecture guardrails for Go projects via `go test`, built for AI coding agents and fast-moving teams.
 
-Define isolation, layer-direction, structure, naming, and blast-radius rules, then fail regular tests when the project shape drifts. Ships with **DDD**, **Clean Architecture**, **Layered**, **Hexagonal**, **Modular Monolith**, **Consumer/Worker**, **Batch**, and **Event-Driven Pipeline** presets, and supports fully custom architecture models. No CLI to learn. No separate config format. Just Go tests.
+Define isolation, layer-direction, structure, naming, and blast radius rules, then fail regular tests when the project shape drifts. Ships with **DDD**, **Clean Architecture**, **Layered**, **Hexagonal**, **Modular Monolith**, **Consumer/Worker**, **Batch**, and **Event-Driven Pipeline** presets, and supports fully custom architecture models. No CLI to learn. No separate config format. Just Go tests.
 
 AI-agent-friendly by default:
 
@@ -270,11 +270,11 @@ Shared `pkg/` must not import orchestration.
 
 Domains must not import orchestration --- orchestration coordinates domains, not the reverse.
 
-### `isolation.internal-imports-orchestration`
+### `isolation.stray-imports-orchestration`
 
 Only `cmd/` and orchestration itself may depend on orchestration.
 
-### `isolation.internal-imports-domain`
+### `isolation.stray-imports-domain`
 
 Non-domain internal packages (other than orchestration/cmd/pkg) must not import domains.
 
@@ -376,15 +376,15 @@ not floating at the internal/ top level.
 
 `middleware/` must live in `internal/pkg/middleware/`, not scattered across domains.
 
-### `structure.domain-root-alias-required` (DDD only)
+### `structure.domain-alias-exists` (DDD only)
 
 Each domain root must define an `alias.go` file as its public API surface.
 
-### `structure.domain-root-alias-package`
+### `structure.domain-alias-package`
 
 The alias file's package name must match the directory name.
 
-### `structure.domain-root-alias-only`
+### `structure.domain-alias-exclusive`
 
 Domain root directories may only contain `alias.go` --- all other code goes in sublayers.
 
@@ -439,7 +439,7 @@ OrderService.go   violation
 order_service.go  correct
 ```
 
-### `naming.repo-file-interface`
+### `structure.repo-file-interface`
 
 Files in `repo/` (or `core/repo/`) must contain an interface matching the filename.
 
@@ -448,7 +448,7 @@ Files in `repo/` (or `core/repo/`) must contain an interface matching the filena
 type Order interface { ... }  // matches filename
 ```
 
-### `naming.repo-file-extra-interface`
+### `structure.repo-file-extra-interface`
 
 Each file in `repo/` must define exactly one interface. Extra interfaces should be split into their own files.
 
@@ -458,7 +458,7 @@ type Review interface { Find() }   // correct
 type Helper interface { Assist() } // violation: move to helper.go
 ```
 
-### `naming.repo-interface-too-large`
+### `interface.too-many-methods`
 
 Repo interfaces must not exceed the method limit set by `WithMaxRepoInterfaceMethods`. Disabled by default.
 
@@ -483,11 +483,11 @@ order_service.go  "_service" suffix is redundant
 order.go          correct
 ```
 
-### `naming.domain-interface-repo-only` (DDD only)
+### `structure.interface-placement` (DDD only)
 
 Interfaces within a domain must be defined in `core/repo/`, not scattered across layers.
 
-### `naming.no-handmock`
+### `testing.no-handmock`
 
 Test files must not define hand-rolled mock/fake/stub structs with methods.
 Use mockery or other generation tools instead.
@@ -566,7 +566,7 @@ Surfaces internal packages with abnormally high coupling via IQR-based statistic
 
 | Rule | Meaning |
 |------|---------|
-| `blast-radius.high-coupling` | package has statistically outlying transitive dependents |
+| `blast.high-coupling` | package has statistically outlying transitive dependents |
 
 | Metric | Definition |
 |--------|-----------|

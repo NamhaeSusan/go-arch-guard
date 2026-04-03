@@ -128,7 +128,7 @@ func AnalyzeBlastRadius(pkgs []*packages.Package, projectModule string, projectR
 			relPath := projectRelativePackagePath(m.path, projectModule)
 			violations = append(violations, Violation{
 				File: relPath,
-				Rule: "blast-radius.high-coupling",
+				Rule: "blast.high-coupling",
 				Message: fmt.Sprintf(
 					"package %q has %d transitive dependents (Ca:%d Ce:%d Instability:%.2f, threshold:%.0f)",
 					relPath, m.transitiveDependents, m.ca, m.ce, m.instability, threshold,

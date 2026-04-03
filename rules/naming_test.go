@@ -27,7 +27,7 @@ func TestCheckNaming(t *testing.T) {
 		// handler: Service + auditLogger (direct), app: AdminOps (direct) + OrderRepo (alias)
 		wantIfaces := map[string]bool{"Service": false, "auditLogger": false, "AdminOps": false, "OrderRepo": false}
 		for _, v := range violations {
-			if v.Rule != "naming.domain-interface-repo-only" {
+			if v.Rule != "structure.interface-placement" {
 				continue
 			}
 			for name := range wantIfaces {
@@ -38,7 +38,7 @@ func TestCheckNaming(t *testing.T) {
 		}
 		for name, found := range wantIfaces {
 			if !found {
-				t.Errorf("expected naming.domain-interface-repo-only violation for %s", name)
+				t.Errorf("expected structure.interface-placement violation for %s", name)
 			}
 		}
 	})
@@ -97,7 +97,7 @@ func TestCheckNaming(t *testing.T) {
 		violations := rules.CheckNaming(pkgs)
 		wantMocks := map[string]bool{"mockOrderRepo": false, "fakeNotifier": false}
 		for _, v := range violations {
-			if v.Rule != "naming.no-handmock" {
+			if v.Rule != "testing.no-handmock" {
 				continue
 			}
 			for name := range wantMocks {
@@ -108,7 +108,7 @@ func TestCheckNaming(t *testing.T) {
 		}
 		for name, found := range wantMocks {
 			if !found {
-				t.Errorf("expected naming.no-handmock violation for %s", name)
+				t.Errorf("expected testing.no-handmock violation for %s", name)
 			}
 		}
 	})
@@ -117,8 +117,8 @@ func TestCheckNaming(t *testing.T) {
 		pkgs := loadValid(t)
 		violations := rules.CheckNaming(pkgs)
 		for _, v := range violations {
-			if v.Rule == "naming.no-handmock" {
-				t.Errorf("unexpected naming.no-handmock violation: %s", v.String())
+			if v.Rule == "testing.no-handmock" {
+				t.Errorf("unexpected testing.no-handmock violation: %s", v.String())
 			}
 		}
 	})
@@ -127,7 +127,7 @@ func TestCheckNaming(t *testing.T) {
 		pkgs := loadInvalid(t)
 		violations := rules.CheckNaming(pkgs, rules.WithExclude("internal/domain/order/app/..."))
 		for _, v := range violations {
-			if v.Rule == "naming.no-handmock" {
+			if v.Rule == "testing.no-handmock" {
 				t.Errorf("expected handmock violation to be excluded, got %s", v.String())
 			}
 		}
@@ -153,12 +153,12 @@ func TestCheckNaming_RepoFileInterface(t *testing.T) {
 	violations := rules.CheckNaming(pkgs) // default model = DDD
 	found := false
 	for _, v := range violations {
-		if v.Rule == "naming.repo-file-interface" {
+		if v.Rule == "structure.repo-file-interface" {
 			found = true
 		}
 	}
 	if !found {
-		t.Error("expected naming.repo-file-interface violation for repo/order.go without Order interface")
+		t.Error("expected structure.repo-file-interface violation for repo/order.go without Order interface")
 	}
 }
 
@@ -199,12 +199,12 @@ func TestCheckNaming_RepoFileExtraInterface(t *testing.T) {
 	violations := rules.CheckNaming(pkgs)
 	found := false
 	for _, v := range violations {
-		if v.Rule == "naming.repo-file-extra-interface" {
+		if v.Rule == "structure.repo-file-extra-interface" {
 			found = true
 		}
 	}
 	if !found {
-		t.Error("expected naming.repo-file-extra-interface violation for extra interface in repo/review.go")
+		t.Error("expected structure.repo-file-extra-interface violation for extra interface in repo/review.go")
 	}
 }
 
@@ -228,18 +228,18 @@ func TestCheckNaming_RepoInterfaceTooLarge(t *testing.T) {
 
 	found := false
 	for _, v := range violations {
-		if v.Rule == "naming.repo-interface-too-large" {
+		if v.Rule == "interface.too-many-methods" {
 			found = true
 		}
 	}
 	if !found {
-		t.Error("expected naming.repo-interface-too-large violation for 11-method interface")
+		t.Error("expected interface.too-many-methods violation for 11-method interface")
 	}
 
 	// Without option, no violation
 	violations2 := rules.CheckNaming(pkgs)
 	for _, v := range violations2 {
-		if v.Rule == "naming.repo-interface-too-large" {
+		if v.Rule == "interface.too-many-methods" {
 			t.Error("should not flag repo-interface-too-large without WithMaxRepoInterfaceMethods option")
 		}
 	}
