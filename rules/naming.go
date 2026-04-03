@@ -264,23 +264,32 @@ func collectFileInterfaces(file *ast.File) map[string]*ast.InterfaceType {
 	return result
 }
 
+// portSublayers are layers that serve as pure interface (port) definitions.
+var portSublayers = []string{"repo", "gateway"}
+
 func hasRepoSublayer(m Model) bool {
 	for _, sl := range m.Sublayers {
-		if sl == "repo" || strings.HasSuffix(sl, "/repo") {
-			return true
+		for _, ps := range portSublayers {
+			if sl == ps || strings.HasSuffix(sl, "/"+ps) {
+				return true
+			}
 		}
 	}
 	return false
 }
 
 func isAnyRepoPackage(pkgPath string) bool {
-	// Only match repo packages within the project's internal/ tree.
 	idx := strings.Index(pkgPath, "/internal/")
 	if idx < 0 {
 		return false
 	}
 	rel := pkgPath[idx+len("/internal/"):]
-	return strings.HasSuffix(rel, "/repo") || strings.Contains(rel, "/repo/")
+	for _, ps := range portSublayers {
+		if strings.HasSuffix(rel, "/"+ps) || strings.Contains(rel, "/"+ps+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 func snakeToPascal(s string) string {

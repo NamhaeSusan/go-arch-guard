@@ -185,7 +185,7 @@ func TestIntegration_CleanArchModel(t *testing.T) {
 	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "entity", "order.go"),
 		"package entity\n\ntype Order struct{ ID string }\n")
 	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "gateway", "repo.go"),
-		"package gateway\n\nimport _ \""+module+"/internal/domain/order/entity\"\n")
+		"package gateway\n\nimport \""+module+"/internal/domain/order/entity\"\n\ntype Repo interface { Find() entity.Order }\n")
 	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "infra", "persistence.go"),
 		"package infra\n\nimport (\n\t_ \""+module+"/internal/domain/order/gateway\"\n\t_ \""+module+"/internal/domain/order/entity\"\n)\n")
 
