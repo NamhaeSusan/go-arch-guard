@@ -68,8 +68,18 @@ func isExcludedInterfacePatternPkg(m Model, pkg *packages.Package) bool {
 		return true
 	}
 	// after = [domain, <domainName>, <sublayer>, ...]
+	// Check both single segment (e.g. "handler") and nested (e.g. "core/repo")
 	sublayer := after[2]
-	return m.InterfacePatternExclude[sublayer]
+	if m.InterfacePatternExclude[sublayer] {
+		return true
+	}
+	if len(after) >= 4 {
+		nested := after[2] + "/" + after[3]
+		if m.InterfacePatternExclude[nested] {
+			return true
+		}
+	}
+	return false
 }
 
 // collectExportedInterfaces returns all exported interface types in a package.

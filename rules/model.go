@@ -81,7 +81,7 @@ func DDD() Model {
 			"domain": true,
 		},
 		InterfacePatternExclude: map[string]bool{
-			"handler": true, "app": true, "core/model": true, "event": true,
+			"handler": true, "app": true, "core/model": true, "core/repo": true, "event": true,
 		},
 	}
 }
