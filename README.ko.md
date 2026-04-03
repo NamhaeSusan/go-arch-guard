@@ -136,8 +136,8 @@ go test -run TestArchitecture -v
 
 | 프리셋 | 타입 | 서브레이어 | 방향 |
 |--------|------|-----------|------|
-| `DDD()` | Domain | handler, app, core/model, core/repo, core/svc, event, infra | handler->app->core/\*, infra->core/repo |
-| `CleanArch()` | Domain | handler, usecase, entity, gateway, infra | handler->usecase->entity+gateway, infra->gateway |
+| `DDD()` | Domain | handler, app, core/model, core/repo, core/svc, event, infra | handler->app->core/\*, infra->core/repo+core/model+event |
+| `CleanArch()` | Domain | handler, usecase, entity, gateway, infra | handler->usecase->entity+gateway, infra->gateway+entity |
 | `Layered()` | Domain | handler, service, repository, model | handler->service->repository+model |
 | `Hexagonal()` | Domain | handler, usecase, port, domain, adapter | handler->usecase->port+domain, adapter->port+domain |
 | `ModularMonolith()` | Domain | api, application, core, infrastructure | api->application->core, infrastructure->core |
