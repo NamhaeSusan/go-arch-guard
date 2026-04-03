@@ -356,6 +356,32 @@ func TestNewModel_OrchestrationDirPropagation(t *testing.T) {
 	}
 }
 
+func TestInterfacePatternExclude(t *testing.T) {
+	tests := []struct {
+		name     string
+		model    Model
+		expected []string
+	}{
+		{"DDD", DDD(), []string{"handler", "app", "core/model", "event"}},
+		{"CleanArch", CleanArch(), []string{"handler", "entity"}},
+		{"Layered", Layered(), []string{"handler", "model"}},
+		{"Hexagonal", Hexagonal(), []string{"handler", "domain"}},
+		{"ModularMonolith", ModularMonolith(), []string{"api", "core"}},
+		{"ConsumerWorker", ConsumerWorker(), []string{"model", "worker"}},
+		{"Batch", Batch(), []string{"model", "job"}},
+		{"EventPipeline", EventPipeline(), []string{"model", "event", "command", "aggregate"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, layer := range tc.expected {
+				if !tc.model.InterfacePatternExclude[layer] {
+					t.Errorf("InterfacePatternExclude missing %q", layer)
+				}
+			}
+		})
+	}
+}
+
 func TestModelConsistency(t *testing.T) {
 	for _, tc := range []struct {
 		name  string

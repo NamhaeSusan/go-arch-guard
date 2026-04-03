@@ -3,22 +3,23 @@ package rules
 // Model defines the architecture model used by all rule checks.
 // Use DDD(), CleanArch(), Layered(), Hexagonal(), ModularMonolith(), ConsumerWorker(), Batch(), EventPipeline(), or NewModel() to create one.
 type Model struct {
-	Sublayers        []string
-	Direction        map[string][]string
-	PkgRestricted    map[string]bool
-	InternalTopLevel map[string]bool
-	DomainDir        string
-	OrchestrationDir string
-	SharedDir        string
-	RequireAlias     bool
-	AliasFileName    string
-	RequireModel     bool
-	ModelPath        string
-	DTOAllowedLayers []string
-	BannedPkgNames   []string
-	LegacyPkgNames   []string
-	LayerDirNames    map[string]bool
-	TypePatterns     []TypePattern
+	Sublayers               []string
+	Direction               map[string][]string
+	PkgRestricted           map[string]bool
+	InternalTopLevel        map[string]bool
+	DomainDir               string
+	OrchestrationDir        string
+	SharedDir               string
+	RequireAlias            bool
+	AliasFileName           string
+	RequireModel            bool
+	ModelPath               string
+	DTOAllowedLayers        []string
+	BannedPkgNames          []string
+	LegacyPkgNames          []string
+	LayerDirNames           map[string]bool
+	TypePatterns            []TypePattern
+	InterfacePatternExclude map[string]bool // layers to skip for interface pattern checks
 }
 
 // TypePattern defines an AST-based naming/structure convention for a directory.
@@ -74,6 +75,9 @@ func DDD() Model {
 			"entity": true, "store": true, "persistence": true,
 			"domain": true,
 		},
+		InterfacePatternExclude: map[string]bool{
+			"handler": true, "app": true, "core/model": true, "event": true,
+		},
 	}
 }
 
@@ -112,6 +116,9 @@ func CleanArch() Model {
 			"service": true, "controller": true,
 			"store": true, "persistence": true, "domain": true,
 		},
+		InterfacePatternExclude: map[string]bool{
+			"handler": true, "entity": true,
+		},
 	}
 }
 
@@ -147,6 +154,9 @@ func Layered() Model {
 			"handler": true, "service": true, "repository": true, "model": true,
 			"controller": true, "entity": true, "store": true,
 			"persistence": true, "domain": true,
+		},
+		InterfacePatternExclude: map[string]bool{
+			"handler": true, "model": true,
 		},
 	}
 }
@@ -186,6 +196,9 @@ func Hexagonal() Model {
 			"controller": true, "service": true, "entity": true,
 			"store": true, "persistence": true,
 		},
+		InterfacePatternExclude: map[string]bool{
+			"handler": true, "domain": true,
+		},
 	}
 }
 
@@ -223,6 +236,9 @@ func ModularMonolith() Model {
 			"controller":     true, "service": true, "entity": true,
 			"store": true, "persistence": true,
 		},
+		InterfacePatternExclude: map[string]bool{
+			"api": true, "core": true,
+		},
 	}
 }
 
@@ -259,6 +275,9 @@ func ConsumerWorker() Model {
 		TypePatterns: []TypePattern{
 			{Dir: "worker", FilePrefix: "worker", TypeSuffix: "Worker", RequireMethod: "Process"},
 		},
+		InterfacePatternExclude: map[string]bool{
+			"model": true, "worker": true,
+		},
 	}
 }
 
@@ -294,6 +313,9 @@ func Batch() Model {
 		},
 		TypePatterns: []TypePattern{
 			{Dir: "job", FilePrefix: "job", TypeSuffix: "Job", RequireMethod: "Run"},
+		},
+		InterfacePatternExclude: map[string]bool{
+			"model": true, "job": true,
 		},
 	}
 }
@@ -338,6 +360,9 @@ func EventPipeline() Model {
 		TypePatterns: []TypePattern{
 			{Dir: "command", FilePrefix: "command", TypeSuffix: "Command", RequireMethod: "Execute"},
 			{Dir: "aggregate", FilePrefix: "aggregate", TypeSuffix: "Aggregate", RequireMethod: "Apply"},
+		},
+		InterfacePatternExclude: map[string]bool{
+			"model": true, "event": true, "command": true, "aggregate": true,
 		},
 	}
 }
@@ -410,4 +435,8 @@ func WithAliasFileName(name string) ModelOption {
 
 func WithLayerDirNames(names map[string]bool) ModelOption {
 	return func(m *Model) { m.LayerDirNames = names }
+}
+
+func WithInterfacePatternExclude(exclude map[string]bool) ModelOption {
+	return func(m *Model) { m.InterfacePatternExclude = exclude }
 }
