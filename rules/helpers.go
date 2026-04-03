@@ -128,6 +128,111 @@ func projectRelativePackagePath(pkgPath, projectModule string) string {
 	return ""
 }
 
+// isPortSublayer reports whether the sublayer name is a port/contract layer
+// (pure interface definitions like repo, gateway).
+func isPortSublayer(name string) bool {
+	base := name
+	if i := strings.LastIndex(name, "/"); i >= 0 {
+		base = name[i+1:]
+	}
+	return base == "repo" || base == "gateway"
+}
+
+// isContractSublayer reports whether the sublayer name is a contract layer
+// (port/repo + service interfaces like svc).
+func isContractSublayer(name string) bool {
+	if isPortSublayer(name) {
+		return true
+	}
+	base := name
+	if i := strings.LastIndex(name, "/"); i >= 0 {
+		base = name[i+1:]
+	}
+	return base == "svc"
+}
+
+// hasPortSublayer reports whether the model has any port sublayer.
+func hasPortSublayer(m Model) bool {
+	for _, sl := range m.Sublayers {
+		if isPortSublayer(sl) {
+			return true
+		}
+	}
+	return false
+}
+
+// matchPortSublayer returns the port sublayer name if pkgPath references one, "" otherwise.
+func matchPortSublayer(m Model, pkgPath string) string {
+	for _, sl := range m.Sublayers {
+		if !isPortSublayer(sl) {
+			continue
+		}
+		if strings.HasSuffix(pkgPath, "/"+sl) || strings.Contains(pkgPath, "/"+sl+"/") {
+			return sl
+		}
+	}
+	return ""
+}
+
+// matchContractSublayer returns the contract sublayer name if pkgPath references one, "" otherwise.
+func matchContractSublayer(m Model, pkgPath string) string {
+	for _, sl := range m.Sublayers {
+		if !isContractSublayer(sl) {
+			continue
+		}
+		if strings.HasSuffix(pkgPath, "/"+sl) || strings.Contains(pkgPath, "/"+sl+"/") {
+			return sl
+		}
+	}
+	return ""
+}
+
+// portSublayerName returns the first port sublayer name from the model, or "core/repo" as fallback.
+func portSublayerName(m Model) string {
+	for _, sl := range m.Sublayers {
+		if isPortSublayer(sl) {
+			return sl
+		}
+	}
+	return "core/repo"
+}
+
+// collectInterfacesFromFile returns interface types from a single AST file.
+// If exportedOnly is true, only exported interfaces are returned.
+func collectInterfacesFromFile(file *ast.File, exportedOnly bool) map[string]*ast.InterfaceType {
+	result := make(map[string]*ast.InterfaceType)
+	for _, decl := range file.Decls {
+		gd, ok := decl.(*ast.GenDecl)
+		if !ok {
+			continue
+		}
+		for _, spec := range gd.Specs {
+			ts, ok := spec.(*ast.TypeSpec)
+			if !ok {
+				continue
+			}
+			if exportedOnly && !ts.Name.IsExported() {
+				continue
+			}
+			if iface, ok := ts.Type.(*ast.InterfaceType); ok {
+				result[ts.Name.Name] = iface
+			}
+		}
+	}
+	return result
+}
+
+// collectExportedInterfacesFromPkg returns all exported interfaces across all files in a package.
+func collectExportedInterfacesFromPkg(pkg *packages.Package) map[string]*ast.InterfaceType {
+	result := make(map[string]*ast.InterfaceType)
+	for _, file := range pkg.Syntax {
+		for name, iface := range collectInterfacesFromFile(file, true) {
+			result[name] = iface
+		}
+	}
+	return result
+}
+
 func deduplicateMetaViolations(violations []Violation) []Violation {
 	seen := make(map[string]bool)
 	result := violations[:0]

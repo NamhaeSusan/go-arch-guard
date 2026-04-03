@@ -449,22 +449,6 @@ func matchesDomainLayerWith(m Model, rel, name string) bool {
 	return len(parts) == 4 && parts[0] == "internal" && parts[1] == m.DomainDir && parts[2] != "" && parts[3] == name
 }
 
-// matchContractSublayer returns the sublayer name if impPath references a
-// contract sublayer (one ending in /repo, /svc, or named repo, svc).
-// These are the sublayers that define interfaces/contracts and should not
-// be re-exported via alias.go. Returns "" if no match.
-func matchContractSublayer(m Model, impPath string) string {
-	for _, sl := range m.Sublayers {
-		if sl == "repo" || sl == "svc" ||
-			strings.HasSuffix(sl, "/repo") || strings.HasSuffix(sl, "/svc") {
-			if strings.Contains(impPath, "/"+sl) {
-				return sl
-			}
-		}
-	}
-	return ""
-}
-
 func hasNonTestGoFiles(dir string) bool {
 	entries, err := os.ReadDir(dir)
 	if err != nil {

@@ -23,7 +23,7 @@ func CheckInterfacePattern(pkgs []*packages.Package, opts ...Option) []Violation
 			continue
 		}
 
-		ifaces := collectExportedInterfaces(pkg)
+		ifaces := collectExportedInterfacesFromPkg(pkg)
 		if len(ifaces) == 0 {
 			continue
 		}
@@ -80,29 +80,6 @@ func isExcludedInterfacePatternPkg(m Model, pkg *packages.Package) bool {
 		}
 	}
 	return false
-}
-
-// collectExportedInterfaces returns all exported interface types in a package.
-func collectExportedInterfaces(pkg *packages.Package) map[string]*ast.InterfaceType {
-	result := make(map[string]*ast.InterfaceType)
-	for _, file := range pkg.Syntax {
-		for _, decl := range file.Decls {
-			gd, ok := decl.(*ast.GenDecl)
-			if !ok {
-				continue
-			}
-			for _, spec := range gd.Specs {
-				ts, ok := spec.(*ast.TypeSpec)
-				if !ok || !ts.Name.IsExported() {
-					continue
-				}
-				if iface, ok := ts.Type.(*ast.InterfaceType); ok {
-					result[ts.Name.Name] = iface
-				}
-			}
-		}
-	}
-	return result
 }
 
 // interfaceMethodNames extracts method names from an interface type.

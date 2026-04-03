@@ -14,7 +14,7 @@ func RunAll(pkgs []*packages.Package, projectModule string, projectRoot string, 
 
 	// Apply defaults: limit repo interface methods for models with repo sublayers.
 	cfg := NewConfig(opts...)
-	if cfg.MaxRepoInterfaceMethods == 0 && hasRepoSublayer(cfg.model()) {
+	if cfg.MaxRepoInterfaceMethods == 0 && hasPortSublayer(cfg.model()) {
 		opts = append([]Option{WithMaxRepoInterfaceMethods(10)}, opts...)
 	}
 

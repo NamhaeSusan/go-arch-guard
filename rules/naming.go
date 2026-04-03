@@ -174,10 +174,10 @@ func toSnakeCase(filename string) string {
 }
 
 func checkRepoFileInterfaceWith(m Model, pkg *packages.Package, cfg Config) []Violation {
-	if !hasRepoSublayer(m) {
+	if !hasPortSublayer(m) {
 		return nil
 	}
-	if !isAnyRepoPackage(pkg.PkgPath) {
+	if matchPortSublayer(m, pkg.PkgPath) == "" {
 		return nil
 	}
 
@@ -194,7 +194,7 @@ func checkRepoFileInterfaceWith(m Model, pkg *packages.Package, cfg Config) []Vi
 		}
 		expected := snakeToPascal(strings.TrimSuffix(base, ".go"))
 
-		ifaces := collectFileInterfaces(astFile)
+		ifaces := collectInterfacesFromFile(astFile, false)
 
 		// Check: expected interface must exist
 		if _, ok := ifaces[expected]; !ok {
@@ -242,54 +242,6 @@ func checkRepoFileInterfaceWith(m Model, pkg *packages.Package, cfg Config) []Vi
 		}
 	}
 	return violations
-}
-
-func collectFileInterfaces(file *ast.File) map[string]*ast.InterfaceType {
-	result := make(map[string]*ast.InterfaceType)
-	for _, decl := range file.Decls {
-		gd, ok := decl.(*ast.GenDecl)
-		if !ok {
-			continue
-		}
-		for _, spec := range gd.Specs {
-			ts, ok := spec.(*ast.TypeSpec)
-			if !ok {
-				continue
-			}
-			if iface, ok := ts.Type.(*ast.InterfaceType); ok {
-				result[ts.Name.Name] = iface
-			}
-		}
-	}
-	return result
-}
-
-// portSublayers are layers that serve as pure interface (port) definitions.
-var portSublayers = []string{"repo", "gateway"}
-
-func hasRepoSublayer(m Model) bool {
-	for _, sl := range m.Sublayers {
-		for _, ps := range portSublayers {
-			if sl == ps || strings.HasSuffix(sl, "/"+ps) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func isAnyRepoPackage(pkgPath string) bool {
-	idx := strings.Index(pkgPath, "/internal/")
-	if idx < 0 {
-		return false
-	}
-	rel := pkgPath[idx+len("/internal/"):]
-	for _, ps := range portSublayers {
-		if strings.HasSuffix(rel, "/"+ps) || strings.Contains(rel, "/"+ps+"/") {
-			return true
-		}
-	}
-	return false
 }
 
 func snakeToPascal(s string) string {
@@ -358,25 +310,7 @@ func isDomainPackageWith(m Model, pkgPath string) bool {
 }
 
 func isRepoPackageWith(m Model, pkgPath string) bool {
-	for _, sl := range m.Sublayers {
-		if sl == "repo" || strings.HasSuffix(sl, "/repo") {
-			// Check if pkgPath ends with this sublayer or is inside it
-			suffix := "/" + sl
-			if strings.HasSuffix(pkgPath, suffix) || strings.Contains(pkgPath, suffix+"/") {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func repoSublayerName(m Model) string {
-	for _, sl := range m.Sublayers {
-		if sl == "repo" || strings.HasSuffix(sl, "/repo") {
-			return sl
-		}
-	}
-	return "core/repo"
+	return matchPortSublayer(m, pkgPath) != ""
 }
 
 // checkDomainInterfaceRepoOnlyWith flags interface declarations in any domain
@@ -389,7 +323,7 @@ func checkDomainInterfaceRepoOnlyWith(m Model, pkg *packages.Package, cfg Config
 	if !isDomainPackageWith(m, pkg.PkgPath) || isRepoPackageWith(m, pkg.PkgPath) {
 		return nil
 	}
-	repoName := repoSublayerName(m)
+	repoName := portSublayerName(m)
 	var violations []Violation
 	for _, file := range pkg.Syntax {
 		filePath := relativePathForPackage(pkg, pkg.Fset.Position(file.Pos()).Filename)
@@ -531,14 +465,7 @@ func collectMockStructs(fset *token.FileSet, file *ast.File) map[string]int {
 }
 
 func isRepoImportPath(m Model, impPath string) bool {
-	for _, sl := range m.Sublayers {
-		if sl == "repo" || strings.HasSuffix(sl, "/repo") {
-			if strings.Contains(impPath, "/"+sl) {
-				return true
-			}
-		}
-	}
-	return false
+	return matchPortSublayer(m, impPath) != ""
 }
 
 func isTypePatternFile(m Model, dir, filename string) bool {
