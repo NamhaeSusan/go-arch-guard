@@ -958,6 +958,279 @@ func TestIntegration_ModularMonolith_Violations(t *testing.T) {
 	})
 }
 
+func TestIntegration_ConsumerWorker_Valid(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/consumerworker"
+	m := rules.ConsumerWorker()
+
+	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "worker", "worker_order.go"),
+		"package worker\n\nimport (\n\t\"context\"\n\t_ \""+module+"/internal/service\"\n)\n\ntype OrderWorker struct{}\nfunc (w *OrderWorker) Process(ctx context.Context) error { return nil }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "worker", "worker_payment.go"),
+		"package worker\n\nimport (\n\t\"context\"\n\t_ \""+module+"/internal/model\"\n)\n\ntype PaymentWorker struct{}\nfunc (w *PaymentWorker) Process(ctx context.Context) error { return nil }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "service", "order.go"),
+		"package service\n\nimport _ \""+module+"/internal/store\"\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "store", "order.go"),
+		"package store\n\nimport _ \""+module+"/internal/model\"\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "model", "order.go"),
+		"package model\n\ntype Order struct{ ID string }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "pkg", "consumer", "consumer.go"),
+		"package consumer\n")
+
+	pkgs, err := analyzer.Load(root, "internal/...")
+	if err != nil {
+		t.Log("partial load:", err)
+	}
+	if len(pkgs) == 0 {
+		t.Fatal("no packages loaded")
+	}
+
+	opts := []rules.Option{rules.WithModel(m)}
+
+	t.Run("layer direction", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, module, root, opts...))
+	})
+	t.Run("domain isolation skipped", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, module, root, opts...))
+	})
+	t.Run("structure", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckStructure(root, opts...))
+	})
+	t.Run("naming", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckNaming(pkgs, opts...))
+	})
+	t.Run("type patterns", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckTypePatterns(pkgs, opts...))
+	})
+	t.Run("run all", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.RunAll(pkgs, module, root, opts...))
+	})
+}
+
+func TestIntegration_ConsumerWorker_Violations(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/cw-violations"
+	m := rules.ConsumerWorker()
+
+	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+	// store imports worker — layer direction violation
+	writeIntegrationFile(t, filepath.Join(root, "internal", "store", "bad.go"),
+		"package store\n\nimport _ \""+module+"/internal/worker\"\n")
+	// model imports pkg — inner-imports-pkg violation
+	writeIntegrationFile(t, filepath.Join(root, "internal", "model", "bad.go"),
+		"package model\n\nimport _ \""+module+"/internal/pkg/consumer\"\n")
+	// worker file defines BadName instead of OrderWorker — type mismatch
+	writeIntegrationFile(t, filepath.Join(root, "internal", "worker", "worker_order.go"),
+		"package worker\n\nimport \"context\"\n\ntype BadName struct{}\nfunc (w *BadName) Process(ctx context.Context) error { return nil }\n")
+	// unexpected top-level package
+	writeIntegrationFile(t, filepath.Join(root, "internal", "random", "stuff.go"),
+		"package random\n")
+	// needed for imports to resolve
+	writeIntegrationFile(t, filepath.Join(root, "internal", "worker", "worker_payment.go"),
+		"package worker\n\nimport \"context\"\n\ntype PaymentWorker struct{}\nfunc (w *PaymentWorker) Process(ctx context.Context) error { return nil }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "pkg", "consumer", "consumer.go"),
+		"package consumer\n")
+
+	pkgs, err := analyzer.Load(root, "internal/...")
+	if err != nil {
+		t.Log("partial load:", err)
+	}
+
+	violations := rules.RunAll(pkgs, module, root, rules.WithModel(m))
+	if len(violations) == 0 {
+		t.Fatal("expected violations")
+	}
+
+	assertHasRule(t, violations, "layer.direction")
+	assertHasRule(t, violations, "layer.inner-imports-pkg")
+	assertHasRule(t, violations, "naming.type-pattern-mismatch")
+	assertHasRule(t, violations, "structure.internal-top-level")
+}
+
+func TestIntegration_Batch_Valid(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/batchapp"
+	m := rules.Batch()
+
+	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "job", "job_expire.go"),
+		"package job\n\nimport (\n\t\"context\"\n\t_ \""+module+"/internal/service\"\n)\n\ntype ExpireJob struct{}\nfunc (j *ExpireJob) Run(ctx context.Context) error { return nil }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "job", "job_cleanup.go"),
+		"package job\n\nimport (\n\t\"context\"\n\t_ \""+module+"/internal/model\"\n)\n\ntype CleanupJob struct{}\nfunc (j *CleanupJob) Run(ctx context.Context) error { return nil }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "service", "file.go"),
+		"package service\n\nimport _ \""+module+"/internal/store\"\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "store", "file.go"),
+		"package store\n\nimport _ \""+module+"/internal/model\"\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "model", "file.go"),
+		"package model\n\ntype File struct{ ID string }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "pkg", "batchutil", "util.go"),
+		"package batchutil\n")
+
+	pkgs, err := analyzer.Load(root, "internal/...")
+	if err != nil {
+		t.Log("partial load:", err)
+	}
+	if len(pkgs) == 0 {
+		t.Fatal("no packages loaded")
+	}
+
+	opts := []rules.Option{rules.WithModel(m)}
+
+	t.Run("layer direction", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, module, root, opts...))
+	})
+	t.Run("domain isolation skipped", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, module, root, opts...))
+	})
+	t.Run("structure", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckStructure(root, opts...))
+	})
+	t.Run("naming", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckNaming(pkgs, opts...))
+	})
+	t.Run("type patterns", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckTypePatterns(pkgs, opts...))
+	})
+	t.Run("run all", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.RunAll(pkgs, module, root, opts...))
+	})
+}
+
+func TestIntegration_Batch_Violations(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/batch-violations"
+	m := rules.Batch()
+
+	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+	// store imports job — layer direction violation
+	writeIntegrationFile(t, filepath.Join(root, "internal", "store", "bad.go"),
+		"package store\n\nimport _ \""+module+"/internal/job\"\n")
+	// model imports pkg — inner-imports-pkg violation
+	writeIntegrationFile(t, filepath.Join(root, "internal", "model", "bad.go"),
+		"package model\n\nimport _ \""+module+"/internal/pkg/batchutil\"\n")
+	// job file defines BadName instead of SyncJob — type mismatch
+	writeIntegrationFile(t, filepath.Join(root, "internal", "job", "job_sync.go"),
+		"package job\n\nimport \"context\"\n\ntype BadName struct{}\nfunc (j *BadName) Run(ctx context.Context) error { return nil }\n")
+	// unexpected top-level package
+	writeIntegrationFile(t, filepath.Join(root, "internal", "random", "stuff.go"),
+		"package random\n")
+	// needed for imports to resolve
+	writeIntegrationFile(t, filepath.Join(root, "internal", "job", "job_cleanup.go"),
+		"package job\n\nimport \"context\"\n\ntype CleanupJob struct{}\nfunc (j *CleanupJob) Run(ctx context.Context) error { return nil }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "pkg", "batchutil", "util.go"),
+		"package batchutil\n")
+
+	pkgs, err := analyzer.Load(root, "internal/...")
+	if err != nil {
+		t.Log("partial load:", err)
+	}
+
+	violations := rules.RunAll(pkgs, module, root, rules.WithModel(m))
+	if len(violations) == 0 {
+		t.Fatal("expected violations")
+	}
+
+	assertHasRule(t, violations, "layer.direction")
+	assertHasRule(t, violations, "layer.inner-imports-pkg")
+	assertHasRule(t, violations, "naming.type-pattern-mismatch")
+	assertHasRule(t, violations, "structure.internal-top-level")
+}
+
+func TestIntegration_EventPipeline_Valid(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/eventapp"
+	m := rules.EventPipeline()
+
+	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "command", "command_create_order.go"),
+		"package command\n\nimport (\n\t\"context\"\n\t_ \""+module+"/internal/aggregate\"\n\t_ \""+module+"/internal/eventstore\"\n)\n\ntype CreateOrderCommand struct{}\nfunc (c *CreateOrderCommand) Execute(ctx context.Context) error { return nil }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "aggregate", "aggregate_order.go"),
+		"package aggregate\n\nimport (\n\t\"context\"\n\t_ \""+module+"/internal/event\"\n)\n\ntype OrderAggregate struct{}\nfunc (a *OrderAggregate) Apply(ctx context.Context) error { return nil }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "event", "order_created.go"),
+		"package event\n\nimport _ \""+module+"/internal/model\"\n\ntype OrderCreated struct{ ID string }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "projection", "order_view.go"),
+		"package projection\n\nimport (\n\t_ \""+module+"/internal/event\"\n\t_ \""+module+"/internal/readstore\"\n)\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "eventstore", "pg.go"),
+		"package eventstore\n\nimport (\n\t_ \""+module+"/internal/event\"\n\t_ \""+module+"/internal/model\"\n)\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "readstore", "pg.go"),
+		"package readstore\n\nimport _ \""+module+"/internal/model\"\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "model", "order.go"),
+		"package model\n\ntype Order struct{ ID string }\n")
+	writeIntegrationFile(t, filepath.Join(root, "internal", "pkg", "eventbus", "bus.go"),
+		"package eventbus\n")
+
+	pkgs, err := analyzer.Load(root, "internal/...")
+	if err != nil {
+		t.Log("partial load:", err)
+	}
+	if len(pkgs) == 0 {
+		t.Fatal("no packages loaded")
+	}
+
+	opts := []rules.Option{rules.WithModel(m)}
+
+	t.Run("layer direction", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, module, root, opts...))
+	})
+	t.Run("domain isolation skipped", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, module, root, opts...))
+	})
+	t.Run("structure", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckStructure(root, opts...))
+	})
+	t.Run("naming", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckNaming(pkgs, opts...))
+	})
+	t.Run("type patterns", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckTypePatterns(pkgs, opts...))
+	})
+	t.Run("run all", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.RunAll(pkgs, module, root, opts...))
+	})
+}
+
+func TestIntegration_EventPipeline_Violations(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/ep-violations"
+	m := rules.EventPipeline()
+
+	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+	// readstore imports command — layer direction violation
+	writeIntegrationFile(t, filepath.Join(root, "internal", "readstore", "bad.go"),
+		"package readstore\n\nimport _ \""+module+"/internal/command\"\n")
+	// event imports pkg — inner-imports-pkg violation
+	writeIntegrationFile(t, filepath.Join(root, "internal", "event", "bad.go"),
+		"package event\n\nimport _ \""+module+"/internal/pkg/eventbus\"\n")
+	// command file defines BadName instead of ShipCommand — type mismatch
+	writeIntegrationFile(t, filepath.Join(root, "internal", "command", "command_ship.go"),
+		"package command\n\nimport \"context\"\n\ntype BadName struct{}\nfunc (c *BadName) Execute(ctx context.Context) error { return nil }\n")
+	// aggregate file defines OrderAggregate but no Apply method — missing process
+	writeIntegrationFile(t, filepath.Join(root, "internal", "aggregate", "aggregate_order.go"),
+		"package aggregate\n\ntype OrderAggregate struct{}\n")
+	// unexpected top-level package
+	writeIntegrationFile(t, filepath.Join(root, "internal", "random", "stuff.go"),
+		"package random\n")
+	// needed for imports to resolve
+	writeIntegrationFile(t, filepath.Join(root, "internal", "pkg", "eventbus", "bus.go"),
+		"package eventbus\n")
+
+	pkgs, err := analyzer.Load(root, "internal/...")
+	if err != nil {
+		t.Log("partial load:", err)
+	}
+
+	violations := rules.RunAll(pkgs, module, root, rules.WithModel(m))
+	if len(violations) == 0 {
+		t.Fatal("expected violations")
+	}
+
+	assertHasRule(t, violations, "layer.direction")
+	assertHasRule(t, violations, "layer.inner-imports-pkg")
+	assertHasRule(t, violations, "naming.type-pattern-mismatch")
+	assertHasRule(t, violations, "naming.type-pattern-missing-method")
+	assertHasRule(t, violations, "structure.internal-top-level")
+}
+
 func writeIntegrationFile(t *testing.T, path string, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

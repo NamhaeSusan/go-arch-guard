@@ -372,6 +372,251 @@ import _ "` + mod + `/internal/domain/order/app"
 	}
 }
 
+// TestSkill_ConsumerWorkerSetup simulates the consumer worker skill's
+// "new project from scratch" scenario. A correctly structured project
+// must pass all rules with the ConsumerWorker model.
+func TestSkill_ConsumerWorkerSetup(t *testing.T) {
+	root := t.TempDir()
+	mod := "example.com/myworker"
+	m := rules.ConsumerWorker()
+
+	files := map[string]string{
+		"go.mod": "module " + mod + "\n\ngo 1.26.1\n",
+
+		// cmd
+		"cmd/worker/main.go": "package main\n\nfunc main() {}\n",
+
+		// worker
+		"internal/worker/worker_order.go": `package worker
+
+import "context"
+
+type OrderWorker struct{}
+
+func (w *OrderWorker) Process(ctx context.Context) error { return nil }
+`,
+		// service
+		"internal/service/order.go": `package service
+
+import _ "` + mod + `/internal/store"
+
+func HandleOrder() {}
+`,
+		// store
+		"internal/store/order.go": `package store
+
+import _ "` + mod + `/internal/model"
+
+func FindOrder() {}
+`,
+		// model
+		"internal/model/order.go": "package model\n\ntype Order struct{ ID int64 }\n",
+
+		// pkg
+		"internal/pkg/consumer/consumer.go": "package consumer\n",
+	}
+
+	writeProjectFiles(t, root, files)
+
+	pkgs, err := analyzer.Load(root, "internal/...", "cmd/...")
+	if err != nil {
+		t.Log(err)
+	}
+	if len(pkgs) == 0 {
+		t.Fatalf("no packages loaded: %v", err)
+	}
+
+	opts := []rules.Option{rules.WithModel(m)}
+
+	t.Run("layer direction", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, "", "", opts...))
+	})
+	t.Run("domain isolation skipped", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, "", "", opts...))
+	})
+	t.Run("naming", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckNaming(pkgs, opts...))
+	})
+	t.Run("structure", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckStructure(root, opts...))
+	})
+	t.Run("type patterns", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckTypePatterns(pkgs, opts...))
+	})
+	t.Run("RunAll", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.RunAll(pkgs, "", "", opts...))
+	})
+}
+
+// TestSkill_BatchSetup simulates the batch skill's "new project from scratch"
+// scenario. A correctly structured project must pass all rules with the Batch model.
+func TestSkill_BatchSetup(t *testing.T) {
+	root := t.TempDir()
+	mod := "example.com/mybatch"
+	m := rules.Batch()
+
+	files := map[string]string{
+		"go.mod": "module " + mod + "\n\ngo 1.26.1\n",
+
+		// cmd
+		"cmd/batch/main.go": "package main\n\nfunc main() {}\n",
+
+		// job
+		"internal/job/job_expire.go": `package job
+
+import "context"
+
+type ExpireJob struct{}
+
+func (j *ExpireJob) Run(ctx context.Context) error { return nil }
+`,
+		// service
+		"internal/service/file.go": `package service
+
+import _ "` + mod + `/internal/store"
+
+func HandleFile() {}
+`,
+		// store
+		"internal/store/file.go": `package store
+
+import _ "` + mod + `/internal/model"
+
+func FindFile() {}
+`,
+		// model
+		"internal/model/file.go": "package model\n\ntype File struct{ ID int64 }\n",
+
+		// pkg
+		"internal/pkg/batchutil/util.go": "package batchutil\n",
+	}
+
+	writeProjectFiles(t, root, files)
+
+	pkgs, err := analyzer.Load(root, "internal/...", "cmd/...")
+	if err != nil {
+		t.Log(err)
+	}
+	if len(pkgs) == 0 {
+		t.Fatalf("no packages loaded: %v", err)
+	}
+
+	opts := []rules.Option{rules.WithModel(m)}
+
+	t.Run("layer direction", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, "", "", opts...))
+	})
+	t.Run("domain isolation skipped", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, "", "", opts...))
+	})
+	t.Run("naming", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckNaming(pkgs, opts...))
+	})
+	t.Run("structure", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckStructure(root, opts...))
+	})
+	t.Run("type patterns", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckTypePatterns(pkgs, opts...))
+	})
+	t.Run("RunAll", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.RunAll(pkgs, "", "", opts...))
+	})
+}
+
+// TestSkill_EventPipelineSetup simulates the event-driven pipeline skill's
+// "new project from scratch" scenario. A correctly structured project
+// must pass all rules with the EventPipeline model.
+func TestSkill_EventPipelineSetup(t *testing.T) {
+	root := t.TempDir()
+	mod := "example.com/myevent"
+	m := rules.EventPipeline()
+
+	files := map[string]string{
+		"go.mod":               "module " + mod + "\n\ngo 1.26.1\n",
+		"cmd/pipeline/main.go": "package main\n\nfunc main() {}\n",
+
+		"internal/command/command_create_order.go": `package command
+
+import "context"
+
+type CreateOrderCommand struct{}
+
+func (c *CreateOrderCommand) Execute(ctx context.Context) error { return nil }
+`,
+		"internal/aggregate/aggregate_order.go": `package aggregate
+
+import "context"
+
+type OrderAggregate struct{}
+
+func (a *OrderAggregate) Apply(ctx context.Context) error { return nil }
+`,
+		"internal/event/order_created.go": `package event
+
+import "` + mod + `/internal/model"
+
+type OrderCreated struct{ Order model.Order }
+`,
+		"internal/projection/order_view.go": `package projection
+
+import (
+	_ "` + mod + `/internal/event"
+	_ "` + mod + `/internal/readstore"
+)
+
+func BuildOrderView() {}
+`,
+		"internal/eventstore/pg.go": `package eventstore
+
+import (
+	_ "` + mod + `/internal/event"
+	_ "` + mod + `/internal/model"
+)
+
+func SaveEvent() {}
+`,
+		"internal/readstore/pg.go": `package readstore
+
+import _ "` + mod + `/internal/model"
+
+func SaveView() {}
+`,
+		"internal/model/order.go":      "package model\n\ntype Order struct{ ID int64 }\n",
+		"internal/pkg/eventbus/bus.go": "package eventbus\n",
+	}
+
+	writeProjectFiles(t, root, files)
+
+	pkgs, err := analyzer.Load(root, "internal/...", "cmd/...")
+	if err != nil {
+		t.Log(err)
+	}
+	if len(pkgs) == 0 {
+		t.Fatalf("no packages loaded: %v", err)
+	}
+
+	opts := []rules.Option{rules.WithModel(m)}
+
+	t.Run("layer direction", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, "", "", opts...))
+	})
+	t.Run("domain isolation skipped", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, "", "", opts...))
+	})
+	t.Run("naming", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckNaming(pkgs, opts...))
+	})
+	t.Run("structure", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckStructure(root, opts...))
+	})
+	t.Run("type patterns", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.CheckTypePatterns(pkgs, opts...))
+	})
+	t.Run("RunAll", func(t *testing.T) {
+		report.AssertNoViolations(t, rules.RunAll(pkgs, "", "", opts...))
+	})
+}
+
 func writeProjectFiles(t *testing.T, root string, files map[string]string) {
 	t.Helper()
 	for rel, content := range files {

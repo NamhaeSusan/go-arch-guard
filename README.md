@@ -8,7 +8,7 @@
 
 Architecture guardrails for Go projects via `go test`, built for AI coding agents and fast-moving teams.
 
-Define isolation, layer-direction, structure, naming, and blast-radius rules, then fail regular tests when the project shape drifts. Ships with **DDD**, **Clean Architecture**, **Layered**, **Hexagonal**, and **Modular Monolith** presets, and supports fully custom architecture models. No CLI to learn. No separate config format. Just Go tests.
+Define isolation, layer-direction, structure, naming, and blast-radius rules, then fail regular tests when the project shape drifts. Ships with **DDD**, **Clean Architecture**, **Layered**, **Hexagonal**, **Modular Monolith**, **Consumer/Worker**, **Batch**, and **Event-Driven Pipeline** presets, and supports fully custom architecture models. No CLI to learn. No separate config format. Just Go tests.
 
 AI-agent-friendly by default:
 
@@ -53,7 +53,8 @@ src, err := scaffold.ArchitectureTest(
 from a hyphenated module basename.
 
 Available presets: `PresetDDD`, `PresetCleanArch`, `PresetLayered`,
-`PresetHexagonal`, `PresetModularMonolith`.
+`PresetHexagonal`, `PresetModularMonolith`, `PresetConsumerWorker`, `PresetBatch`,
+`PresetEventPipeline`.
 
 ### Recommended shortcut
 
@@ -101,7 +102,7 @@ func TestArchitecture(t *testing.T) {
 For other presets, add `opts` with the model function:
 
 ```go
-m := rules.CleanArch() // or Layered(), Hexagonal(), ModularMonolith()
+m := rules.CleanArch() // or Layered(), Hexagonal(), ModularMonolith(), ConsumerWorker(), Batch(), EventPipeline()
 opts := []rules.Option{rules.WithModel(m)}
 
 rules.CheckDomainIsolation(pkgs, "", "", opts...)
@@ -144,147 +145,25 @@ Sample output when violations exist:
 
 Pass empty strings for `module` and `root` to auto-extract from loaded packages. If the module cannot be determined, a `meta.no-matching-packages` warning is emitted.
 
-## Architecture Models
+## Presets
 
-### Built-in Presets
+| Preset | Type | Sublayers | Direction |
+|--------|------|-----------|-----------|
+| `DDD()` | Domain | handler, app, core/model, core/repo, core/svc, event, infra | handler->app->core/\*, infra->core/repo |
+| `CleanArch()` | Domain | handler, usecase, entity, gateway, infra | handler->usecase->entity+gateway, infra->gateway |
+| `Layered()` | Domain | handler, service, repository, model | handler->service->repository+model |
+| `Hexagonal()` | Domain | handler, usecase, port, domain, adapter | handler->usecase->port+domain, adapter->port+domain |
+| `ModularMonolith()` | Domain | api, application, core, infrastructure | api->application->core, infrastructure->core |
+| `ConsumerWorker()` | Flat | worker, service, store, model | worker->service->store->model |
+| `Batch()` | Flat | job, service, store, model | job->service->store->model |
+| `EventPipeline()` | Flat | command, aggregate, event, projection, eventstore, readstore, model | command->aggregate+eventstore, projection->event/readstore |
 
-| Preset | Sublayers | Direction | Alias Required | Model Required |
-|--------|-----------|-----------|:-:|:-:|
-| `DDD()` | handler, app, core/model, core/repo, core/svc, event, infra | handler→app→core/\*, infra→core/repo | Yes | Yes |
-| `CleanArch()` | handler, usecase, entity, gateway, infra | handler→usecase→entity+gateway, infra→gateway | No | No |
-| `Layered()` | handler, service, repository, model | handler→service→repository+model, repository→model | No | No |
-| `Hexagonal()` | handler, usecase, port, domain, adapter | handler→usecase→port+domain, adapter→port+domain | No | No |
-| `ModularMonolith()` | api, application, core, infrastructure | api→application→core, infrastructure→core | No | No |
+Domain presets use `internal/domain/{name}/{layer}/` layout.
+Flat presets use `internal/{layer}/` layout (no domain directory).
 
-### DDD Layout
+See [preset details](docs/presets.md) for full layout diagrams and direction tables.
 
-```text
-internal/
-├── domain/
-│   └── order/
-│       ├── alias.go              # public surface (required)
-│       ├── handler/http/         # inbound adapters
-│       ├── app/                  # application service
-│       ├── core/
-│       │   ├── model/            # domain model (required)
-│       │   ├── repo/             # repository interface
-│       │   └── svc/              # domain service interface
-│       ├── event/                # domain events
-│       └── infra/persistence/    # outbound adapters
-├── orchestration/                # cross-domain coordination
-└── pkg/                          # shared utilities
-```
-
-DDD layer direction:
-
-| from | allowed to import |
-|------|-------------------|
-| `handler` | `app` |
-| `app` | `core/model`, `core/repo`, `core/svc`, `event` |
-| `core` | `core/model` |
-| `core/model` | nothing |
-| `core/repo` | `core/model` |
-| `core/svc` | `core/model` |
-| `event` | `core/model` |
-| `infra` | `core/repo`, `core/model`, `event` |
-
-### Clean Architecture Layout
-
-```text
-internal/
-├── domain/
-│   └── product/
-│       ├── handler/              # interface adapters (controllers)
-│       ├── usecase/              # application business rules
-│       ├── entity/               # enterprise business rules
-│       ├── gateway/              # data access interfaces
-│       └── infra/                # frameworks & drivers
-├── orchestration/
-└── pkg/
-```
-
-Clean Architecture layer direction:
-
-| from | allowed to import |
-|------|-------------------|
-| `handler` | `usecase` |
-| `usecase` | `entity`, `gateway` |
-| `entity` | nothing |
-| `gateway` | `entity` |
-| `infra` | `gateway`, `entity` |
-
-### Layered (Spring-style) Layout
-
-```text
-internal/
-├── domain/
-│   └── order/
-│       ├── handler/              # HTTP/gRPC handlers
-│       ├── service/              # business logic
-│       ├── repository/           # data access
-│       └── model/                # domain models
-├── orchestration/
-└── pkg/
-```
-
-Layered direction:
-
-| from | allowed to import |
-|------|-------------------|
-| `handler` | `service` |
-| `service` | `repository`, `model` |
-| `repository` | `model` |
-| `model` | nothing |
-
-### Hexagonal (Ports & Adapters) Layout
-
-```text
-internal/
-├── domain/
-│   └── order/
-│       ├── handler/              # driving adapters (HTTP, gRPC)
-│       ├── usecase/              # application logic
-│       ├── port/                 # interfaces (inbound + outbound)
-│       ├── domain/               # entities, value objects
-│       └── adapter/              # driven adapters (DB, messaging)
-├── orchestration/
-└── pkg/
-```
-
-Hexagonal direction:
-
-| from | allowed to import |
-|------|-------------------|
-| `handler` | `usecase` |
-| `usecase` | `port`, `domain` |
-| `port` | `domain` |
-| `domain` | nothing |
-| `adapter` | `port`, `domain` |
-
-### Modular Monolith Layout
-
-```text
-internal/
-├── domain/
-│   └── order/
-│       ├── api/                  # module public interface
-│       ├── application/          # use cases
-│       ├── core/                 # entities, value objects
-│       └── infrastructure/       # DB, external services
-├── orchestration/
-└── pkg/
-```
-
-Modular Monolith direction:
-
-| from | allowed to import |
-|------|-------------------|
-| `api` | `application` |
-| `application` | `core` |
-| `core` | nothing |
-| `infrastructure` | `core` |
-
-### Custom Model
+### Custom Model Options
 
 Start from DDD defaults and override what you need:
 
@@ -322,83 +201,333 @@ All model options:
 | `WithBannedPkgNames([]string{...})` | package names banned under internal/ |
 | `WithLegacyPkgNames([]string{...})` | package names that trigger migration warnings |
 | `WithLayerDirNames(map[string]bool{...})` | directory names considered "layer-like" for naming checks |
+| `WithInterfacePatternExclude(map[string]bool{...})` | layers to skip for interface pattern checks |
 
 ## Isolation Rules
 
 `rules.CheckDomainIsolation(pkgs, module, root, opts...)`
 
-Blocks cross-domain imports and forces external access through domain root packages.
+Prevents domains from leaking into each other. Without isolation, a change in domain A
+can silently break domain B --- the most common source of unintended coupling in DDD projects.
 
-| Rule | Meaning |
-|------|---------|
-| `isolation.cross-domain` | domain A must not import domain B |
-| `isolation.cmd-deep-import` | `cmd/` must only import domain roots, not sub-packages |
-| `isolation.orchestration-deep-import` | orchestration must only import domain roots |
-| `isolation.pkg-imports-domain` | shared pkg must not import any domain |
-| `isolation.pkg-imports-orchestration` | shared pkg must not import orchestration |
-| `isolation.domain-imports-orchestration` | domains must not import orchestration |
-| `isolation.internal-imports-orchestration` | non-cmd/orchestration packages must not import orchestration |
-| `isolation.internal-imports-domain` | unregistered internal packages must not import domains |
+### `isolation.cross-domain`
 
-Import matrix:
+Domains must not import other domains directly.
 
-| from → to | domain root | domain sub-pkg | orchestration | shared pkg |
-|-----------|:-:|:-:|:-:|:-:|
+```go
+// internal/domain/order/app/service.go
+package app
+
+import _ "myapp/internal/domain/user/app"  // violation
+```
+
+```go
+// use orchestration for cross-domain coordination
+package orchestration
+
+import (
+    "myapp/internal/domain/order"
+    "myapp/internal/domain/user"
+)
+```
+
+### `isolation.cmd-deep-import`
+
+`cmd/` must only import domain root packages (alias), not sub-packages.
+
+```go
+// cmd/server/main.go
+import _ "myapp/internal/domain/order/app"  // too deep
+
+import _ "myapp/internal/domain/order"  // domain root only
+```
+
+### `isolation.orchestration-deep-import`
+
+Orchestration must only import domain roots, keeping the coupling surface minimal.
+
+```go
+// internal/orchestration/checkout.go
+import _ "myapp/internal/domain/order/app"  // too deep
+
+import _ "myapp/internal/domain/order"  // domain root only
+```
+
+### `isolation.pkg-imports-domain`
+
+Shared `pkg/` must not import any domain --- it should be domain-agnostic.
+
+```go
+// internal/pkg/logger/logger.go
+import _ "myapp/internal/domain/order"  // violation: pkg depends on domain
+```
+
+### `isolation.pkg-imports-orchestration`
+
+Shared `pkg/` must not import orchestration.
+
+### `isolation.domain-imports-orchestration`
+
+Domains must not import orchestration --- orchestration coordinates domains, not the reverse.
+
+### `isolation.internal-imports-orchestration`
+
+Only `cmd/` and orchestration itself may depend on orchestration.
+
+### `isolation.internal-imports-domain`
+
+Non-domain internal packages (other than orchestration/cmd/pkg) must not import domains.
+
+**Import matrix:**
+
+| from | domain root | domain sub-pkg | orchestration | shared pkg |
+|------|:-:|:-:|:-:|:-:|
 | **same domain** | Yes | Yes | No | Yes |
 | **other domain** | No | No | No | Yes |
 | **orchestration** | Yes | No | Yes | Yes |
 | **cmd** | Yes | No | Yes | Yes |
 | **shared pkg** | No | No | No | Yes |
 
+> **Flat-layout presets** (ConsumerWorker, Batch, EventPipeline): isolation rules are
+> skipped entirely --- there are no domains to isolate.
+
 ## Layer Direction Rules
 
 `rules.CheckLayerDirection(pkgs, module, root, opts...)`
 
-Enforces allowed intra-domain dependency direction. The direction matrix is defined by the architecture model.
+Prevents reverse dependencies between layers. Without direction enforcement,
+inner layers (model, entity) gradually accumulate imports from outer layers,
+making them impossible to extract or test independently.
 
-| Rule | Meaning |
-|------|---------|
-| `layer.direction` | import violates the allowed layer direction |
-| `layer.inner-imports-pkg` | inner layer imports shared pkg (controlled by `PkgRestricted`) |
-| `layer.unknown-sublayer` | unknown sublayer found in domain |
+### `layer.direction`
 
-Notes:
+Imports must follow the allowed direction defined by the preset's direction matrix.
 
-- same-sublayer imports are always allowed
-- the domain root package is not checked
-- direction matrix is fully customizable via `WithDirection`
+```go
+// DDD preset: core/svc may only import core/model
+package svc // internal/domain/order/core/svc/
+
+import _ "myapp/internal/domain/order/app"  // reverse direction
+
+import _ "myapp/internal/domain/order/core/model"  // allowed
+```
+
+### `layer.inner-imports-pkg`
+
+Inner layers marked as `PkgRestricted` must not import shared `pkg/`.
+This keeps core domain logic free of infrastructure concerns.
+
+```go
+// DDD: core/model is PkgRestricted
+package model // internal/domain/order/core/model/
+
+import _ "myapp/internal/pkg/logger"  // model must be self-contained
+```
+
+### `layer.unknown-sublayer`
+
+Detects directories under a domain that don't match any recognized sublayer name.
+
+```
+internal/domain/order/utils/   "utils" is not a recognized sublayer
+```
+
+> **Flat-layout presets**: layers are checked at `internal/` top level instead of within domains.
 
 ## Structure Rules
 
 `rules.CheckStructure(root, opts...)`
 
-| Rule | Meaning |
-|------|---------|
-| `structure.internal-top-level` | only allowed top-level packages under `internal/` |
-| `structure.banned-package` | banned package names (default: `util`, `common`, `misc`, `helper`, `shared`, `services`) |
-| `structure.legacy-package` | legacy packages that should be migrated |
-| `structure.misplaced-layer` | `app`/`handler`/`infra` outside domain slices |
-| `structure.middleware-placement` | `middleware/` must live in shared pkg |
-| `structure.domain-root-alias-required` | domain root must define alias file (DDD only) |
-| `structure.domain-root-alias-package` | alias file package name must match directory |
-| `structure.domain-root-alias-only` | domain root may only contain alias file |
-| `structure.domain-alias-no-interface` | alias file must not re-export interfaces |
-| `structure.domain-model-required` | domain must have model directory (DDD only) |
-| `structure.dto-placement` | DTO files only in handler/app |
+Enforces filesystem layout conventions that prevent structural drift during vibe coding.
+
+### `structure.internal-top-level`
+
+Only allowed directories may exist at the `internal/` top level.
+
+```
+// DDD: only domain/, orchestration/, pkg/ allowed
+internal/
+  domain/          allowed
+  orchestration/   allowed
+  pkg/             allowed
+  config/          not in allowed list
+```
+
+### `structure.banned-package`
+
+Blocks vague package names that become dumping grounds.
+
+Banned by default: `util`, `common`, `misc`, `helper`, `shared`, `services`
+
+```
+internal/domain/order/app/util/   "util" is banned
+```
+
+### `structure.legacy-package`
+
+Warns about package names that should be migrated: `router`, `bootstrap`
+
+### `structure.misplaced-layer`
+
+Layer directories (`app`, `handler`, `infra`) must only exist inside domain slices,
+not floating at the internal/ top level.
+
+### `structure.middleware-placement`
+
+`middleware/` must live in `internal/pkg/middleware/`, not scattered across domains.
+
+### `structure.domain-root-alias-required` (DDD only)
+
+Each domain root must define an `alias.go` file as its public API surface.
+
+### `structure.domain-root-alias-package`
+
+The alias file's package name must match the directory name.
+
+### `structure.domain-root-alias-only`
+
+Domain root directories may only contain `alias.go` --- all other code goes in sublayers.
+
+### `structure.domain-alias-no-interface`
+
+Alias files must not re-export interfaces --- this leaks cross-domain contracts.
+
+### `structure.domain-model-required` (DDD only)
+
+Each domain must have a `core/model/` directory with at least one Go file.
+
+### `structure.dto-placement`
+
+DTO files (`dto.go`, `*_dto.go`) may only exist in allowed layers (handler, app).
 
 ## Naming Rules
 
 `rules.CheckNaming(pkgs, opts...)`
 
-| Rule | Meaning |
-|------|---------|
-| `naming.no-stutter` | exported type repeats the package name |
-| `naming.no-impl-suffix` | exported type ends with `Impl` |
-| `naming.snake-case-file` | file name is not snake_case |
-| `naming.repo-file-interface` | file in repo/ lacks matching interface |
-| `naming.no-layer-suffix` | file name redundantly repeats the layer name |
-| `naming.domain-interface-repo-only` | domain interface outside repo sublayer (DDD only) |
-| `naming.no-handmock` | test file defines hand-rolled mock/fake/stub |
+Enforces Go naming conventions that keep the codebase consistent and grep-friendly.
+
+### `naming.no-stutter`
+
+Exported types must not repeat the package name.
+
+```go
+package repo
+
+type RepoOrder struct{}  // stutters: repo.RepoOrder
+type Order struct{}      // clean: repo.Order
+```
+
+### `naming.no-impl-suffix`
+
+Exported types must not end with `Impl`. Use unexported types instead.
+
+```go
+type OrderServiceImpl struct{}  // Impl suffix
+type orderService struct{}      // unexported
+```
+
+### `naming.snake-case-file`
+
+All Go filenames must be snake_case.
+
+```
+OrderService.go   violation
+order_service.go  correct
+```
+
+### `naming.repo-file-interface`
+
+Files in `repo/` (or `core/repo/`) must contain an interface matching the filename.
+
+```go
+// order.go in repo/ must define:
+type Order interface { ... }  // matches filename
+```
+
+### `naming.no-layer-suffix`
+
+Filenames must not redundantly repeat the layer name.
+
+```
+// inside service/ directory:
+order_service.go  "_service" suffix is redundant
+order.go          correct
+```
+
+### `naming.domain-interface-repo-only` (DDD only)
+
+Interfaces within a domain must be defined in `core/repo/`, not scattered across layers.
+
+### `naming.no-handmock`
+
+Test files must not define hand-rolled mock/fake/stub structs with methods.
+Use mockery or other generation tools instead.
+
+### `naming.type-pattern-mismatch` (flat presets)
+
+Files matching a TypePattern prefix must define the corresponding type.
+
+```go
+// worker/worker_order.go must define:
+type OrderWorker struct{}  // expected
+
+type SomethingElse struct{}  // expected OrderWorker
+```
+
+### `naming.type-pattern-missing-method` (flat presets)
+
+Types matched by TypePattern must have the required method.
+
+```go
+type OrderWorker struct{}
+// missing Process method  --- violation
+
+func (w *OrderWorker) Process(ctx context.Context) error { ... }  // correct
+```
+
+## Interface Pattern Rules
+
+`rules.CheckInterfacePattern(pkgs, opts...)`
+
+Enforces Go interface best practices: private implementation, `New()`-only constructor,
+interface return type, and single interface per package.
+
+### `interface.exported-impl`
+
+Exported structs must not implement interfaces --- make implementation types unexported
+to prevent consumers from depending on the concrete type.
+
+```go
+type RepositoryImpl struct{ db *sql.DB }  // exported struct implements interface
+type repository struct{ db *sql.DB }      // unexported --- correct
+```
+
+### `interface.constructor-name`
+
+Constructors must be named `New`, not `NewXxx` variants. This enforces a consistent
+factory pattern across all packages.
+
+```go
+func NewRepository(db *sql.DB) Repository  // NewXxx not allowed
+func New(db *sql.DB) Repository            // correct
+```
+
+### `interface.constructor-returns-interface`
+
+`New()` must return an interface, not a concrete type. This ensures callers depend
+on the contract, not the implementation.
+
+```go
+func New(db *sql.DB) *repository  // returns concrete type
+func New(db *sql.DB) Repository   // returns interface --- correct
+```
+
+### `interface.single-per-package`
+
+At most one exported interface per package (Warning). Multiple interfaces in one package
+typically signal that the package has too many responsibilities.
+
+Excluded layers per preset (entry points, model, event, pkg) are controlled by `InterfacePatternExclude`.
 
 ## Blast Radius
 
@@ -457,6 +586,7 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `rules.CheckNaming(pkgs, opts...)` | naming convention checks |
 | `rules.CheckStructure(root, opts...)` | filesystem structure checks |
 | `rules.AnalyzeBlastRadius(pkgs, module, root, opts...)` | coupling outlier detection |
+| `rules.CheckInterfacePattern(pkgs, opts...)` | interface pattern best practices |
 | `rules.RunAll(pkgs, module, root, opts...)` | run the recommended built-in rule bundle |
 | `report.AssertNoViolations(t, violations)` | fail test on Error violations |
 | `report.BuildJSONReport(violations)` | build a machine-readable JSON-friendly report |
@@ -468,6 +598,10 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `rules.Layered()` | Spring-style layered model |
 | `rules.Hexagonal()` | Ports & Adapters model |
 | `rules.ModularMonolith()` | Module-based layered model |
+| `rules.ConsumerWorker()` | Consumer/Worker flat-layout model |
+| `rules.Batch()` | Batch flat-layout model |
+| `rules.EventPipeline()` | Event-sourcing / CQRS flat-layout model |
+| `rules.CheckTypePatterns(pkgs, opts...)` | AST-based type pattern enforcement |
 | `rules.NewModel(opts...)` | custom model builder |
 | `rules.WithModel(m)` | apply custom model to checks |
 | `rules.WithSeverity(rules.Warning)` | downgrade to warnings |

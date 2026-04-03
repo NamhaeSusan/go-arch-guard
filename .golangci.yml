@@ -1,6 +1,10 @@
 version: "2"
 
 linters:
+  enable:
+    - gocritic
+    - errorlint
+    - misspell
   settings:
     gocyclo:
       min-complexity: 35

@@ -117,6 +117,170 @@ func TestModularMonolith_ReturnsValidModel(t *testing.T) {
 	}
 }
 
+func TestConsumerWorker_ReturnsValidModel(t *testing.T) {
+	m := ConsumerWorker()
+	if len(m.Sublayers) != 4 {
+		t.Fatalf("ConsumerWorker sublayer count = %d, want 4", len(m.Sublayers))
+	}
+	if m.DomainDir != "" {
+		t.Errorf("DomainDir = %q, want empty (flat layout)", m.DomainDir)
+	}
+	if m.OrchestrationDir != "" {
+		t.Errorf("OrchestrationDir = %q, want empty", m.OrchestrationDir)
+	}
+	if m.SharedDir != "pkg" {
+		t.Errorf("SharedDir = %q, want %q", m.SharedDir, "pkg")
+	}
+	if m.RequireAlias {
+		t.Error("ConsumerWorker should not require alias")
+	}
+	if m.RequireModel {
+		t.Error("ConsumerWorker should not require model")
+	}
+	if m.ModelPath != "model" {
+		t.Errorf("ModelPath = %q, want %q", m.ModelPath, "model")
+	}
+	if !m.PkgRestricted["model"] {
+		t.Error("model sublayer must be pkg-restricted")
+	}
+	for _, layer := range []string{"worker", "service", "store", "model", "pkg"} {
+		if !m.InternalTopLevel[layer] {
+			t.Errorf("InternalTopLevel missing %q", layer)
+		}
+	}
+	if len(m.InternalTopLevel) != 5 {
+		t.Errorf("InternalTopLevel has %d entries, want 5", len(m.InternalTopLevel))
+	}
+	workerAllowed := m.Direction["worker"]
+	if len(workerAllowed) != 2 {
+		t.Errorf("worker allowed = %v, want [service model]", workerAllowed)
+	}
+	modelAllowed := m.Direction["model"]
+	if len(modelAllowed) != 0 {
+		t.Errorf("model allowed = %v, want []", modelAllowed)
+	}
+	if len(m.TypePatterns) != 1 {
+		t.Fatalf("TypePatterns count = %d, want 1", len(m.TypePatterns))
+	}
+	tp := m.TypePatterns[0]
+	if tp.Dir != "worker" || tp.FilePrefix != "worker" || tp.TypeSuffix != "Worker" || tp.RequireMethod != "Process" {
+		t.Errorf("TypePattern = %+v, unexpected", tp)
+	}
+}
+
+func TestBatch_ReturnsValidModel(t *testing.T) {
+	m := Batch()
+	if len(m.Sublayers) != 4 {
+		t.Fatalf("Batch sublayer count = %d, want 4", len(m.Sublayers))
+	}
+	if m.DomainDir != "" {
+		t.Errorf("DomainDir = %q, want empty (flat layout)", m.DomainDir)
+	}
+	if m.OrchestrationDir != "" {
+		t.Errorf("OrchestrationDir = %q, want empty", m.OrchestrationDir)
+	}
+	if m.SharedDir != "pkg" {
+		t.Errorf("SharedDir = %q, want %q", m.SharedDir, "pkg")
+	}
+	if m.RequireAlias {
+		t.Error("Batch should not require alias")
+	}
+	if m.RequireModel {
+		t.Error("Batch should not require model")
+	}
+	if m.ModelPath != "model" {
+		t.Errorf("ModelPath = %q, want %q", m.ModelPath, "model")
+	}
+	if !m.PkgRestricted["model"] {
+		t.Error("model sublayer must be pkg-restricted")
+	}
+	for _, layer := range []string{"job", "service", "store", "model", "pkg"} {
+		if !m.InternalTopLevel[layer] {
+			t.Errorf("InternalTopLevel missing %q", layer)
+		}
+	}
+	if len(m.InternalTopLevel) != 5 {
+		t.Errorf("InternalTopLevel has %d entries, want 5", len(m.InternalTopLevel))
+	}
+	jobAllowed := m.Direction["job"]
+	if len(jobAllowed) != 2 {
+		t.Errorf("job allowed = %v, want [service model]", jobAllowed)
+	}
+	modelAllowed := m.Direction["model"]
+	if len(modelAllowed) != 0 {
+		t.Errorf("model allowed = %v, want []", modelAllowed)
+	}
+	if len(m.TypePatterns) != 1 {
+		t.Fatalf("TypePatterns count = %d, want 1", len(m.TypePatterns))
+	}
+	tp := m.TypePatterns[0]
+	if tp.Dir != "job" || tp.FilePrefix != "job" || tp.TypeSuffix != "Job" || tp.RequireMethod != "Run" {
+		t.Errorf("TypePattern = %+v, unexpected", tp)
+	}
+}
+
+func TestEventPipeline_ReturnsValidModel(t *testing.T) {
+	m := EventPipeline()
+	if len(m.Sublayers) != 7 {
+		t.Fatalf("EventPipeline sublayer count = %d, want 7", len(m.Sublayers))
+	}
+	if m.DomainDir != "" {
+		t.Errorf("DomainDir = %q, want empty (flat layout)", m.DomainDir)
+	}
+	if m.OrchestrationDir != "" {
+		t.Errorf("OrchestrationDir = %q, want empty", m.OrchestrationDir)
+	}
+	if m.SharedDir != "pkg" {
+		t.Errorf("SharedDir = %q, want %q", m.SharedDir, "pkg")
+	}
+	if m.RequireAlias {
+		t.Error("EventPipeline should not require alias")
+	}
+	if m.RequireModel {
+		t.Error("EventPipeline should not require model")
+	}
+	if m.ModelPath != "model" {
+		t.Errorf("ModelPath = %q, want %q", m.ModelPath, "model")
+	}
+	if !m.PkgRestricted["model"] {
+		t.Error("model sublayer must be pkg-restricted")
+	}
+	if !m.PkgRestricted["event"] {
+		t.Error("event sublayer must be pkg-restricted")
+	}
+	for _, layer := range []string{"command", "aggregate", "event", "projection", "eventstore", "readstore", "model", "pkg"} {
+		if !m.InternalTopLevel[layer] {
+			t.Errorf("InternalTopLevel missing %q", layer)
+		}
+	}
+	if len(m.InternalTopLevel) != 8 {
+		t.Errorf("InternalTopLevel has %d entries, want 8", len(m.InternalTopLevel))
+	}
+	cmdAllowed := m.Direction["command"]
+	if len(cmdAllowed) != 3 {
+		t.Errorf("command allowed = %v, want [aggregate eventstore model]", cmdAllowed)
+	}
+	aggAllowed := m.Direction["aggregate"]
+	if len(aggAllowed) != 2 {
+		t.Errorf("aggregate allowed = %v, want [event model]", aggAllowed)
+	}
+	modelAllowed := m.Direction["model"]
+	if len(modelAllowed) != 0 {
+		t.Errorf("model allowed = %v, want []", modelAllowed)
+	}
+	if len(m.TypePatterns) != 2 {
+		t.Fatalf("TypePatterns count = %d, want 2", len(m.TypePatterns))
+	}
+	tp0 := m.TypePatterns[0]
+	if tp0.Dir != "command" || tp0.FilePrefix != "command" || tp0.TypeSuffix != "Command" || tp0.RequireMethod != "Execute" {
+		t.Errorf("TypePattern[0] = %+v, unexpected", tp0)
+	}
+	tp1 := m.TypePatterns[1]
+	if tp1.Dir != "aggregate" || tp1.FilePrefix != "aggregate" || tp1.TypeSuffix != "Aggregate" || tp1.RequireMethod != "Apply" {
+		t.Errorf("TypePattern[1] = %+v, unexpected", tp1)
+	}
+}
+
 func TestNewModel_CustomOverrides(t *testing.T) {
 	m := NewModel(
 		WithDomainDir("module"),
@@ -192,6 +356,32 @@ func TestNewModel_OrchestrationDirPropagation(t *testing.T) {
 	}
 }
 
+func TestInterfacePatternExclude(t *testing.T) {
+	tests := []struct {
+		name     string
+		model    Model
+		expected []string
+	}{
+		{"DDD", DDD(), []string{"handler", "app", "core/model", "event"}},
+		{"CleanArch", CleanArch(), []string{"handler", "entity"}},
+		{"Layered", Layered(), []string{"handler", "model"}},
+		{"Hexagonal", Hexagonal(), []string{"handler", "domain"}},
+		{"ModularMonolith", ModularMonolith(), []string{"api", "core"}},
+		{"ConsumerWorker", ConsumerWorker(), []string{"model", "worker"}},
+		{"Batch", Batch(), []string{"model", "job"}},
+		{"EventPipeline", EventPipeline(), []string{"model", "event", "command", "aggregate"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, layer := range tc.expected {
+				if !tc.model.InterfacePatternExclude[layer] {
+					t.Errorf("InterfacePatternExclude missing %q", layer)
+				}
+			}
+		})
+	}
+}
+
 func TestModelConsistency(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
@@ -202,6 +392,9 @@ func TestModelConsistency(t *testing.T) {
 		{"Layered", Layered()},
 		{"Hexagonal", Hexagonal()},
 		{"ModularMonolith", ModularMonolith()},
+		{"ConsumerWorker", ConsumerWorker()},
+		{"Batch", Batch()},
+		{"EventPipeline", EventPipeline()},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			validateModelConsistency(t, tc.model)
@@ -222,7 +415,7 @@ func validateModelConsistency(t *testing.T, m Model) {
 			t.Errorf("Direction key %q not in Sublayers", key)
 		}
 	}
-	if !m.InternalTopLevel[m.DomainDir] {
+	if m.DomainDir != "" && !m.InternalTopLevel[m.DomainDir] {
 		t.Errorf("InternalTopLevel missing DomainDir %q", m.DomainDir)
 	}
 	if !m.InternalTopLevel[m.SharedDir] {

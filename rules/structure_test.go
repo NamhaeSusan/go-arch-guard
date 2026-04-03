@@ -505,6 +505,41 @@ type Order = model.Order
 			}
 		}
 	})
+
+	t.Run("flat layout valid structure has no violations", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, filepath.Join(root, "internal", "worker", "consume.go"), "package worker\n")
+		writeFile(t, filepath.Join(root, "internal", "service", "order.go"), "package service\n")
+		writeFile(t, filepath.Join(root, "internal", "store", "pg.go"), "package store\n")
+		writeFile(t, filepath.Join(root, "internal", "model", "order.go"), "package model\n")
+		writeFile(t, filepath.Join(root, "internal", "pkg", "logger.go"), "package pkg\n")
+
+		violations := rules.CheckStructure(root, rules.WithModel(rules.ConsumerWorker()))
+		if len(violations) > 0 {
+			for _, v := range violations {
+				t.Log(v.String())
+			}
+			t.Errorf("expected no violations for valid flat layout, got %d", len(violations))
+		}
+	})
+
+	t.Run("flat layout rejects unexpected top-level package", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, filepath.Join(root, "internal", "worker", "consume.go"), "package worker\n")
+		writeFile(t, filepath.Join(root, "internal", "randomstuff", "junk.go"), "package randomstuff\n")
+
+		violations := rules.CheckStructure(root, rules.WithModel(rules.ConsumerWorker()))
+		found := false
+		for _, v := range violations {
+			if v.Rule == "structure.internal-top-level" && v.File == "internal/randomstuff/" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected internal-top-level violation for randomstuff/ in flat layout")
+		}
+	})
 }
 
 func writeFile(t *testing.T, path string, content string) {

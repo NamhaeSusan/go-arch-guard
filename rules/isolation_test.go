@@ -1,6 +1,7 @@
 package rules_test
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/NamhaeSusan/go-arch-guard/analyzer"
@@ -195,6 +196,27 @@ func TestCheckDomainIsolation(t *testing.T) {
 		}
 		if !found {
 			t.Error("expected meta.no-matching-packages warning for wrong module path")
+		}
+	})
+
+	t.Run("flat layout skipped", func(t *testing.T) {
+		root := t.TempDir()
+		module := "example.com/workeriso"
+		m := rules.ConsumerWorker()
+
+		writeTestFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+		writeTestFile(t, filepath.Join(root, "internal", "worker", "w.go"),
+			"package worker\n\nimport _ \""+module+"/internal/service\"\n")
+		writeTestFile(t, filepath.Join(root, "internal", "service", "s.go"),
+			"package service\n")
+
+		pkgs := loadTestPackages(t, root)
+		violations := rules.CheckDomainIsolation(pkgs, module, root, rules.WithModel(m))
+		if len(violations) > 0 {
+			for _, v := range violations {
+				t.Log(v.String())
+			}
+			t.Error("expected 0 domain isolation violations for flat layout")
 		}
 	})
 

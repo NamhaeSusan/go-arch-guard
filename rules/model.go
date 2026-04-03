@@ -1,23 +1,33 @@
 package rules
 
 // Model defines the architecture model used by all rule checks.
-// Use DDD(), CleanArch(), Layered(), Hexagonal(), ModularMonolith(), or NewModel() to create one.
+// Use DDD(), CleanArch(), Layered(), Hexagonal(), ModularMonolith(), ConsumerWorker(), Batch(), EventPipeline(), or NewModel() to create one.
 type Model struct {
-	Sublayers        []string
-	Direction        map[string][]string
-	PkgRestricted    map[string]bool
-	InternalTopLevel map[string]bool
-	DomainDir        string
-	OrchestrationDir string
-	SharedDir        string
-	RequireAlias     bool
-	AliasFileName    string
-	RequireModel     bool
-	ModelPath        string
-	DTOAllowedLayers []string
-	BannedPkgNames   []string
-	LegacyPkgNames   []string
-	LayerDirNames    map[string]bool
+	Sublayers               []string
+	Direction               map[string][]string
+	PkgRestricted           map[string]bool
+	InternalTopLevel        map[string]bool
+	DomainDir               string
+	OrchestrationDir        string
+	SharedDir               string
+	RequireAlias            bool
+	AliasFileName           string
+	RequireModel            bool
+	ModelPath               string
+	DTOAllowedLayers        []string
+	BannedPkgNames          []string
+	LegacyPkgNames          []string
+	LayerDirNames           map[string]bool
+	TypePatterns            []TypePattern
+	InterfacePatternExclude map[string]bool // layers to skip for interface pattern checks
+}
+
+// TypePattern defines an AST-based naming/structure convention for a directory.
+type TypePattern struct {
+	Dir           string // target directory under internal/, e.g. "worker"
+	FilePrefix    string // required file prefix, e.g. "worker"
+	TypeSuffix    string // required exported type suffix, e.g. "Worker"
+	RequireMethod string // required method name, e.g. "Process"
 }
 
 // ModelOption configures a Model via NewModel.
@@ -65,6 +75,9 @@ func DDD() Model {
 			"entity": true, "store": true, "persistence": true,
 			"domain": true,
 		},
+		InterfacePatternExclude: map[string]bool{
+			"handler": true, "app": true, "core/model": true, "event": true,
+		},
 	}
 }
 
@@ -103,6 +116,9 @@ func CleanArch() Model {
 			"service": true, "controller": true,
 			"store": true, "persistence": true, "domain": true,
 		},
+		InterfacePatternExclude: map[string]bool{
+			"handler": true, "entity": true,
+		},
 	}
 }
 
@@ -138,6 +154,9 @@ func Layered() Model {
 			"handler": true, "service": true, "repository": true, "model": true,
 			"controller": true, "entity": true, "store": true,
 			"persistence": true, "domain": true,
+		},
+		InterfacePatternExclude: map[string]bool{
+			"handler": true, "model": true,
 		},
 	}
 }
@@ -177,6 +196,9 @@ func Hexagonal() Model {
 			"controller": true, "service": true, "entity": true,
 			"store": true, "persistence": true,
 		},
+		InterfacePatternExclude: map[string]bool{
+			"handler": true, "domain": true,
+		},
 	}
 }
 
@@ -213,6 +235,134 @@ func ModularMonolith() Model {
 			"infrastructure": true,
 			"controller":     true, "service": true, "entity": true,
 			"store": true, "persistence": true,
+		},
+		InterfacePatternExclude: map[string]bool{
+			"api": true, "core": true,
+		},
+	}
+}
+
+// ConsumerWorker returns a flat-layout model for Kafka/RabbitMQ consumer projects.
+// Flat layout means layers live directly under internal/ (no domain/ directory).
+func ConsumerWorker() Model {
+	return Model{
+		Sublayers: []string{"worker", "service", "store", "model"},
+		Direction: map[string][]string{
+			"worker":  {"service", "model"},
+			"service": {"store", "model"},
+			"store":   {"model"},
+			"model":   {},
+		},
+		PkgRestricted: map[string]bool{"model": true},
+		InternalTopLevel: map[string]bool{
+			"worker": true, "service": true,
+			"store": true, "model": true, "pkg": true,
+		},
+		DomainDir:        "",
+		OrchestrationDir: "",
+		SharedDir:        "pkg",
+		RequireAlias:     false,
+		AliasFileName:    "",
+		RequireModel:     false,
+		ModelPath:        "model",
+		DTOAllowedLayers: []string{"worker", "service"},
+		BannedPkgNames:   []string{"util", "common", "misc", "helper", "shared", "services"},
+		LegacyPkgNames:   []string{"router", "bootstrap"},
+		LayerDirNames: map[string]bool{
+			"worker": true, "service": true,
+			"store": true, "model": true,
+		},
+		TypePatterns: []TypePattern{
+			{Dir: "worker", FilePrefix: "worker", TypeSuffix: "Worker", RequireMethod: "Process"},
+		},
+		InterfacePatternExclude: map[string]bool{
+			"model": true, "worker": true,
+		},
+	}
+}
+
+// Batch returns a flat-layout model for cron/scheduler batch job projects.
+// Flat layout means layers live directly under internal/ (no domain/ directory).
+func Batch() Model {
+	return Model{
+		Sublayers: []string{"job", "service", "store", "model"},
+		Direction: map[string][]string{
+			"job":     {"service", "model"},
+			"service": {"store", "model"},
+			"store":   {"model"},
+			"model":   {},
+		},
+		PkgRestricted: map[string]bool{"model": true},
+		InternalTopLevel: map[string]bool{
+			"job": true, "service": true,
+			"store": true, "model": true, "pkg": true,
+		},
+		DomainDir:        "",
+		OrchestrationDir: "",
+		SharedDir:        "pkg",
+		RequireAlias:     false,
+		AliasFileName:    "",
+		RequireModel:     false,
+		ModelPath:        "model",
+		DTOAllowedLayers: []string{"job", "service"},
+		BannedPkgNames:   []string{"util", "common", "misc", "helper", "shared", "services"},
+		LegacyPkgNames:   []string{"router", "bootstrap"},
+		LayerDirNames: map[string]bool{
+			"job": true, "service": true,
+			"store": true, "model": true,
+		},
+		TypePatterns: []TypePattern{
+			{Dir: "job", FilePrefix: "job", TypeSuffix: "Job", RequireMethod: "Run"},
+		},
+		InterfacePatternExclude: map[string]bool{
+			"model": true, "job": true,
+		},
+	}
+}
+
+// EventPipeline returns a flat-layout model for event-sourcing / CQRS projects.
+func EventPipeline() Model {
+	return Model{
+		Sublayers: []string{
+			"command", "aggregate", "event", "projection",
+			"eventstore", "readstore", "model",
+		},
+		Direction: map[string][]string{
+			"command":    {"aggregate", "eventstore", "model"},
+			"aggregate":  {"event", "model"},
+			"event":      {"model"},
+			"projection": {"event", "readstore", "model"},
+			"eventstore": {"event", "model"},
+			"readstore":  {"model"},
+			"model":      {},
+		},
+		PkgRestricted: map[string]bool{"model": true, "event": true},
+		InternalTopLevel: map[string]bool{
+			"command": true, "aggregate": true, "event": true,
+			"projection": true, "eventstore": true, "readstore": true,
+			"model": true, "pkg": true,
+		},
+		DomainDir:        "",
+		OrchestrationDir: "",
+		SharedDir:        "pkg",
+		RequireAlias:     false,
+		AliasFileName:    "",
+		RequireModel:     false,
+		ModelPath:        "model",
+		DTOAllowedLayers: []string{"command", "projection"},
+		BannedPkgNames:   []string{"util", "common", "misc", "helper", "shared", "services"},
+		LegacyPkgNames:   []string{"router", "bootstrap"},
+		LayerDirNames: map[string]bool{
+			"command": true, "aggregate": true, "event": true,
+			"projection": true, "eventstore": true, "readstore": true,
+			"model": true,
+		},
+		TypePatterns: []TypePattern{
+			{Dir: "command", FilePrefix: "command", TypeSuffix: "Command", RequireMethod: "Execute"},
+			{Dir: "aggregate", FilePrefix: "aggregate", TypeSuffix: "Aggregate", RequireMethod: "Apply"},
+		},
+		InterfacePatternExclude: map[string]bool{
+			"model": true, "event": true, "command": true, "aggregate": true,
 		},
 	}
 }
@@ -285,4 +435,8 @@ func WithAliasFileName(name string) ModelOption {
 
 func WithLayerDirNames(names map[string]bool) ModelOption {
 	return func(m *Model) { m.LayerDirNames = names }
+}
+
+func WithInterfacePatternExclude(exclude map[string]bool) ModelOption {
+	return func(m *Model) { m.InterfacePatternExclude = exclude }
 }

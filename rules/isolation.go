@@ -10,6 +10,12 @@ import (
 func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projectRoot string, opts ...Option) []Violation {
 	cfg := NewConfig(opts...)
 	m := cfg.model()
+
+	// Flat layout has no domains — skip isolation checks entirely.
+	if m.DomainDir == "" {
+		return nil
+	}
+
 	projectModule = resolveModule(pkgs, projectModule)
 	projectRoot = resolveRoot(pkgs, projectRoot)
 	if warns := validateModule(pkgs, projectModule); len(warns) > 0 {

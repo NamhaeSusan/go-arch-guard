@@ -6,13 +6,13 @@
 
 `go test`로 Go 프로젝트의 아키텍처 가드레일을 적용하는 도구이며, 특히 AI 코딩 에이전트와 빠르게 움직이는 팀에 맞춰 설계되었습니다.
 
-격리, 레이어 방향, 구조, 네이밍, 블래스트 반경 규칙을 정의하고, 프로젝트 형태가 벗어나면 일반 테스트에서 실패시킵니다. **DDD**, **Clean Architecture**, **Layered**, **Hexagonal**, **Modular Monolith** 프리셋을 기본 제공하며, 완전한 커스텀 아키텍처 모델도 지원합니다. 별도 CLI나 설정 포맷 없이, Go 테스트만으로 동작합니다.
+격리, 레이어 방향, 구조, 네이밍, 블래스트 반경 규칙을 정의하고, 프로젝트 형태가 벗어나면 일반 테스트에서 실패시킵니다. **DDD**, **Clean Architecture**, **Layered**, **Hexagonal**, **Modular Monolith**, **Consumer/Worker**, **Batch**, **Event-Driven Pipeline** 프리셋을 기본 제공하며, 완전한 커스텀 아키텍처 모델도 지원합니다. 별도 CLI나 설정 포맷 없이, Go 테스트만으로 동작합니다.
 
 AI 에이전트 친화적인 기본 surface:
 
-- `scaffold.ArchitectureTest(...)` — 바로 붙여 넣을 수 있는 `architecture_test.go` 생성
-- `rules.RunAll(...)` — 권장 rule 묶음을 한 번에 실행
-- `report.MarshalJSONReport(...)` — 봇과 자동 수정 루프가 읽기 쉬운 JSON 출력
+- `scaffold.ArchitectureTest(...)` --- 바로 붙여 넣을 수 있는 `architecture_test.go` 생성
+- `rules.RunAll(...)` --- 권장 rule 묶음을 한 번에 실행
+- `report.MarshalJSONReport(...)` --- 봇과 자동 수정 루프가 읽기 쉬운 JSON 출력
 
 ## 왜 필요한가
 
@@ -51,7 +51,8 @@ src, err := scaffold.ArchitectureTest(
 module basename을 그대로 쓰면 안 됩니다.
 
 사용 가능한 프리셋: `PresetDDD`, `PresetCleanArch`, `PresetLayered`,
-`PresetHexagonal`, `PresetModularMonolith`.
+`PresetHexagonal`, `PresetModularMonolith`, `PresetConsumerWorker`, `PresetBatch`,
+`PresetEventPipeline`.
 
 ### 권장 shortcut
 
@@ -99,7 +100,7 @@ func TestArchitecture(t *testing.T) {
 다른 프리셋을 쓸 때는 모델 함수만 교체하고 `opts...`를 전달합니다:
 
 ```go
-m := rules.CleanArch() // 또는 Layered(), Hexagonal(), ModularMonolith()
+m := rules.CleanArch() // 또는 Layered(), Hexagonal(), ModularMonolith(), ConsumerWorker(), Batch(), EventPipeline()
 opts := []rules.Option{rules.WithModel(m)}
 
 rules.CheckDomainIsolation(pkgs, "", "", opts...)
@@ -131,147 +132,25 @@ go test -run TestArchitecture -v
 
 `module`과 `root`에 빈 문자열을 전달하면 로드된 패키지에서 자동 추출합니다.
 
-## 아키텍처 모델
+## 프리셋
 
-### 프리셋
+| 프리셋 | 타입 | 서브레이어 | 방향 |
+|--------|------|-----------|------|
+| `DDD()` | Domain | handler, app, core/model, core/repo, core/svc, event, infra | handler->app->core/\*, infra->core/repo |
+| `CleanArch()` | Domain | handler, usecase, entity, gateway, infra | handler->usecase->entity+gateway, infra->gateway |
+| `Layered()` | Domain | handler, service, repository, model | handler->service->repository+model |
+| `Hexagonal()` | Domain | handler, usecase, port, domain, adapter | handler->usecase->port+domain, adapter->port+domain |
+| `ModularMonolith()` | Domain | api, application, core, infrastructure | api->application->core, infrastructure->core |
+| `ConsumerWorker()` | Flat | worker, service, store, model | worker->service->store->model |
+| `Batch()` | Flat | job, service, store, model | job->service->store->model |
+| `EventPipeline()` | Flat | command, aggregate, event, projection, eventstore, readstore, model | command->aggregate+eventstore, projection->event/readstore |
 
-| 프리셋 | 서브레이어 | 방향 | Alias 필수 | 모델 필수 |
-|--------|-----------|------|:-:|:-:|
-| `DDD()` | handler, app, core/model, core/repo, core/svc, event, infra | handler→app→core/\*, infra→core/repo | O | O |
-| `CleanArch()` | handler, usecase, entity, gateway, infra | handler→usecase→entity+gateway, infra→gateway | X | X |
-| `Layered()` | handler, service, repository, model | handler→service→repository+model, repository→model | X | X |
-| `Hexagonal()` | handler, usecase, port, domain, adapter | handler→usecase→port+domain, adapter→port+domain | X | X |
-| `ModularMonolith()` | api, application, core, infrastructure | api→application→core, infrastructure→core | X | X |
+Domain 프리셋은 `internal/domain/{name}/{layer}/` 레이아웃을 사용합니다.
+Flat 프리셋은 `internal/{layer}/` 레이아웃을 사용합니다 (domain 디렉토리 없음).
 
-### DDD 레이아웃
+전체 레이아웃 다이어그램과 방향 테이블은 [프리셋 상세](docs/presets.md)를 참고하세요.
 
-```text
-internal/
-├── domain/
-│   └── order/
-│       ├── alias.go              # 공개 surface (필수)
-│       ├── handler/http/         # 인바운드 어댑터
-│       ├── app/                  # 애플리케이션 서비스
-│       ├── core/
-│       │   ├── model/            # 도메인 모델 (필수)
-│       │   ├── repo/             # 레포지토리 인터페이스
-│       │   └── svc/              # 도메인 서비스 인터페이스
-│       ├── event/                # 도메인 이벤트
-│       └── infra/persistence/    # 아웃바운드 어댑터
-├── orchestration/                # 크로스 도메인 조율
-└── pkg/                          # 공유 유틸리티
-```
-
-DDD 레이어 방향:
-
-| 출발 | import 가능 대상 |
-|------|-----------------|
-| `handler` | `app` |
-| `app` | `core/model`, `core/repo`, `core/svc`, `event` |
-| `core` | `core/model` |
-| `core/model` | 없음 |
-| `core/repo` | `core/model` |
-| `core/svc` | `core/model` |
-| `event` | `core/model` |
-| `infra` | `core/repo`, `core/model`, `event` |
-
-### Clean Architecture 레이아웃
-
-```text
-internal/
-├── domain/
-│   └── product/
-│       ├── handler/              # 인터페이스 어댑터 (컨트롤러)
-│       ├── usecase/              # 애플리케이션 비즈니스 규칙
-│       ├── entity/               # 엔터프라이즈 비즈니스 규칙
-│       ├── gateway/              # 데이터 접근 인터페이스
-│       └── infra/                # 프레임워크 & 드라이버
-├── orchestration/
-└── pkg/
-```
-
-Clean Architecture 레이어 방향:
-
-| 출발 | import 가능 대상 |
-|------|-----------------|
-| `handler` | `usecase` |
-| `usecase` | `entity`, `gateway` |
-| `entity` | 없음 |
-| `gateway` | `entity` |
-| `infra` | `gateway`, `entity` |
-
-### Layered (Spring 스타일) 레이아웃
-
-```text
-internal/
-├── domain/
-│   └── order/
-│       ├── handler/              # HTTP/gRPC 핸들러
-│       ├── service/              # 비즈니스 로직
-│       ├── repository/           # 데이터 접근
-│       └── model/                # 도메인 모델
-├── orchestration/
-└── pkg/
-```
-
-Layered 레이어 방향:
-
-| 출발 | import 가능 대상 |
-|------|-----------------|
-| `handler` | `service` |
-| `service` | `repository`, `model` |
-| `repository` | `model` |
-| `model` | 없음 |
-
-### Hexagonal (포트 & 어댑터) 레이아웃
-
-```text
-internal/
-├── domain/
-│   └── order/
-│       ├── handler/              # 드라이빙 어댑터 (HTTP, gRPC)
-│       ├── usecase/              # 애플리케이션 로직
-│       ├── port/                 # 인터페이스 (인바운드 + 아웃바운드)
-│       ├── domain/               # 엔티티, 값 객체
-│       └── adapter/              # 드리븐 어댑터 (DB, 메시징)
-├── orchestration/
-└── pkg/
-```
-
-Hexagonal 레이어 방향:
-
-| 출발 | import 가능 대상 |
-|------|-----------------|
-| `handler` | `usecase` |
-| `usecase` | `port`, `domain` |
-| `port` | `domain` |
-| `domain` | 없음 |
-| `adapter` | `port`, `domain` |
-
-### Modular Monolith 레이아웃
-
-```text
-internal/
-├── domain/
-│   └── order/
-│       ├── api/                  # 모듈 공개 인터페이스
-│       ├── application/          # 유즈케이스
-│       ├── core/                 # 엔티티, 값 객체
-│       └── infrastructure/       # DB, 외부 서비스
-├── orchestration/
-└── pkg/
-```
-
-Modular Monolith 레이어 방향:
-
-| 출발 | import 가능 대상 |
-|------|-----------------|
-| `api` | `application` |
-| `application` | `core` |
-| `core` | 없음 |
-| `infrastructure` | `core` |
-
-### 커스텀 모델
+### 커스텀 모델 옵션
 
 DDD 기본값에서 시작하여 필요한 부분만 오버라이드:
 
@@ -309,75 +188,332 @@ m := rules.NewModel(
 | `WithBannedPkgNames([]string{...})` | internal/ 하위 금지 패키지명 |
 | `WithLegacyPkgNames([]string{...})` | 마이그레이션 경고 패키지명 |
 | `WithLayerDirNames(map[string]bool{...})` | 네이밍 체크 시 "레이어" 디렉토리 이름 |
+| `WithInterfacePatternExclude(map[string]bool{...})` | 인터페이스 패턴 검사 제외 레이어 |
 
 ## 격리 규칙
 
 `rules.CheckDomainIsolation(pkgs, module, root, opts...)`
 
-| 규칙 | 의미 |
-|------|------|
-| `isolation.cross-domain` | 도메인 A는 도메인 B를 import할 수 없음 |
-| `isolation.cmd-deep-import` | `cmd/`는 도메인 루트만 import 가능 |
-| `isolation.orchestration-deep-import` | 오케스트레이션은 도메인 루트만 import 가능 |
-| `isolation.pkg-imports-domain` | 공유 패키지는 도메인을 import할 수 없음 |
-| `isolation.pkg-imports-orchestration` | 공유 패키지는 오케스트레이션을 import할 수 없음 |
-| `isolation.domain-imports-orchestration` | 도메인은 오케스트레이션을 import할 수 없음 |
-| `isolation.internal-imports-orchestration` | cmd/orchestration 외 패키지는 오케스트레이션을 import할 수 없음 |
-| `isolation.internal-imports-domain` | 미등록 내부 패키지는 도메인을 import할 수 없음 |
+도메인 간 누수를 차단합니다. 격리 없이는 도메인 A의 변경이 도메인 B를 조용히 깨뜨릴 수 있으며,
+이것이 DDD 프로젝트에서 가장 흔한 의도치 않은 결합 원인입니다.
 
-Import 매트릭스:
+### `isolation.cross-domain`
 
-| from → to | 도메인 루트 | 도메인 하위 | 오케스트레이션 | 공유 패키지 |
-|-----------|:-:|:-:|:-:|:-:|
+도메인은 다른 도메인을 직접 import할 수 없습니다.
+
+```go
+// internal/domain/order/app/service.go
+package app
+
+import _ "myapp/internal/domain/user/app"  // 위반
+```
+
+```go
+// 크로스 도메인 조율에는 orchestration 사용
+package orchestration
+
+import (
+    "myapp/internal/domain/order"
+    "myapp/internal/domain/user"
+)
+```
+
+### `isolation.cmd-deep-import`
+
+`cmd/`는 도메인 루트 패키지(alias)만 import할 수 있고, 하위 패키지는 안 됩니다.
+
+```go
+// cmd/server/main.go
+import _ "myapp/internal/domain/order/app"  // 너무 깊음
+
+import _ "myapp/internal/domain/order"  // 도메인 루트만 허용
+```
+
+### `isolation.orchestration-deep-import`
+
+오케스트레이션은 도메인 루트만 import하여 결합 표면을 최소화해야 합니다.
+
+```go
+// internal/orchestration/checkout.go
+import _ "myapp/internal/domain/order/app"  // 너무 깊음
+
+import _ "myapp/internal/domain/order"  // 도메인 루트만 허용
+```
+
+### `isolation.pkg-imports-domain`
+
+공유 `pkg/`는 어떤 도메인도 import할 수 없습니다 --- 도메인에 무관해야 합니다.
+
+```go
+// internal/pkg/logger/logger.go
+import _ "myapp/internal/domain/order"  // 위반: pkg가 도메인에 의존
+```
+
+### `isolation.pkg-imports-orchestration`
+
+공유 `pkg/`는 오케스트레이션을 import할 수 없습니다.
+
+### `isolation.domain-imports-orchestration`
+
+도메인은 오케스트레이션을 import할 수 없습니다 --- 오케스트레이션이 도메인을 조율하지, 그 반대가 아닙니다.
+
+### `isolation.internal-imports-orchestration`
+
+`cmd/`와 오케스트레이션 자체만 오케스트레이션에 의존할 수 있습니다.
+
+### `isolation.internal-imports-domain`
+
+도메인이 아닌 내부 패키지(orchestration/cmd/pkg 제외)는 도메인을 import할 수 없습니다.
+
+**Import 매트릭스:**
+
+| from | 도메인 루트 | 도메인 하위 | 오케스트레이션 | 공유 패키지 |
+|------|:-:|:-:|:-:|:-:|
 | **같은 도메인** | O | O | X | O |
 | **다른 도메인** | X | X | X | O |
 | **오케스트레이션** | O | X | O | O |
 | **cmd** | O | X | O | O |
 | **공유 패키지** | X | X | X | O |
 
+> **Flat 레이아웃 프리셋** (ConsumerWorker, Batch, EventPipeline): 격리할 도메인이 없으므로
+> 격리 규칙이 완전히 스킵됩니다.
+
 ## 레이어 방향 규칙
 
 `rules.CheckLayerDirection(pkgs, module, root, opts...)`
 
-| 규칙 | 의미 |
-|------|------|
-| `layer.direction` | 허용된 레이어 방향 위반 import |
-| `layer.inner-imports-pkg` | 내부 레이어가 공유 패키지를 import (`PkgRestricted` 제어) |
-| `layer.unknown-sublayer` | 도메인에서 알 수 없는 서브레이어 |
+레이어 간 역방향 의존성을 차단합니다. 방향 강제 없이는 내부 레이어(model, entity)가
+외부 레이어의 import를 점진적으로 축적하여, 추출이나 독립 테스트가 불가능해집니다.
 
-방향 매트릭스는 아키텍처 모델에서 정의됩니다. `WithDirection`으로 완전 커스터마이징 가능.
+### `layer.direction`
+
+import는 프리셋의 방향 매트릭스에 정의된 허용 방향을 따라야 합니다.
+
+```go
+// DDD 프리셋: core/svc는 core/model만 import 가능
+package svc // internal/domain/order/core/svc/
+
+import _ "myapp/internal/domain/order/app"  // 역방향
+
+import _ "myapp/internal/domain/order/core/model"  // 허용
+```
+
+### `layer.inner-imports-pkg`
+
+`PkgRestricted`로 표시된 내부 레이어는 공유 `pkg/`를 import할 수 없습니다.
+핵심 도메인 로직을 인프라 관심사로부터 자유롭게 유지합니다.
+
+```go
+// DDD: core/model은 PkgRestricted
+package model // internal/domain/order/core/model/
+
+import _ "myapp/internal/pkg/logger"  // model은 자족적이어야 함
+```
+
+### `layer.unknown-sublayer`
+
+도메인 하위에 인식된 서브레이어 이름과 일치하지 않는 디렉토리를 감지합니다.
+
+```
+internal/domain/order/utils/   "utils"는 인식된 서브레이어가 아님
+```
+
+> **Flat 레이아웃 프리셋**: 도메인 내부가 아닌 `internal/` 최상위에서 레이어를 검사합니다.
 
 ## 구조 규칙
 
 `rules.CheckStructure(root, opts...)`
 
-| 규칙 | 의미 |
-|------|------|
-| `structure.internal-top-level` | `internal/` 아래 허용된 최상위 패키지만 |
-| `structure.banned-package` | 금지된 패키지명 (기본: `util`, `common`, `misc`, `helper`, `shared`, `services`) |
-| `structure.legacy-package` | 마이그레이션 필요 레거시 패키지 |
-| `structure.misplaced-layer` | 도메인 슬라이스 외부의 `app`/`handler`/`infra` |
-| `structure.middleware-placement` | `middleware/`는 공유 패키지에만 |
-| `structure.domain-root-alias-required` | 도메인 루트에 alias 파일 필수 (DDD만) |
-| `structure.domain-root-alias-package` | alias 파일 패키지명이 디렉토리와 일치 |
-| `structure.domain-root-alias-only` | 도메인 루트에 alias 파일만 허용 |
-| `structure.domain-alias-no-interface` | alias 파일에서 interface re-export 금지 |
-| `structure.domain-model-required` | 도메인에 모델 디렉토리 필수 (DDD만) |
-| `structure.dto-placement` | DTO 파일은 handler/app에만 |
+바이브 코딩 중 구조적 드리프트를 방지하는 파일시스템 레이아웃 규칙을 강제합니다.
+
+### `structure.internal-top-level`
+
+`internal/` 최상위에는 허용된 디렉토리만 존재할 수 있습니다.
+
+```
+// DDD: domain/, orchestration/, pkg/만 허용
+internal/
+  domain/          허용
+  orchestration/   허용
+  pkg/             허용
+  config/          허용 목록에 없음
+```
+
+### `structure.banned-package`
+
+쓰레기통이 되기 쉬운 모호한 패키지명을 차단합니다.
+
+기본 금지 목록: `util`, `common`, `misc`, `helper`, `shared`, `services`
+
+```
+internal/domain/order/app/util/   "util"은 금지됨
+```
+
+### `structure.legacy-package`
+
+마이그레이션이 필요한 패키지명을 경고합니다: `router`, `bootstrap`
+
+### `structure.misplaced-layer`
+
+레이어 디렉토리(`app`, `handler`, `infra`)는 도메인 슬라이스 안에만 있어야 하며,
+internal/ 최상위에 떠 있으면 안 됩니다.
+
+### `structure.middleware-placement`
+
+`middleware/`는 `internal/pkg/middleware/`에 있어야 하며, 도메인에 흩어지면 안 됩니다.
+
+### `structure.domain-root-alias-required` (DDD만)
+
+각 도메인 루트는 공개 API surface로 `alias.go` 파일을 정의해야 합니다.
+
+### `structure.domain-root-alias-package`
+
+alias 파일의 패키지 이름은 디렉토리 이름과 일치해야 합니다.
+
+### `structure.domain-root-alias-only`
+
+도메인 루트 디렉토리는 `alias.go`만 포함할 수 있습니다 --- 나머지 코드는 서브레이어에 넣어야 합니다.
+
+### `structure.domain-alias-no-interface`
+
+alias 파일은 인터페이스를 re-export할 수 없습니다 --- 크로스 도메인 계약이 누수됩니다.
+
+### `structure.domain-model-required` (DDD만)
+
+각 도메인에 `core/model/` 디렉토리와 하나 이상의 Go 파일이 있어야 합니다.
+
+### `structure.dto-placement`
+
+DTO 파일(`dto.go`, `*_dto.go`)은 허용된 레이어(handler, app)에만 존재할 수 있습니다.
 
 ## 네이밍 규칙
 
 `rules.CheckNaming(pkgs, opts...)`
 
-| 규칙 | 의미 |
-|------|------|
-| `naming.no-stutter` | exported 타입이 패키지 이름 반복 |
-| `naming.no-impl-suffix` | exported 타입이 `Impl`로 끝남 |
-| `naming.snake-case-file` | 파일명이 snake_case가 아님 |
-| `naming.repo-file-interface` | repo/ 파일에 매칭 interface 없음 |
-| `naming.no-layer-suffix` | 파일명이 레이어 이름 불필요 반복 |
-| `naming.domain-interface-repo-only` | repo 서브레이어 외부에서 도메인 interface 정의 (DDD만) |
-| `naming.no-handmock` | 테스트에서 hand-rolled mock/fake/stub 정의 |
+코드베이스를 일관되고 grep 친화적으로 유지하는 Go 네이밍 규칙을 강제합니다.
+
+### `naming.no-stutter`
+
+exported 타입은 패키지 이름을 반복하면 안 됩니다.
+
+```go
+package repo
+
+type RepoOrder struct{}  // 더듬거림: repo.RepoOrder
+type Order struct{}      // 깔끔: repo.Order
+```
+
+### `naming.no-impl-suffix`
+
+exported 타입은 `Impl`로 끝나면 안 됩니다. unexported 타입을 대신 사용하세요.
+
+```go
+type OrderServiceImpl struct{}  // Impl 접미사
+type orderService struct{}      // unexported
+```
+
+### `naming.snake-case-file`
+
+모든 Go 파일명은 snake_case여야 합니다.
+
+```
+OrderService.go   위반
+order_service.go  올바름
+```
+
+### `naming.repo-file-interface`
+
+`repo/` (또는 `core/repo/`) 파일은 파일명과 일치하는 인터페이스를 포함해야 합니다.
+
+```go
+// repo/order.go는 다음을 정의해야:
+type Order interface { ... }  // 파일명과 일치
+```
+
+### `naming.no-layer-suffix`
+
+파일명은 레이어 이름을 불필요하게 반복하면 안 됩니다.
+
+```
+// service/ 디렉토리 안에서:
+order_service.go  "_service" 접미사 불필요
+order.go          올바름
+```
+
+### `naming.domain-interface-repo-only` (DDD만)
+
+도메인 내 인터페이스는 `core/repo/`에만 정의해야 하며, 레이어에 흩어지면 안 됩니다.
+
+### `naming.no-handmock`
+
+테스트 파일은 hand-rolled mock/fake/stub struct를 정의하면 안 됩니다.
+mockery 등 생성 도구를 대신 사용하세요.
+
+### `naming.type-pattern-mismatch` (flat 프리셋)
+
+TypePattern 접두사와 일치하는 파일은 대응하는 타입을 정의해야 합니다.
+
+```go
+// worker/worker_order.go는 다음을 정의해야:
+type OrderWorker struct{}  // 기대됨
+
+type SomethingElse struct{}  // OrderWorker가 기대됨
+```
+
+### `naming.type-pattern-missing-method` (flat 프리셋)
+
+TypePattern으로 매칭된 타입은 필수 메서드를 가져야 합니다.
+
+```go
+type OrderWorker struct{}
+// Process 메서드 누락 --- 위반
+
+func (w *OrderWorker) Process(ctx context.Context) error { ... }  // 올바름
+```
+
+## 인터페이스 패턴 규칙
+
+`rules.CheckInterfacePattern(pkgs, opts...)`
+
+Go 인터페이스 모범 사례를 강제합니다: 비공개 구현체, `New()` 전용 생성자,
+인터페이스 반환 타입, 패키지당 단일 인터페이스.
+
+### `interface.exported-impl`
+
+exported struct는 인터페이스를 구현하면 안 됩니다 --- 구현 타입을 unexported로 만들어
+소비자가 concrete 타입에 의존하지 않도록 합니다.
+
+```go
+type RepositoryImpl struct{ db *sql.DB }  // exported struct가 interface 구현
+type repository struct{ db *sql.DB }      // unexported --- 올바름
+```
+
+### `interface.constructor-name`
+
+생성자는 `New`여야 하며, `NewXxx` 변형은 불허합니다. 모든 패키지에서 일관된
+팩토리 패턴을 강제합니다.
+
+```go
+func NewRepository(db *sql.DB) Repository  // NewXxx 불허
+func New(db *sql.DB) Repository            // 올바름
+```
+
+### `interface.constructor-returns-interface`
+
+`New()`는 concrete 타입이 아닌 인터페이스를 반환해야 합니다. 호출자가
+구현이 아닌 계약에 의존하도록 보장합니다.
+
+```go
+func New(db *sql.DB) *repository  // concrete 타입 반환
+func New(db *sql.DB) Repository   // 인터페이스 반환 --- 올바름
+```
+
+### `interface.single-per-package`
+
+패키지당 exported 인터페이스는 최대 1개 (Warning). 하나의 패키지에 여러 인터페이스가 있으면
+보통 패키지의 책임이 너무 많다는 신호입니다.
+
+프리셋별 제외 레이어(진입점, model, event, pkg)는 `InterfacePatternExclude`로 제어합니다.
 
 ## 블래스트 반경
 
@@ -427,6 +563,7 @@ go run github.com/NamhaeSusan/go-arch-guard/cmd/tui .
 | `rules.CheckNaming(pkgs, opts...)` | 네이밍 검사 |
 | `rules.CheckStructure(root, opts...)` | 파일시스템 구조 검사 |
 | `rules.AnalyzeBlastRadius(pkgs, module, root, opts...)` | 커플링 이상치 탐지 |
+| `rules.CheckInterfacePattern(pkgs, opts...)` | 인터페이스 패턴 모범 사례 |
 | `rules.RunAll(pkgs, module, root, opts...)` | 권장 기본 rule 묶음 실행 |
 | `report.AssertNoViolations(t, violations)` | Error 위반 시 테스트 실패 |
 | `report.BuildJSONReport(violations)` | 기계가 읽기 쉬운 JSON 리포트 구성 |
@@ -438,6 +575,10 @@ go run github.com/NamhaeSusan/go-arch-guard/cmd/tui .
 | `rules.Layered()` | Spring 스타일 레이어드 모델 |
 | `rules.Hexagonal()` | 포트 & 어댑터 모델 |
 | `rules.ModularMonolith()` | 모듈 기반 레이어드 모델 |
+| `rules.ConsumerWorker()` | Consumer/Worker 플랫 레이아웃 모델 |
+| `rules.Batch()` | Batch 플랫 레이아웃 모델 |
+| `rules.EventPipeline()` | 이벤트 소싱 / CQRS 플랫 레이아웃 모델 |
+| `rules.CheckTypePatterns(pkgs, opts...)` | AST 기반 타입 패턴 강제 |
 | `rules.NewModel(opts...)` | 커스텀 모델 빌더 |
 | `rules.WithModel(m)` | 커스텀 모델 적용 |
 | `rules.WithSeverity(rules.Warning)` | 경고로 다운그레이드 |
@@ -464,7 +605,7 @@ fmt.Println(string(data))
 /plugin install go-arch-guard@go-arch-guard-marketplace
 ```
 
-## 외부 Import 위생 — 이 라이브러리가 아닌 AI 도구 지침으로 강제
+## 외부 Import 위생 --- 이 라이브러리가 아닌 AI 도구 지침으로 강제
 
 `go-arch-guard`는 **프로젝트 내부** import만 검사합니다. 외부 의존성 위생은 AI 도구 지침과 코드 리뷰로 강제하세요.
 
@@ -473,10 +614,10 @@ fmt.Println(string(data))
 ```text
 # 외부 Import 제약 (go-arch-guard는 이를 강제하지 않음)
 
-- core/model, core/repo, core/svc, event — stdlib만, 서드파티 금지
-- handler — HTTP/gRPC 프레임워크 허용, 영속성 라이브러리 금지
-- infra — 영속성/메시징 라이브러리 허용, HTTP 프레임워크 금지
-- app — 일반적으로 자유, 인프라 라이브러리 직접 import 지양
+- core/model, core/repo, core/svc, event --- stdlib만, 서드파티 금지
+- handler --- HTTP/gRPC 프레임워크 허용, 영속성 라이브러리 금지
+- infra --- 영속성/메시징 라이브러리 허용, HTTP 프레임워크 금지
+- app --- 일반적으로 자유, 인프라 라이브러리 직접 import 지양
 ```
 
 ## 라이선스

@@ -26,17 +26,20 @@ func CheckStructure(projectRoot string, opts ...Option) []Violation {
 	violations = append(violations, checkPackageNames(internalDir, m, cfg)...)
 	violations = append(violations, checkMiddlewarePlacement(internalDir, m, cfg)...)
 
-	domainDir := filepath.Join(internalDir, m.DomainDir)
-	if m.RequireAlias {
-		violations = append(violations, checkDomainRootAliasRequired(domainDir, m, cfg)...)
-		violations = append(violations, checkDomainRootAliasPackage(domainDir, m, cfg)...)
-		violations = append(violations, checkDomainRootAliasOnly(domainDir, m, cfg)...)
-		violations = append(violations, checkDomainAliasNoInterface(domainDir, m, cfg)...)
+	// Domain-specific checks only apply when DomainDir is set.
+	if m.DomainDir != "" {
+		domainDir := filepath.Join(internalDir, m.DomainDir)
+		if m.RequireAlias {
+			violations = append(violations, checkDomainRootAliasRequired(domainDir, m, cfg)...)
+			violations = append(violations, checkDomainRootAliasPackage(domainDir, m, cfg)...)
+			violations = append(violations, checkDomainRootAliasOnly(domainDir, m, cfg)...)
+			violations = append(violations, checkDomainAliasNoInterface(domainDir, m, cfg)...)
+		}
+		if m.RequireModel {
+			violations = append(violations, checkDomainModelRequired(domainDir, m, cfg)...)
+		}
+		violations = append(violations, checkDTOPlacement(internalDir, m, cfg)...)
 	}
-	if m.RequireModel {
-		violations = append(violations, checkDomainModelRequired(domainDir, m, cfg)...)
-	}
-	violations = append(violations, checkDTOPlacement(internalDir, m, cfg)...)
 
 	return violations
 }

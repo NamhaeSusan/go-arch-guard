@@ -42,6 +42,21 @@ func TestArchitectureTest(t *testing.T) {
 			preset:   scaffold.PresetModularMonolith,
 			contains: []string{"m := rules.ModularMonolith()"},
 		},
+		{
+			name:     "consumer worker",
+			preset:   scaffold.PresetConsumerWorker,
+			contains: []string{"m := rules.ConsumerWorker()"},
+		},
+		{
+			name:     "batch",
+			preset:   scaffold.PresetBatch,
+			contains: []string{"m := rules.Batch()"},
+		},
+		{
+			name:     "event pipeline",
+			preset:   scaffold.PresetEventPipeline,
+			contains: []string{"m := rules.EventPipeline()"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -64,6 +79,19 @@ func TestArchitectureTest(t *testing.T) {
 				t.Fatalf("generated source must parse: %v\n%s", err, src)
 			}
 		})
+	}
+}
+
+func TestArchitectureTest_ConsumerWorker(t *testing.T) {
+	src, err := scaffold.ArchitectureTest(scaffold.PresetConsumerWorker, scaffold.ArchitectureTestOptions{PackageName: "myapp_test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(src, "rules.ConsumerWorker()") {
+		t.Error("generated source must call rules.ConsumerWorker()")
+	}
+	if !strings.Contains(src, "package myapp_test") {
+		t.Error("generated source must have correct package name")
 	}
 }
 
