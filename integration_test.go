@@ -627,21 +627,20 @@ func TestIntegration_RealWorldCleanArch_Violations(t *testing.T) {
 
 	opts := []rules.Option{rules.WithModel(m)}
 
+	layerViolations := rules.CheckLayerDirection(pkgs, module, root, opts...)
 	t.Run("detects direction violation", func(t *testing.T) {
-		violations := rules.CheckLayerDirection(pkgs, module, root, opts...)
-		assertHasRule(t, violations, "layer.direction")
+		assertHasRule(t, layerViolations, "layer.direction")
 	})
 	t.Run("detects entity importing pkg", func(t *testing.T) {
-		violations := rules.CheckLayerDirection(pkgs, module, root, opts...)
-		assertHasRule(t, violations, "layer.inner-imports-pkg")
+		assertHasRule(t, layerViolations, "layer.inner-imports-pkg")
 	})
 	t.Run("detects unknown sublayer", func(t *testing.T) {
-		violations := rules.CheckLayerDirection(pkgs, module, root, opts...)
-		assertHasRule(t, violations, "layer.unknown-sublayer")
+		assertHasRule(t, layerViolations, "layer.unknown-sublayer")
 	})
+
+	isolationViolations := rules.CheckDomainIsolation(pkgs, module, root, opts...)
 	t.Run("detects cross-domain import", func(t *testing.T) {
-		violations := rules.CheckDomainIsolation(pkgs, module, root, opts...)
-		assertHasRule(t, violations, "isolation.cross-domain")
+		assertHasRule(t, isolationViolations, "isolation.cross-domain")
 	})
 }
 
@@ -736,13 +735,12 @@ func TestIntegration_Layered_Violations(t *testing.T) {
 
 	opts := []rules.Option{rules.WithModel(m)}
 
+	layerViolations := rules.CheckLayerDirection(pkgs, module, root, opts...)
 	t.Run("detects direction violation", func(t *testing.T) {
-		violations := rules.CheckLayerDirection(pkgs, module, root, opts...)
-		assertHasRule(t, violations, "layer.direction")
+		assertHasRule(t, layerViolations, "layer.direction")
 	})
 	t.Run("detects model importing pkg", func(t *testing.T) {
-		violations := rules.CheckLayerDirection(pkgs, module, root, opts...)
-		assertHasRule(t, violations, "layer.inner-imports-pkg")
+		assertHasRule(t, layerViolations, "layer.inner-imports-pkg")
 	})
 }
 
@@ -839,13 +837,12 @@ func TestIntegration_Hexagonal_Violations(t *testing.T) {
 
 	opts := []rules.Option{rules.WithModel(m)}
 
+	layerViolations := rules.CheckLayerDirection(pkgs, module, root, opts...)
 	t.Run("detects direction violation", func(t *testing.T) {
-		violations := rules.CheckLayerDirection(pkgs, module, root, opts...)
-		assertHasRule(t, violations, "layer.direction")
+		assertHasRule(t, layerViolations, "layer.direction")
 	})
 	t.Run("detects domain importing pkg", func(t *testing.T) {
-		violations := rules.CheckLayerDirection(pkgs, module, root, opts...)
-		assertHasRule(t, violations, "layer.inner-imports-pkg")
+		assertHasRule(t, layerViolations, "layer.inner-imports-pkg")
 	})
 }
 
@@ -940,13 +937,14 @@ func TestIntegration_ModularMonolith_Violations(t *testing.T) {
 
 	opts := []rules.Option{rules.WithModel(m)}
 
+	layerViolations := rules.CheckLayerDirection(pkgs, module, root, opts...)
 	t.Run("detects direction violation", func(t *testing.T) {
-		violations := rules.CheckLayerDirection(pkgs, module, root, opts...)
-		assertHasRule(t, violations, "layer.direction")
+		assertHasRule(t, layerViolations, "layer.direction")
 	})
+
+	isolationViolations := rules.CheckDomainIsolation(pkgs, module, root, opts...)
 	t.Run("detects cross-domain import", func(t *testing.T) {
-		violations := rules.CheckDomainIsolation(pkgs, module, root, opts...)
-		assertHasRule(t, violations, "isolation.cross-domain")
+		assertHasRule(t, isolationViolations, "isolation.cross-domain")
 	})
 }
 

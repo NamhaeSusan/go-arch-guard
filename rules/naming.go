@@ -332,6 +332,9 @@ func repoSublayerName(m Model) string {
 	return "core/repo"
 }
 
+// checkDomainInterfaceRepoOnlyWith flags interface declarations in any domain
+// sublayer other than repo/. In DDD models, interfaces (ports) belong in the
+// repo sublayer; handler/, app/, core/svc/ etc. should not define interfaces.
 func checkDomainInterfaceRepoOnlyWith(m Model, pkg *packages.Package, cfg Config) []Violation {
 	if !m.RequireAlias {
 		return nil

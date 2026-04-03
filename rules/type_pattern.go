@@ -27,6 +27,8 @@ func CheckTypePatterns(pkgs []*packages.Package, opts ...Option) []Violation {
 	return violations
 }
 
+// checkTypePattern validates naming conventions for types in flat-layout
+// directories directly under internal/ (e.g. internal/worker/, internal/aggregate/).
 func checkTypePattern(pkg *packages.Package, tp TypePattern, cfg Config) []Violation {
 	// TypePattern applies only to flat-layout packages directly under internal/ (e.g. internal/worker).
 	if !strings.HasSuffix(pkg.PkgPath, "/internal/"+tp.Dir) {
