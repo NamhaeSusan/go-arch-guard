@@ -23,7 +23,7 @@ func CheckInterfacePattern(pkgs []*packages.Package, opts ...Option) []Violation
 			continue
 		}
 
-		ifaces := collectExportedInterfaces(pkg)
+		ifaces := collectExportedInterfacesFromPkg(pkg)
 		if len(ifaces) == 0 {
 			continue
 		}
@@ -68,31 +68,18 @@ func isExcludedInterfacePatternPkg(m Model, pkg *packages.Package) bool {
 		return true
 	}
 	// after = [domain, <domainName>, <sublayer>, ...]
+	// Check both single segment (e.g. "handler") and nested (e.g. "core/repo")
 	sublayer := after[2]
-	return m.InterfacePatternExclude[sublayer]
-}
-
-// collectExportedInterfaces returns all exported interface types in a package.
-func collectExportedInterfaces(pkg *packages.Package) map[string]*ast.InterfaceType {
-	result := make(map[string]*ast.InterfaceType)
-	for _, file := range pkg.Syntax {
-		for _, decl := range file.Decls {
-			gd, ok := decl.(*ast.GenDecl)
-			if !ok {
-				continue
-			}
-			for _, spec := range gd.Specs {
-				ts, ok := spec.(*ast.TypeSpec)
-				if !ok || !ts.Name.IsExported() {
-					continue
-				}
-				if iface, ok := ts.Type.(*ast.InterfaceType); ok {
-					result[ts.Name.Name] = iface
-				}
-			}
+	if m.InterfacePatternExclude[sublayer] {
+		return true
+	}
+	if len(after) >= 4 {
+		nested := after[2] + "/" + after[3]
+		if m.InterfacePatternExclude[nested] {
+			return true
 		}
 	}
-	return result
+	return false
 }
 
 // interfaceMethodNames extracts method names from an interface type.

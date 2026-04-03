@@ -12,6 +12,12 @@ func RunAll(pkgs []*packages.Package, projectModule string, projectRoot string, 
 	projectModule = resolveModule(pkgs, projectModule)
 	projectRoot = resolveRoot(pkgs, projectRoot)
 
+	// Apply defaults: limit repo interface methods for models with repo sublayers.
+	cfg := NewConfig(opts...)
+	if cfg.MaxRepoInterfaceMethods == 0 && hasPortSublayer(cfg.model()) {
+		opts = append([]Option{WithMaxRepoInterfaceMethods(10)}, opts...)
+	}
+
 	var violations []Violation
 	violations = append(violations, CheckDomainIsolation(pkgs, projectModule, projectRoot, opts...)...)
 	violations = append(violations, CheckLayerDirection(pkgs, projectModule, projectRoot, opts...)...)

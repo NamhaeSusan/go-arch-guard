@@ -2,7 +2,6 @@ package rules
 
 import (
 	"fmt"
-	"go/ast"
 	"go/parser"
 	"go/token"
 	"io/fs"
@@ -220,43 +219,27 @@ func checkDomainAliasNoInterface(domainDir string, m Model, cfg Config) []Violat
 		if err != nil {
 			continue
 		}
-		for _, decl := range file.Decls {
-			gd, ok := decl.(*ast.GenDecl)
-			if !ok {
-				continue
+		aliasFile := relPath + "/" + m.AliasFileName
+		for _, info := range inspectTypeSpecs(file, fset) {
+			if info.IsIface {
+				violations = append(violations, Violation{
+					File:     aliasFile,
+					Line:     info.Pos.Line,
+					Rule:     "structure.domain-alias-no-interface",
+					Message:  m.AliasFileName + ` re-exports interface "` + info.Name + `" — suspected cross-domain dependency; use ` + m.OrchestrationDir + `/ instead`,
+					Fix:      "move cross-domain coordination to " + m.OrchestrationDir + "/handler/ or " + m.OrchestrationDir + "/",
+					Severity: cfg.Sev,
+				})
 			}
-			for _, spec := range gd.Specs {
-				ts, ok := spec.(*ast.TypeSpec)
-				if !ok {
-					continue
-				}
-				if _, isIface := ts.Type.(*ast.InterfaceType); isIface {
-					violations = append(violations, Violation{
-						File:     relPath + "/" + m.AliasFileName,
-						Line:     fset.Position(ts.Name.Pos()).Line,
-						Rule:     "structure.domain-alias-no-interface",
-						Message:  m.AliasFileName + ` re-exports interface "` + ts.Name.Name + `" — suspected cross-domain dependency; use ` + m.OrchestrationDir + `/ instead`,
-						Fix:      "move cross-domain coordination to " + m.OrchestrationDir + "/handler/ or " + m.OrchestrationDir + "/",
-						Severity: cfg.Sev,
-					})
-				}
-				if ts.Assign != 0 {
-					if sel, ok := ts.Type.(*ast.SelectorExpr); ok {
-						if ident, ok := sel.X.(*ast.Ident); ok {
-							impPath := resolveIdentImportPath(file, ident.Name)
-							if src := matchContractSublayer(m, impPath); src != "" {
-								violations = append(violations, Violation{
-									File:     relPath + "/" + m.AliasFileName,
-									Line:     fset.Position(ts.Name.Pos()).Line,
-									Rule:     "structure.domain-alias-contract-reexport",
-									Message:  m.AliasFileName + ` re-exports "` + ts.Name.Name + `" from ` + src + ` — suspected cross-domain dependency; use ` + m.OrchestrationDir + `/ instead`,
-									Fix:      "move cross-domain coordination to " + m.OrchestrationDir + "/handler/ or " + m.OrchestrationDir + "/",
-									Severity: cfg.Sev,
-								})
-							}
-						}
-					}
-				}
+			if src := matchContractSublayer(m, info.AliasFrom); src != "" {
+				violations = append(violations, Violation{
+					File:     aliasFile,
+					Line:     info.Pos.Line,
+					Rule:     "structure.domain-alias-contract-reexport",
+					Message:  m.AliasFileName + ` re-exports "` + info.Name + `" from ` + src + ` — suspected cross-domain dependency; use ` + m.OrchestrationDir + `/ instead`,
+					Fix:      "move cross-domain coordination to " + m.OrchestrationDir + "/handler/ or " + m.OrchestrationDir + "/",
+					Severity: cfg.Sev,
+				})
 			}
 		}
 	}
@@ -447,22 +430,6 @@ func isMisplacedLayerDirWith(m Model, rel, name string) bool {
 func matchesDomainLayerWith(m Model, rel, name string) bool {
 	parts := strings.Split(rel, "/")
 	return len(parts) == 4 && parts[0] == "internal" && parts[1] == m.DomainDir && parts[2] != "" && parts[3] == name
-}
-
-// matchContractSublayer returns the sublayer name if impPath references a
-// contract sublayer (one ending in /repo, /svc, or named repo, svc).
-// These are the sublayers that define interfaces/contracts and should not
-// be re-exported via alias.go. Returns "" if no match.
-func matchContractSublayer(m Model, impPath string) string {
-	for _, sl := range m.Sublayers {
-		if sl == "repo" || sl == "svc" ||
-			strings.HasSuffix(sl, "/repo") || strings.HasSuffix(sl, "/svc") {
-			if strings.Contains(impPath, "/"+sl) {
-				return sl
-			}
-		}
-	}
-	return ""
 }
 
 func hasNonTestGoFiles(dir string) bool {

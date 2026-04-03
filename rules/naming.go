@@ -1,11 +1,13 @@
 package rules
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"unicode"
 
@@ -172,10 +174,10 @@ func toSnakeCase(filename string) string {
 }
 
 func checkRepoFileInterfaceWith(m Model, pkg *packages.Package, cfg Config) []Violation {
-	if !hasRepoSublayer(m) {
+	if !hasPortSublayer(m) {
 		return nil
 	}
-	if !isAnyRepoPackage(pkg.PkgPath) {
+	if matchPortSublayer(m, pkg.PkgPath) == "" {
 		return nil
 	}
 
@@ -191,37 +193,55 @@ func checkRepoFileInterfaceWith(m Model, pkg *packages.Package, cfg Config) []Vi
 			continue
 		}
 		expected := snakeToPascal(strings.TrimSuffix(base, ".go"))
-		if hasInterface(astFile, expected) {
-			continue
+
+		ifaces := collectInterfacesFromFile(astFile, false)
+
+		// Check: expected interface must exist
+		if _, ok := ifaces[expected]; !ok {
+			violations = append(violations, Violation{
+				File:     relPath,
+				Rule:     "naming.repo-file-interface",
+				Message:  `file "` + base + `" in repo/ must contain interface "` + expected + `"`,
+				Fix:      `add "type ` + expected + ` interface { ... }" or rename the file`,
+				Severity: cfg.Sev,
+			})
 		}
-		violations = append(violations, Violation{
-			File:     relPath,
-			Rule:     "naming.repo-file-interface",
-			Message:  `file "` + base + `" in repo/ must contain interface "` + expected + `"`,
-			Fix:      `add "type ` + expected + ` interface { ... }" or rename the file`,
-			Severity: cfg.Sev,
-		})
+
+		// Check: only one interface per file
+		if len(ifaces) > 1 {
+			var extra []string
+			for name := range ifaces {
+				if name != expected {
+					extra = append(extra, name)
+				}
+			}
+			sort.Strings(extra)
+			violations = append(violations, Violation{
+				File:     relPath,
+				Rule:     "naming.repo-file-extra-interface",
+				Message:  `file "` + base + `" in repo/ must define only "` + expected + `", found extra: ` + strings.Join(extra, ", "),
+				Fix:      "move each extra interface to its own file (e.g. " + strings.ToLower(extra[0]) + ".go)",
+				Severity: cfg.Sev,
+			})
+		}
+
+		// Check: interface method count
+		if cfg.MaxRepoInterfaceMethods > 0 {
+			for name, iface := range ifaces {
+				methodCount := len(iface.Methods.List)
+				if methodCount > cfg.MaxRepoInterfaceMethods {
+					violations = append(violations, Violation{
+						File:     relPath,
+						Rule:     "naming.repo-interface-too-large",
+						Message:  fmt.Sprintf(`interface "%s" has %d methods (max %d)`, name, methodCount, cfg.MaxRepoInterfaceMethods),
+						Fix:      "split into smaller, focused interfaces",
+						Severity: cfg.Sev,
+					})
+				}
+			}
+		}
 	}
 	return violations
-}
-
-func hasRepoSublayer(m Model) bool {
-	for _, sl := range m.Sublayers {
-		if sl == "repo" || strings.HasSuffix(sl, "/repo") {
-			return true
-		}
-	}
-	return false
-}
-
-func isAnyRepoPackage(pkgPath string) bool {
-	// Only match repo packages within the project's internal/ tree.
-	idx := strings.Index(pkgPath, "/internal/")
-	if idx < 0 {
-		return false
-	}
-	rel := pkgPath[idx+len("/internal/"):]
-	return strings.HasSuffix(rel, "/repo") || strings.Contains(rel, "/repo/")
 }
 
 func snakeToPascal(s string) string {
@@ -235,27 +255,6 @@ func snakeToPascal(s string) string {
 		b.WriteString(p[1:])
 	}
 	return b.String()
-}
-
-func hasInterface(file *ast.File, name string) bool {
-	for _, decl := range file.Decls {
-		gd, ok := decl.(*ast.GenDecl)
-		if !ok {
-			continue
-		}
-		for _, spec := range gd.Specs {
-			ts, ok := spec.(*ast.TypeSpec)
-			if !ok {
-				continue
-			}
-			if ts.Name.Name == name {
-				if _, isIface := ts.Type.(*ast.InterfaceType); isIface {
-					return true
-				}
-			}
-		}
-	}
-	return false
 }
 
 var bannedLayerSuffixes = []string{
@@ -311,25 +310,7 @@ func isDomainPackageWith(m Model, pkgPath string) bool {
 }
 
 func isRepoPackageWith(m Model, pkgPath string) bool {
-	for _, sl := range m.Sublayers {
-		if sl == "repo" || strings.HasSuffix(sl, "/repo") {
-			// Check if pkgPath ends with this sublayer or is inside it
-			suffix := "/" + sl
-			if strings.HasSuffix(pkgPath, suffix) || strings.Contains(pkgPath, suffix+"/") {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func repoSublayerName(m Model) string {
-	for _, sl := range m.Sublayers {
-		if sl == "repo" || strings.HasSuffix(sl, "/repo") {
-			return sl
-		}
-	}
-	return "core/repo"
+	return matchPortSublayer(m, pkgPath) != ""
 }
 
 // checkDomainInterfaceRepoOnlyWith flags interface declarations in any domain
@@ -342,54 +323,34 @@ func checkDomainInterfaceRepoOnlyWith(m Model, pkg *packages.Package, cfg Config
 	if !isDomainPackageWith(m, pkg.PkgPath) || isRepoPackageWith(m, pkg.PkgPath) {
 		return nil
 	}
-	repoName := repoSublayerName(m)
+	repoName := portSublayerName(m)
 	var violations []Violation
 	for _, file := range pkg.Syntax {
 		filePath := relativePathForPackage(pkg, pkg.Fset.Position(file.Pos()).Filename)
 		if cfg.IsExcluded(filePath) {
 			continue
 		}
-		for _, decl := range file.Decls {
-			gd, ok := decl.(*ast.GenDecl)
-			if !ok {
-				continue
+		for _, info := range inspectTypeSpecs(file, pkg.Fset) {
+			relFile := relativePathForPackage(pkg, info.Pos.Filename)
+			if info.IsIface {
+				violations = append(violations, Violation{
+					File:     relFile,
+					Line:     info.Pos.Line,
+					Rule:     "naming.domain-interface-repo-only",
+					Message:  `interface "` + info.Name + `" must be defined in ` + repoName + `/, not in ` + path.Base(path.Dir(pkg.PkgPath)) + `/`,
+					Fix:      "move interface to " + repoName + "/",
+					Severity: cfg.Sev,
+				})
 			}
-			for _, spec := range gd.Specs {
-				ts, ok := spec.(*ast.TypeSpec)
-				if !ok {
-					continue
-				}
-				// Direct interface definition
-				if _, isIface := ts.Type.(*ast.InterfaceType); isIface {
-					pos := pkg.Fset.Position(ts.Name.Pos())
-					violations = append(violations, Violation{
-						File:     relativePathForPackage(pkg, pos.Filename),
-						Line:     pos.Line,
-						Rule:     "naming.domain-interface-repo-only",
-						Message:  `interface "` + ts.Name.Name + `" must be defined in ` + repoName + `/, not in ` + path.Base(path.Dir(pkg.PkgPath)) + `/`,
-						Fix:      "move interface to " + repoName + "/",
-						Severity: cfg.Sev,
-					})
-				}
-				// Type alias from repo sublayer (re-exporting interface)
-				if ts.Assign != 0 {
-					if sel, ok := ts.Type.(*ast.SelectorExpr); ok {
-						if ident, ok := sel.X.(*ast.Ident); ok {
-							impPath := resolveIdentImportPath(file, ident.Name)
-							if isRepoImportPath(m, impPath) {
-								pos := pkg.Fset.Position(ts.Name.Pos())
-								violations = append(violations, Violation{
-									File:     relativePathForPackage(pkg, pos.Filename),
-									Line:     pos.Line,
-									Rule:     "naming.domain-interface-repo-only",
-									Message:  `type alias "` + ts.Name.Name + `" re-exports interface from ` + repoName + ` — suspected cross-domain dependency; use ` + m.OrchestrationDir + `/ instead`,
-									Fix:      "remove alias and move cross-domain coordination to " + m.OrchestrationDir + "/",
-									Severity: cfg.Sev,
-								})
-							}
-						}
-					}
-				}
+			if info.AliasFrom != "" && isRepoPackageWith(m, info.AliasFrom) {
+				violations = append(violations, Violation{
+					File:     relFile,
+					Line:     info.Pos.Line,
+					Rule:     "naming.domain-interface-repo-only",
+					Message:  `type alias "` + info.Name + `" re-exports interface from ` + repoName + ` — suspected cross-domain dependency; use ` + m.OrchestrationDir + `/ instead`,
+					Fix:      "remove alias and move cross-domain coordination to " + m.OrchestrationDir + "/",
+					Severity: cfg.Sev,
+				})
 			}
 		}
 	}
@@ -483,17 +444,6 @@ func collectMockStructs(fset *token.FileSet, file *ast.File) map[string]int {
 	return result
 }
 
-func isRepoImportPath(m Model, impPath string) bool {
-	for _, sl := range m.Sublayers {
-		if sl == "repo" || strings.HasSuffix(sl, "/repo") {
-			if strings.Contains(impPath, "/"+sl) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func isTypePatternFile(m Model, dir, filename string) bool {
 	name := strings.TrimSuffix(filename, ".go")
 	for _, tp := range m.TypePatterns {
@@ -502,14 +452,4 @@ func isTypePatternFile(m Model, dir, filename string) bool {
 		}
 	}
 	return false
-}
-
-func receiverTypeName(expr ast.Expr) string {
-	if star, ok := expr.(*ast.StarExpr); ok {
-		expr = star.X
-	}
-	if ident, ok := expr.(*ast.Ident); ok {
-		return ident.Name
-	}
-	return ""
 }

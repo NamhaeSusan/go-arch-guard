@@ -448,6 +448,31 @@ Files in `repo/` (or `core/repo/`) must contain an interface matching the filena
 type Order interface { ... }  // matches filename
 ```
 
+### `naming.repo-file-extra-interface`
+
+Each file in `repo/` must define exactly one interface. Extra interfaces should be split into their own files.
+
+```go
+// repo/review.go
+type Review interface { Find() }   // correct
+type Helper interface { Assist() } // violation: move to helper.go
+```
+
+### `naming.repo-interface-too-large`
+
+Repo interfaces must not exceed the method limit set by `WithMaxRepoInterfaceMethods`. Disabled by default.
+
+```go
+rules.CheckNaming(pkgs, rules.WithMaxRepoInterfaceMethods(10))
+```
+
+```go
+// repo/review.go
+type Review interface {
+    // 11 methods --- violation (max 10)
+}
+```
+
 ### `naming.no-layer-suffix`
 
 Filenames must not redundantly repeat the layer name.
@@ -610,6 +635,7 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `rules.WithModel(m)` | apply custom model to checks |
 | `rules.WithSeverity(rules.Warning)` | downgrade to warnings |
 | `rules.WithExclude("path/...")` | skip a subtree |
+| `rules.WithMaxRepoInterfaceMethods(10)` | limit repo interface method count |
 
 ## Machine-readable JSON Output
 
