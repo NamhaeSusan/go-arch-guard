@@ -78,9 +78,9 @@ msg := kafka.Message{
 REST API payload 규칙과 동일:
 
 - JSON 필드명: `camelCase`
-- ID 필드: `"orderId"`, `"userId"` (리소스명 + Id)
-- 시간 필드: RFC 3339, `~At` 접미사 (`createdAt`, `cancelledAt`)
-- Boolean: `is`/`has` 접두사
+- ID 외래키: camelCase `{resource}Id` — `"orderId"`, `"userId"`
+- 시간 필드: RFC 3339, `At` 접미사 — `"createdAt"`, `"cancelledAt"`
+- Boolean: `is`/`has` 접두사 (camelCase) — `"isRefundable"`, `"hasItems"`
 - Enum: `UPPER_SNAKE_CASE` 문자열
 
 ```json
