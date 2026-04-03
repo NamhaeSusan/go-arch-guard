@@ -205,6 +205,61 @@ func New() *store { return &store{} }
 	}
 }
 
+func TestCheckInterfacePattern_SinglePerPackage_Violation(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/sp-bad"
+
+	writeTestFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+	writeTestFile(t, filepath.Join(root, "internal", "store", "store.go"),
+		`package store
+
+type OrderStore interface {
+	FindOrder() error
+}
+
+type UserStore interface {
+	FindUser() error
+}
+`)
+
+	pkgs := loadTestPackages(t, root)
+	violations := rules.CheckInterfacePattern(pkgs, rules.WithModel(rules.ConsumerWorker()))
+	found := false
+	for _, v := range violations {
+		if v.Rule == "interface.single-per-package" {
+			found = true
+			if v.Severity != rules.Warning {
+				t.Errorf("expected Warning severity, got %v", v.Severity)
+			}
+		}
+	}
+	if !found {
+		t.Error("expected interface.single-per-package violation")
+	}
+}
+
+func TestCheckInterfacePattern_SinglePerPackage_Valid(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/sp-valid"
+
+	writeTestFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+	writeTestFile(t, filepath.Join(root, "internal", "store", "store.go"),
+		`package store
+
+type Store interface {
+	Find() error
+}
+`)
+
+	pkgs := loadTestPackages(t, root)
+	violations := rules.CheckInterfacePattern(pkgs, rules.WithModel(rules.ConsumerWorker()))
+	for _, v := range violations {
+		if v.Rule == "interface.single-per-package" {
+			t.Errorf("unexpected single-per-package violation")
+		}
+	}
+}
+
 func TestCheckInterfacePattern_ConstructorReturnsInterfaceValid(t *testing.T) {
 	root := t.TempDir()
 	module := "example.com/ip-ctor-iface-valid"

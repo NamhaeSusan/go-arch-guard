@@ -3,6 +3,7 @@ package rules
 import (
 	"fmt"
 	"go/ast"
+	"sort"
 	"strings"
 
 	"golang.org/x/tools/go/packages"
@@ -27,6 +28,7 @@ func CheckInterfacePattern(pkgs []*packages.Package, opts ...Option) []Violation
 			continue
 		}
 
+		violations = append(violations, checkSingleInterfacePerPackage(pkg, ifaces, cfg)...)
 		violations = append(violations, checkExportedImpl(pkg, ifaces, cfg)...)
 		violations = append(violations, checkConstructorName(pkg, cfg)...)
 		violations = append(violations, checkConstructorReturnsInterface(pkg, ifaces, cfg)...)
@@ -105,6 +107,26 @@ func interfaceMethodNames(iface *ast.InterfaceType) map[string]bool {
 		}
 	}
 	return methods
+}
+
+// checkSingleInterfacePerPackage warns when a package declares more than one
+// exported interface. Always uses Warning severity.
+func checkSingleInterfacePerPackage(pkg *packages.Package, ifaces map[string]*ast.InterfaceType, cfg Config) []Violation {
+	if len(ifaces) <= 1 {
+		return nil
+	}
+	var names []string
+	for name := range ifaces {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return []Violation{{
+		File:     relativePackageFile(pkg),
+		Rule:     "interface.single-per-package",
+		Message:  fmt.Sprintf("package has %d exported interfaces (%s), expected at most 1", len(ifaces), strings.Join(names, ", ")),
+		Fix:      "split into separate packages, one interface each",
+		Severity: Warning,
+	}}
 }
 
 // checkExportedImpl detects exported structs that implement an exported interface
