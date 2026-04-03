@@ -141,9 +141,9 @@ go test -run TestArchitecture -v
 | `Layered()` | Domain | handler, service, repository, model | handler->service->repository+model |
 | `Hexagonal()` | Domain | handler, usecase, port, domain, adapter | handler->usecase->port+domain, adapter->port+domain |
 | `ModularMonolith()` | Domain | api, application, core, infrastructure | api->application->core, infrastructure->core |
-| `ConsumerWorker()` | Flat | worker, service, store, model | worker->service->store->model |
-| `Batch()` | Flat | job, service, store, model | job->service->store->model |
-| `EventPipeline()` | Flat | command, aggregate, event, projection, eventstore, readstore, model | command->aggregate+eventstore, projection->event/readstore |
+| `ConsumerWorker()` | Flat | worker, service, store, model | worker→service+model, service→store+model, store→model |
+| `Batch()` | Flat | job, service, store, model | job→service+model, service→store+model, store→model |
+| `EventPipeline()` | Flat | command, aggregate, event, projection, eventstore, readstore, model | command→aggregate+eventstore+model, aggregate→event+model, projection→event+readstore+model |
 
 Domain 프리셋은 `internal/domain/{name}/{layer}/` 레이아웃을 사용합니다.
 Flat 프리셋은 `internal/{layer}/` 레이아웃을 사용합니다 (domain 디렉토리 없음).

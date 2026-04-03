@@ -175,8 +175,8 @@ rules.WithSeverity(rules.Warning)         // 실패 없이 로그만
 | 카테고리 | 규칙 |
 |---------|------|
 | 레이어 방향 | `layer.direction`, `layer.inner-imports-pkg` |
-| 구조 | `structure.internal-top-level`, `structure.banned-package` |
-| 네이밍 | `naming.no-stutter`, `naming.no-impl-suffix`, `naming.snake-case-file`, `naming.no-handmock` |
+| 구조 | `structure.internal-top-level`, `structure.banned-package`, `structure.legacy-package`, `structure.middleware-placement` |
+| 네이밍 | `naming.no-stutter`, `naming.no-impl-suffix`, `naming.snake-case-file`, `naming.no-layer-suffix`, `naming.no-handmock` |
 | 타입 패턴 | `naming.type-pattern-mismatch`, `naming.type-pattern-missing-method` |
 | 인터페이스 패턴 | `interface.exported-impl`, `interface.constructor-name`, `interface.constructor-returns-interface`, `interface.single-per-package` |
 | 커플링 | `blast-radius.high-coupling` |
