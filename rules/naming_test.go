@@ -134,6 +134,34 @@ func TestCheckNaming(t *testing.T) {
 	})
 }
 
+func TestCheckNaming_RepoFileInterface(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/repo-iface"
+
+	// Use DDD model (has repo sublayer)
+	writeTestFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+	// order.go in repo/ must define Order interface — but doesn't
+	writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "core", "repo", "order.go"),
+		"package repo\n\nfunc FindOrder() {}\n")
+	// Need alias.go for DDD
+	writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"),
+		"package order\n")
+	writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"),
+		"package model\n\ntype Order struct{}\n")
+
+	pkgs := loadTestPackages(t, root)
+	violations := rules.CheckNaming(pkgs) // default model = DDD
+	found := false
+	for _, v := range violations {
+		if v.Rule == "naming.repo-file-interface" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected naming.repo-file-interface violation for repo/order.go without Order interface")
+	}
+}
+
 func TestCheckNaming_FlatLayout_WorkerFileAllowed(t *testing.T) {
 	root := t.TempDir()
 	module := "example.com/workernaming"
