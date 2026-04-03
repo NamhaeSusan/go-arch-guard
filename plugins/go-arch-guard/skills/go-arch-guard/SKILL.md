@@ -246,7 +246,7 @@ m := rules.NewModel(
 )
 ```
 
-전체 옵션: `WithSublayers`, `WithDirection`, `WithPkgRestricted`, `WithDomainDir`, `WithOrchestrationDir`, `WithSharedDir`, `WithRequireAlias`, `WithAliasFileName`, `WithRequireModel`, `WithModelPath`, `WithDTOAllowedLayers`, `WithBannedPkgNames`, `WithLegacyPkgNames`, `WithLayerDirNames`
+전체 옵션: `WithSublayers`, `WithDirection`, `WithPkgRestricted`, `WithDomainDir`, `WithOrchestrationDir`, `WithSharedDir`, `WithRequireAlias`, `WithAliasFileName`, `WithRequireModel`, `WithModelPath`, `WithDTOAllowedLayers`, `WithBannedPkgNames`, `WithLegacyPkgNames`, `WithLayerDirNames`, `WithInterfacePatternExclude`
 
 ---
 

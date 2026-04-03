@@ -164,6 +164,7 @@ rules.WithSeverity(rules.Warning)         // 실패 없이 로그만
 | 구조 | `structure.internal-top-level`, `structure.banned-package` |
 | 네이밍 | `naming.no-stutter`, `naming.no-impl-suffix`, `naming.snake-case-file`, `naming.no-handmock` |
 | 타입 패턴 | `naming.type-pattern-mismatch`, `naming.type-pattern-missing-method` |
+| 인터페이스 패턴 | `interface.exported-impl`, `interface.constructor-name`, `interface.constructor-returns-interface`, `interface.single-per-package` |
 | 커플링 | `blast-radius.high-coupling` |
 
 **미적용:** `isolation.*` (도메인 격리) — 플랫 레이아웃에는 도메인 개념 없음.

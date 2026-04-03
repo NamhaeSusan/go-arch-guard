@@ -419,6 +419,7 @@ m := rules.NewModel(
 | `WithBannedPkgNames([]string{...})` | internal/ 하위 금지 패키지명 |
 | `WithLegacyPkgNames([]string{...})` | 마이그레이션 경고 패키지명 |
 | `WithLayerDirNames(map[string]bool{...})` | 네이밍 체크 시 "레이어" 디렉토리 이름 |
+| `WithInterfacePatternExclude(map[string]bool{...})` | 인터페이스 패턴 검사 제외 레이어 |
 
 ## 격리 규칙
 
@@ -491,6 +492,40 @@ Import 매트릭스:
 | `naming.type-pattern-mismatch` | `worker_*.go`/`job_*.go` 파일에 매칭 타입 미정의 |
 | `naming.type-pattern-missing-method` | 타입에 필수 메서드 없음 (예: `Process`, `Run`, `Execute`, `Apply`) |
 
+## 인터페이스 패턴 규칙
+
+`rules.CheckInterfacePattern(pkgs, opts...)`
+
+Go 인터페이스 모범 사례를 강제합니다: 비공개 구현체, `New()` 전용 생성자,
+인터페이스 반환 타입, 패키지당 단일 인터페이스.
+
+| 규칙 | 의미 |
+|------|------|
+| `interface.exported-impl` | exported struct가 interface를 구현; unexported로 변경 필요 |
+| `interface.constructor-name` | 생성자는 `New`여야 함; `NewXxx` 변형 불허 |
+| `interface.constructor-returns-interface` | `New()`는 concrete 타입이 아닌 interface를 반환해야 함 |
+| `interface.single-per-package` | 패키지당 exported interface는 최대 1개 (Warning) |
+
+예시:
+
+```go
+// 올바른 패턴
+type Repository interface {
+    FindByID(id int64) (*Order, error)
+}
+
+type repository struct{ db *sql.DB }
+
+func New(db *sql.DB) Repository { return &repository{db: db} }
+
+// 위반
+type RepositoryImpl struct{ db *sql.DB }    // interface.exported-impl
+func NewRepository(db *sql.DB) Repository   // interface.constructor-name
+func New(db *sql.DB) *repository            // interface.constructor-returns-interface
+```
+
+프리셋별 제외 레이어(진입점, model, event, pkg)는 `InterfacePatternExclude`로 제어합니다.
+
 ## 블래스트 반경
 
 `rules.AnalyzeBlastRadius(pkgs, module, root, opts...)`
@@ -539,6 +574,7 @@ go run github.com/NamhaeSusan/go-arch-guard/cmd/tui .
 | `rules.CheckNaming(pkgs, opts...)` | 네이밍 검사 |
 | `rules.CheckStructure(root, opts...)` | 파일시스템 구조 검사 |
 | `rules.AnalyzeBlastRadius(pkgs, module, root, opts...)` | 커플링 이상치 탐지 |
+| `rules.CheckInterfacePattern(pkgs, opts...)` | 인터페이스 패턴 모범 사례 |
 | `rules.RunAll(pkgs, module, root, opts...)` | 권장 기본 rule 묶음 실행 |
 | `report.AssertNoViolations(t, violations)` | Error 위반 시 테스트 실패 |
 | `report.BuildJSONReport(violations)` | 기계가 읽기 쉬운 JSON 리포트 구성 |

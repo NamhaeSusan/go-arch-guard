@@ -433,6 +433,7 @@ All model options:
 | `WithBannedPkgNames([]string{...})` | package names banned under internal/ |
 | `WithLegacyPkgNames([]string{...})` | package names that trigger migration warnings |
 | `WithLayerDirNames(map[string]bool{...})` | directory names considered "layer-like" for naming checks |
+| `WithInterfacePatternExclude(map[string]bool{...})` | layers to skip for interface pattern checks |
 
 ## Isolation Rules
 
@@ -513,6 +514,40 @@ Notes:
 | `naming.type-pattern-mismatch` | `worker_*.go`/`job_*.go` file must define matching type |
 | `naming.type-pattern-missing-method` | type must have required method (e.g. `Process`, `Run`, `Execute`, `Apply`) |
 
+## Interface Pattern Rules
+
+`rules.CheckInterfacePattern(pkgs, opts...)`
+
+Enforces Go interface best practices: private implementation, `New()`-only constructor,
+interface return type, and single interface per package.
+
+| Rule | Meaning |
+|------|---------|
+| `interface.exported-impl` | exported struct implements interface; make it unexported |
+| `interface.constructor-name` | constructor must be named `New`; `NewXxx` variants not allowed |
+| `interface.constructor-returns-interface` | `New()` must return an interface, not concrete type |
+| `interface.single-per-package` | at most one exported interface per package (Warning) |
+
+Example:
+
+```go
+// correct pattern
+type Repository interface {
+    FindByID(id int64) (*Order, error)
+}
+
+type repository struct{ db *sql.DB }
+
+func New(db *sql.DB) Repository { return &repository{db: db} }
+
+// violations
+type RepositoryImpl struct{ db *sql.DB }    // interface.exported-impl
+func NewRepository(db *sql.DB) Repository   // interface.constructor-name
+func New(db *sql.DB) *repository            // interface.constructor-returns-interface
+```
+
+Excluded layers per preset (entry points, model, event, pkg) are controlled by `InterfacePatternExclude`.
+
 ## Blast Radius
 
 `rules.AnalyzeBlastRadius(pkgs, module, root, opts...)`
@@ -570,6 +605,7 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `rules.CheckNaming(pkgs, opts...)` | naming convention checks |
 | `rules.CheckStructure(root, opts...)` | filesystem structure checks |
 | `rules.AnalyzeBlastRadius(pkgs, module, root, opts...)` | coupling outlier detection |
+| `rules.CheckInterfacePattern(pkgs, opts...)` | interface pattern best practices |
 | `rules.RunAll(pkgs, module, root, opts...)` | run the recommended built-in rule bundle |
 | `report.AssertNoViolations(t, violations)` | fail test on Error violations |
 | `report.BuildJSONReport(violations)` | build a machine-readable JSON-friendly report |
