@@ -2,7 +2,6 @@ package rules
 
 import (
 	"fmt"
-	"go/ast"
 	"go/parser"
 	"go/token"
 	"io/fs"
@@ -220,43 +219,27 @@ func checkDomainAliasNoInterface(domainDir string, m Model, cfg Config) []Violat
 		if err != nil {
 			continue
 		}
-		for _, decl := range file.Decls {
-			gd, ok := decl.(*ast.GenDecl)
-			if !ok {
-				continue
+		aliasFile := relPath + "/" + m.AliasFileName
+		for _, info := range inspectTypeSpecs(file, fset) {
+			if info.IsIface {
+				violations = append(violations, Violation{
+					File:     aliasFile,
+					Line:     info.Pos.Line,
+					Rule:     "structure.domain-alias-no-interface",
+					Message:  m.AliasFileName + ` re-exports interface "` + info.Name + `" — suspected cross-domain dependency; use ` + m.OrchestrationDir + `/ instead`,
+					Fix:      "move cross-domain coordination to " + m.OrchestrationDir + "/handler/ or " + m.OrchestrationDir + "/",
+					Severity: cfg.Sev,
+				})
 			}
-			for _, spec := range gd.Specs {
-				ts, ok := spec.(*ast.TypeSpec)
-				if !ok {
-					continue
-				}
-				if _, isIface := ts.Type.(*ast.InterfaceType); isIface {
-					violations = append(violations, Violation{
-						File:     relPath + "/" + m.AliasFileName,
-						Line:     fset.Position(ts.Name.Pos()).Line,
-						Rule:     "structure.domain-alias-no-interface",
-						Message:  m.AliasFileName + ` re-exports interface "` + ts.Name.Name + `" — suspected cross-domain dependency; use ` + m.OrchestrationDir + `/ instead`,
-						Fix:      "move cross-domain coordination to " + m.OrchestrationDir + "/handler/ or " + m.OrchestrationDir + "/",
-						Severity: cfg.Sev,
-					})
-				}
-				if ts.Assign != 0 {
-					if sel, ok := ts.Type.(*ast.SelectorExpr); ok {
-						if ident, ok := sel.X.(*ast.Ident); ok {
-							impPath := resolveIdentImportPath(file, ident.Name)
-							if src := matchContractSublayer(m, impPath); src != "" {
-								violations = append(violations, Violation{
-									File:     relPath + "/" + m.AliasFileName,
-									Line:     fset.Position(ts.Name.Pos()).Line,
-									Rule:     "structure.domain-alias-contract-reexport",
-									Message:  m.AliasFileName + ` re-exports "` + ts.Name.Name + `" from ` + src + ` — suspected cross-domain dependency; use ` + m.OrchestrationDir + `/ instead`,
-									Fix:      "move cross-domain coordination to " + m.OrchestrationDir + "/handler/ or " + m.OrchestrationDir + "/",
-									Severity: cfg.Sev,
-								})
-							}
-						}
-					}
-				}
+			if src := matchContractSublayer(m, info.AliasFrom); src != "" {
+				violations = append(violations, Violation{
+					File:     aliasFile,
+					Line:     info.Pos.Line,
+					Rule:     "structure.domain-alias-contract-reexport",
+					Message:  m.AliasFileName + ` re-exports "` + info.Name + `" from ` + src + ` — suspected cross-domain dependency; use ` + m.OrchestrationDir + `/ instead`,
+					Fix:      "move cross-domain coordination to " + m.OrchestrationDir + "/handler/ or " + m.OrchestrationDir + "/",
+					Severity: cfg.Sev,
+				})
 			}
 		}
 	}

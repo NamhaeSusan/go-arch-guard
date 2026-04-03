@@ -99,20 +99,3 @@ func hasExportedType(file *ast.File, name string) bool {
 	}
 	return false
 }
-
-func collectMethods(pkg *packages.Package) map[string]bool {
-	result := make(map[string]bool)
-	for _, file := range pkg.Syntax {
-		for _, decl := range file.Decls {
-			fd, ok := decl.(*ast.FuncDecl)
-			if !ok || fd.Recv == nil || len(fd.Recv.List) == 0 {
-				continue
-			}
-			typeName := receiverTypeName(fd.Recv.List[0].Type)
-			if typeName != "" {
-				result[typeName+"."+fd.Name.Name] = true
-			}
-		}
-	}
-	return result
-}

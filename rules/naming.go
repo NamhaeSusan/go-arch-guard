@@ -330,47 +330,27 @@ func checkDomainInterfaceRepoOnlyWith(m Model, pkg *packages.Package, cfg Config
 		if cfg.IsExcluded(filePath) {
 			continue
 		}
-		for _, decl := range file.Decls {
-			gd, ok := decl.(*ast.GenDecl)
-			if !ok {
-				continue
+		for _, info := range inspectTypeSpecs(file, pkg.Fset) {
+			relFile := relativePathForPackage(pkg, info.Pos.Filename)
+			if info.IsIface {
+				violations = append(violations, Violation{
+					File:     relFile,
+					Line:     info.Pos.Line,
+					Rule:     "naming.domain-interface-repo-only",
+					Message:  `interface "` + info.Name + `" must be defined in ` + repoName + `/, not in ` + path.Base(path.Dir(pkg.PkgPath)) + `/`,
+					Fix:      "move interface to " + repoName + "/",
+					Severity: cfg.Sev,
+				})
 			}
-			for _, spec := range gd.Specs {
-				ts, ok := spec.(*ast.TypeSpec)
-				if !ok {
-					continue
-				}
-				// Direct interface definition
-				if _, isIface := ts.Type.(*ast.InterfaceType); isIface {
-					pos := pkg.Fset.Position(ts.Name.Pos())
-					violations = append(violations, Violation{
-						File:     relativePathForPackage(pkg, pos.Filename),
-						Line:     pos.Line,
-						Rule:     "naming.domain-interface-repo-only",
-						Message:  `interface "` + ts.Name.Name + `" must be defined in ` + repoName + `/, not in ` + path.Base(path.Dir(pkg.PkgPath)) + `/`,
-						Fix:      "move interface to " + repoName + "/",
-						Severity: cfg.Sev,
-					})
-				}
-				// Type alias from repo sublayer (re-exporting interface)
-				if ts.Assign != 0 {
-					if sel, ok := ts.Type.(*ast.SelectorExpr); ok {
-						if ident, ok := sel.X.(*ast.Ident); ok {
-							impPath := resolveIdentImportPath(file, ident.Name)
-							if isRepoImportPath(m, impPath) {
-								pos := pkg.Fset.Position(ts.Name.Pos())
-								violations = append(violations, Violation{
-									File:     relativePathForPackage(pkg, pos.Filename),
-									Line:     pos.Line,
-									Rule:     "naming.domain-interface-repo-only",
-									Message:  `type alias "` + ts.Name.Name + `" re-exports interface from ` + repoName + ` — suspected cross-domain dependency; use ` + m.OrchestrationDir + `/ instead`,
-									Fix:      "remove alias and move cross-domain coordination to " + m.OrchestrationDir + "/",
-									Severity: cfg.Sev,
-								})
-							}
-						}
-					}
-				}
+			if info.AliasFrom != "" && isRepoPackageWith(m, info.AliasFrom) {
+				violations = append(violations, Violation{
+					File:     relFile,
+					Line:     info.Pos.Line,
+					Rule:     "naming.domain-interface-repo-only",
+					Message:  `type alias "` + info.Name + `" re-exports interface from ` + repoName + ` — suspected cross-domain dependency; use ` + m.OrchestrationDir + `/ instead`,
+					Fix:      "remove alias and move cross-domain coordination to " + m.OrchestrationDir + "/",
+					Severity: cfg.Sev,
+				})
 			}
 		}
 	}
@@ -464,10 +444,6 @@ func collectMockStructs(fset *token.FileSet, file *ast.File) map[string]int {
 	return result
 }
 
-func isRepoImportPath(m Model, impPath string) bool {
-	return matchPortSublayer(m, impPath) != ""
-}
-
 func isTypePatternFile(m Model, dir, filename string) bool {
 	name := strings.TrimSuffix(filename, ".go")
 	for _, tp := range m.TypePatterns {
@@ -476,14 +452,4 @@ func isTypePatternFile(m Model, dir, filename string) bool {
 		}
 	}
 	return false
-}
-
-func receiverTypeName(expr ast.Expr) string {
-	if star, ok := expr.(*ast.StarExpr); ok {
-		expr = star.X
-	}
-	if ident, ok := expr.(*ast.Ident); ok {
-		return ident.Name
-	}
-	return ""
 }

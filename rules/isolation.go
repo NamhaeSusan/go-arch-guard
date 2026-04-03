@@ -199,20 +199,20 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 	return violations
 }
 
-func isOrchestrationPkgWith(m Model, pkgPath, internalPrefix string) bool {
-	if m.OrchestrationDir == "" {
+func isUnderInternalDir(pkgPath, internalPrefix, dir string) bool {
+	if dir == "" {
 		return false
 	}
 	rel := strings.TrimPrefix(pkgPath, internalPrefix)
-	return rel == m.OrchestrationDir || strings.HasPrefix(rel, m.OrchestrationDir+"/")
+	return rel == dir || strings.HasPrefix(rel, dir+"/")
+}
+
+func isOrchestrationPkgWith(m Model, pkgPath, internalPrefix string) bool {
+	return isUnderInternalDir(pkgPath, internalPrefix, m.OrchestrationDir)
 }
 
 func isPkgPkgWith(m Model, pkgPath, internalPrefix string) bool {
-	if m.SharedDir == "" {
-		return false
-	}
-	rel := strings.TrimPrefix(pkgPath, internalPrefix)
-	return rel == m.SharedDir || strings.HasPrefix(rel, m.SharedDir+"/")
+	return isUnderInternalDir(pkgPath, internalPrefix, m.SharedDir)
 }
 
 func isDomainAliasWith(m Model, importPath, internalPrefix, domain string) bool {
