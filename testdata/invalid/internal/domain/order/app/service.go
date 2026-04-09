@@ -5,7 +5,7 @@ import (
 	"github.com/kimtaeyun/testproject-dc-invalid/internal/domain/order/core/repo"
 )
 
-// VIOLATION: app package defines interface
+// OK: consumer-defined interface is allowed in app.
 type AdminOps interface {
 	GetUserByID(id string) (string, error)
 }

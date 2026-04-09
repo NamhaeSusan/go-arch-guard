@@ -313,9 +313,19 @@ func isRepoPackageWith(m Model, pkgPath string) bool {
 	return matchPortSublayer(m, pkgPath) != ""
 }
 
-// checkDomainInterfaceRepoOnlyWith flags interface declarations in any domain
-// sublayer other than repo/. In DDD models, interfaces (ports) belong in the
-// repo sublayer; handler/, app/, core/svc/ etc. should not define interfaces.
+// isRepoPortName reports whether the given name follows the repository-port
+// naming convention (ends in "Repository" or "Repo"). Only repo-port interfaces
+// must live in the repo sublayer; consumer-defined interfaces (the Go idiom
+// where a package declares the small interface it consumes) are allowed in
+// app/, handler/, svc/ etc. at the site where they are used.
+func isRepoPortName(name string) bool {
+	return strings.HasSuffix(name, "Repository") || strings.HasSuffix(name, "Repo")
+}
+
+// checkDomainInterfaceRepoOnlyWith flags repository-port interface declarations
+// (names ending in "Repository"/"Repo") declared outside the repo sublayer, and
+// type aliases that re-export an interface from another domain's repo package.
+// Consumer-defined interfaces are allowed wherever they are used.
 func checkDomainInterfaceRepoOnlyWith(m Model, pkg *packages.Package, cfg Config) []Violation {
 	if !m.RequireAlias {
 		return nil
@@ -332,13 +342,13 @@ func checkDomainInterfaceRepoOnlyWith(m Model, pkg *packages.Package, cfg Config
 		}
 		for _, info := range inspectTypeSpecs(file, pkg.Fset) {
 			relFile := relativePathForPackage(pkg, info.Pos.Filename)
-			if info.IsIface {
+			if info.IsIface && isRepoPortName(info.Name) {
 				violations = append(violations, Violation{
 					File:     relFile,
 					Line:     info.Pos.Line,
 					Rule:     "structure.interface-placement",
-					Message:  `interface "` + info.Name + `" must be defined in ` + repoName + `/, not in ` + path.Base(path.Dir(pkg.PkgPath)) + `/`,
-					Fix:      "move interface to " + repoName + "/",
+					Message:  `interface "` + info.Name + `" matches repository-port naming and must be defined in ` + repoName + `/, not in ` + path.Base(path.Dir(pkg.PkgPath)) + `/`,
+					Fix:      "move to " + repoName + "/, or rename if it's a consumer-defined interface",
 					Severity: cfg.Sev,
 				})
 			}

@@ -485,7 +485,13 @@ order.go          correct
 
 ### `structure.interface-placement` (DDD only)
 
-Interfaces within a domain must be defined in `core/repo/`, not scattered across layers.
+Repository-port interfaces — names ending in `Repository` or `Repo` — must be
+defined in `core/repo/`, not scattered across layers. Consumer-defined
+interfaces (the Go idiom where a package declares the small interface it
+consumes) are allowed anywhere they are used: `handler/`, `app/`, `svc/`, etc.
+
+Also flags `type X = otherdomain.Repo` aliases that re-export a repository
+interface across domain boundaries — those belong in `orchestration/`.
 
 ### `testing.no-handmock`
 
