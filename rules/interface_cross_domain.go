@@ -9,14 +9,16 @@ import (
 )
 
 // CheckCrossDomainAnonymous detects anonymous interfaces declared outside of
-// their referenced domain whose method signatures touch types from another
-// domain. This catches cmd-style or orchestration-style consumers that declare
-// inline ad-hoc abstractions over domain types instead of using named
-// interfaces exposed via alias.go.
+// their referenced domain — and outside the designated orchestration layer —
+// whose method signatures touch types from another domain. This catches
+// cmd-style consumers that declare inline ad-hoc abstractions over domain
+// types when those abstractions belong in the orchestration layer.
 //
-// Default severity is Error. The rule enforces that alias.go is the sole
-// public surface for cross-domain access; any anonymous interface that
-// abstracts a domain type creates a parallel uncontrolled surface.
+// Default severity is Error. The project convention this rule enforces:
+// cross-domain abstractions are owned by the orchestration package, not by
+// arbitrary wiring code (cmd/, internal/pkg/, etc.). Any anonymous interface
+// that abstracts a domain type from outside both the source domain and the
+// orchestration layer creates a parallel uncontrolled cross-domain surface.
 //
 // Skipped:
 //   - Test files (_test.go) where mock/fake fixtures naturally use this shape.
@@ -24,10 +26,12 @@ import (
 //   - Embedded interface types (e.g. interface{ io.Reader }).
 //   - Same-domain references (an anonymous interface inside internal/domain/X
 //     that references internal/domain/X types).
+//   - Packages inside internal/<OrchestrationDir>/ — orchestration is the
+//     designated cross-domain coordination layer and is exempt by design.
 //   - Models with no DomainDir (flat layouts like ConsumerWorker, Batch).
 //
-// The rule uses the Model's DomainDir setting (default "domain") to identify
-// domain packages.
+// The rule uses the Model's DomainDir and OrchestrationDir settings to
+// identify domain and orchestration packages.
 func CheckCrossDomainAnonymous(pkgs []*packages.Package, opts ...Option) []Violation {
 	cfg := NewConfig(opts...)
 	m := cfg.model()
@@ -44,6 +48,11 @@ func CheckCrossDomainAnonymous(pkgs []*packages.Package, opts ...Option) []Viola
 }
 
 func checkCrossDomainAnonymousInPkg(pkg *packages.Package, m Model, sev Severity) []Violation {
+	if isOrchestrationPath(pkg.PkgPath, m) {
+		// Orchestration is the designated cross-domain coordination layer.
+		// Anonymous interfaces here are by-design.
+		return nil
+	}
 	currentDomain := owningDomainForPath(pkg.PkgPath, m)
 
 	var violations []Violation
@@ -151,8 +160,8 @@ func checkAnonymousInterface(iface *ast.InterfaceType, file *ast.File, pkg *pack
 		File:     file_,
 		Line:     pos.Line,
 		Rule:     "interface.cross-domain-anonymous",
-		Message:  fmt.Sprintf("anonymous interface declared in package %q references types from domain(s) %v — cross-domain abstractions must be defined in the target domain's alias.go and used as a named interface, not declared inline", pkg.PkgPath, domains),
-		Fix:      "define a small named interface in the target domain (e.g. internal/domain/<name>/alias.go) and replace the inline anonymous interface with that named type",
+		Message:  fmt.Sprintf("anonymous interface declared in package %q references types from domain(s) %v — cross-domain abstractions must be owned by the orchestration layer, not declared inline outside it", pkg.PkgPath, domains),
+		Fix:      "move this adapter/abstraction into internal/" + m.OrchestrationDir + "/ — that's the designated place for cross-domain coordination. Wiring code (cmd/, etc.) should depend on orchestration constructors, not declare its own cross-domain interfaces",
 		Severity: sev,
 	}}
 }
@@ -218,6 +227,23 @@ func owningDomainForPath(pkgPath string, m Model) string {
 		}
 	}
 	return ""
+}
+
+// isOrchestrationPath reports whether a package path lives under
+// internal/<OrchestrationDir>/. Used to exempt the orchestration layer from
+// cross-domain anonymous-interface checks since orchestration is the
+// designated place for cross-domain coordination.
+func isOrchestrationPath(pkgPath string, m Model) bool {
+	if m.OrchestrationDir == "" {
+		return false
+	}
+	parts := strings.Split(pkgPath, "/")
+	for i := 0; i+1 < len(parts); i++ {
+		if parts[i] == "internal" && parts[i+1] == m.OrchestrationDir {
+			return true
+		}
+	}
+	return false
 }
 
 // sortStrings is a tiny helper to keep this file dependency-free of "sort".

@@ -560,9 +560,9 @@ Excluded layers per preset (entry points, model, event, pkg) are controlled by `
 
 ### `interface.cross-domain-anonymous`
 
-Detects anonymous interfaces declared outside of their referenced domain whose method signatures touch types from another domain. Default severity is **Error**.
+Detects anonymous interfaces declared outside of their referenced domain — and outside the designated orchestration layer — whose method signatures touch types from another domain. Default severity is **Error**.
 
-Catches the pattern where a wiring layer (cmd/) or orchestration package declares inline ad-hoc abstractions over domain types instead of using named interfaces exposed via `alias.go`. This protects `alias.go`'s role as the sole controlled public surface for cross-domain access — anonymous inline interfaces create a parallel uncontrolled surface.
+This rule enforces the convention that **cross-domain abstractions are owned by the orchestration package**, not by arbitrary wiring code. A `cmd/` (or `internal/pkg/`) package that declares an inline anonymous interface over a domain type is creating a parallel uncontrolled cross-domain surface; that adapter/abstraction belongs in `internal/orchestration/`.
 
 ```go
 // flagged: cmd/ declares inline interface that abstracts a domain type
@@ -571,28 +571,34 @@ package main
 import "example.com/p/internal/domain/user"
 
 type adapter struct {
-    repo interface {                                          // ← cross-domain anonymous
+    repo interface {                                          // ← cross-domain anonymous in cmd/
         GetByID(ctx context.Context, id string) (*user.User, error)
     }
 }
 ```
 
 ```go
-// not flagged: named interface exposed via alias.go and used as a named type
-package main
+// not flagged: same shape but inside the orchestration layer where
+// cross-domain coordination is by design
+package orchestration
 
 import "example.com/p/internal/domain/user"
 
-type adapter struct {
-    repo user.UserReader  // named, comes through alias
+type userInfoAdapter struct {
+    repo interface {                                          // ← anonymous, but orchestration is exempt
+        GetByID(ctx context.Context, id string) (*user.User, error)
+    }
 }
 ```
+
+The fix for a flagged occurrence is to **move the adapter into the orchestration package** and have wiring code call orchestration constructors instead of declaring its own interfaces.
 
 Skipped:
 - Test files (`_test.go`) where mock/fake fixtures naturally use this shape
 - Empty interfaces (`interface{}`) and interfaces without method declarations
 - Embedded interface types (e.g. `interface { io.Reader }`)
 - Same-domain references (anonymous interface inside `internal/domain/X` referencing `internal/domain/X` types)
+- Packages inside `internal/<OrchestrationDir>/` — orchestration is the designated cross-domain coordination layer
 - Models with no `DomainDir` (flat layouts like ConsumerWorker, Batch, EventPipeline)
 
 ### `interface.container-only`

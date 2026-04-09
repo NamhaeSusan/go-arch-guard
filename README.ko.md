@@ -546,9 +546,9 @@ func New(db *sql.DB) Repository   // 인터페이스 반환 --- 올바름
 
 ### `interface.cross-domain-anonymous`
 
-도메인 외부에서 선언된 anonymous interface가 method signature에 다른 도메인 타입을 참조하는 경우를 감지합니다. 기본 severity: **Error**.
+도메인 외부 *그리고 orchestration 외부*에서 선언된 anonymous interface가 method signature에 다른 도메인 타입을 참조하는 경우를 감지합니다. 기본 severity: **Error**.
 
-wiring 레이어(cmd/)나 orchestration 패키지가 도메인 타입에 대해 ad-hoc inline 추상화를 선언하는 패턴을 잡습니다. `alias.go`가 cross-domain 접근의 *유일한* 공개 표면이라는 컨벤션을 보호합니다 — inline anonymous interface는 통제되지 않은 *두 번째* 공개 표면을 만듭니다.
+이 룰은 **cross-domain 추상화는 orchestration 패키지가 소유한다**는 컨벤션을 강제합니다. cmd/ (또는 internal/pkg/) 같은 wiring 코드가 도메인 타입에 대해 inline anonymous interface를 선언하면, 통제되지 않은 *두 번째* cross-domain 표면을 만드는 셈입니다 — 그 어댑터/추상화는 `internal/orchestration/`에 있어야 합니다.
 
 ```go
 // flagged: cmd/가 도메인 타입을 추상화하는 inline interface 선언
@@ -557,28 +557,33 @@ package main
 import "example.com/p/internal/domain/user"
 
 type adapter struct {
-    repo interface {                                          // ← cross-domain anonymous
+    repo interface {                                          // ← cmd/의 cross-domain anonymous
         GetByID(ctx context.Context, id string) (*user.User, error)
     }
 }
 ```
 
 ```go
-// flagged 안 됨: alias.go에 노출된 named interface를 사용
-package main
+// flagged 안 됨: 같은 모양이지만 orchestration 안 (cross-domain 조정의 지정된 장소)
+package orchestration
 
 import "example.com/p/internal/domain/user"
 
-type adapter struct {
-    repo user.UserReader  // named, alias 경유
+type userInfoAdapter struct {
+    repo interface {                                          // ← anonymous지만 orchestration은 exempt
+        GetByID(ctx context.Context, id string) (*user.User, error)
+    }
 }
 ```
+
+flag된 위치를 고치는 방법은 **어댑터를 orchestration 패키지로 이동**하고, wiring 코드는 자체 interface를 선언하는 대신 orchestration 생성자를 호출하는 것입니다.
 
 스킵:
 - 테스트 파일 (`_test.go`)
 - 빈 interface (`interface{}`) 및 메서드 선언 없는 interface
 - Embedded interface (`interface { io.Reader }`)
 - 같은 도메인 내 참조
+- `internal/<OrchestrationDir>/` 안의 모든 패키지 — orchestration은 cross-domain 조정의 지정된 레이어
 - `DomainDir`이 없는 플랫 레이아웃 모델 (ConsumerWorker, Batch, EventPipeline)
 
 ### `interface.container-only`

@@ -184,12 +184,13 @@ type handler struct {
 	}
 }
 
-// TestCheckCrossDomainAnonymous_OrchestrationFlagged verifies that
-// orchestration packages are also subject to the rule (any non-domain consumer
-// is treated as cross-domain).
-func TestCheckCrossDomainAnonymous_OrchestrationFlagged(t *testing.T) {
+// TestCheckCrossDomainAnonymous_OrchestrationExempt verifies that
+// anonymous interfaces in the orchestration package are NOT flagged. The
+// orchestration layer is the designated place for cross-domain coordination,
+// so anonymous interfaces over domain types are by-design here.
+func TestCheckCrossDomainAnonymous_OrchestrationExempt(t *testing.T) {
 	root := t.TempDir()
-	module := "example.com/cda-orchestration"
+	module := "example.com/cda-orchestration-exempt"
 
 	writeTestFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
 
@@ -207,7 +208,7 @@ type ReviewDraft struct {
 import (
 	"context"
 
-	"example.com/cda-orchestration/internal/domain/draft"
+	"example.com/cda-orchestration-exempt/internal/domain/draft"
 )
 
 type service struct {
@@ -220,17 +221,52 @@ type service struct {
 	pkgs := loadTestPackages(t, root)
 	vs := rules.CheckCrossDomainAnonymous(pkgs)
 
-	found := false
 	for _, v := range vs {
 		if v.Rule == "interface.cross-domain-anonymous" {
-			found = true
-			break
+			t.Errorf("orchestration anonymous interface should be exempt, got: %s", v.String())
 		}
 	}
-	if !found {
-		t.Errorf("expected violation in orchestration, got %d", len(vs))
-		for _, v := range vs {
-			t.Log(v.String())
+}
+
+// TestCheckCrossDomainAnonymous_OrchestrationSubpackageExempt verifies that
+// nested packages under internal/orchestration/ (e.g. handler/http) are also
+// exempt.
+func TestCheckCrossDomainAnonymous_OrchestrationSubpackageExempt(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/cda-orch-sub"
+
+	writeTestFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+
+	writeTestFile(t, filepath.Join(root, "internal", "domain", "user", "alias.go"),
+		`package user
+
+type User struct {
+	ID string
+}
+`)
+
+	writeTestFile(t, filepath.Join(root, "internal", "orchestration", "handler", "http", "auth.go"),
+		`package http
+
+import (
+	"context"
+
+	"example.com/cda-orch-sub/internal/domain/user"
+)
+
+type handler struct {
+	users interface {
+		GetUserByID(ctx context.Context, id string) (*user.User, error)
+	}
+}
+`)
+
+	pkgs := loadTestPackages(t, root)
+	vs := rules.CheckCrossDomainAnonymous(pkgs)
+
+	for _, v := range vs {
+		if v.Rule == "interface.cross-domain-anonymous" {
+			t.Errorf("orchestration subpackage should be exempt, got: %s", v.String())
 		}
 	}
 }

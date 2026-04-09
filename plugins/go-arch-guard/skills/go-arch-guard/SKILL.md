@@ -320,7 +320,7 @@ fmt.Println(string(data))
 
 | 룰 | 잡는 패턴 |
 |----|----------|
-| `interface.cross-domain-anonymous` | 어떤 패키지든 anonymous interface가 method signature에 다른 도메인 타입을 참조하면 위반. cmd/ 또는 orchestration이 도메인 타입에 대해 inline ad-hoc 추상화를 선언하는 패턴을 잡는다. **Severity: Error** — `alias.go`가 cross-domain 접근의 *유일한* 공개 표면이라는 컨벤션을 보호. fix: 대상 도메인의 alias.go에 좁은 named interface를 노출하고 그것을 사용. |
+| `interface.cross-domain-anonymous` | 도메인 외부 *그리고 orchestration 외부*에서 선언된 anonymous interface가 method signature에 다른 도메인 타입을 참조하면 위반. cmd/ 또는 internal/pkg/ 같은 wiring 코드가 도메인 타입에 대해 inline ad-hoc 추상화를 선언하는 패턴을 잡는다. **Severity: Error** — cross-domain 추상화는 orchestration 패키지가 소유한다는 컨벤션을 강제. **fix: 어댑터를 `internal/orchestration/`으로 이동하고 wiring 코드는 orchestration 생성자를 호출**. orchestration 패키지(서브패키지 포함)는 by-design exempt. |
 
 ---
 
