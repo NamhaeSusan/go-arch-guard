@@ -471,7 +471,14 @@ order.go          올바름
 
 ### `structure.interface-placement` (DDD만)
 
-도메인 내 인터페이스는 `core/repo/`에만 정의해야 하며, 레이어에 흩어지면 안 됩니다.
+Repository 포트 인터페이스(이름이 `Repository` 또는 `Repo`로 끝나는 것)는
+`core/repo/`에만 정의해야 합니다. Consumer-defined interface(사용처에서
+작은 인터페이스를 선언하는 Go 관례)는 `handler/`, `app/`, `svc/` 등
+사용처 어디든 허용됩니다.
+
+`type X = otherdomain.Repo` 처럼 다른 도메인의 repository 인터페이스를
+재노출하는 alias도 함께 감지합니다 — 이런 cross-domain 경계 코드는
+`orchestration/`에 두어야 합니다.
 
 ### `testing.no-handmock`
 

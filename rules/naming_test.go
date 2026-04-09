@@ -21,11 +21,14 @@ func TestCheckNaming(t *testing.T) {
 		}
 	})
 
-	t.Run("detects interface outside core/repo in domain", func(t *testing.T) {
+	t.Run("flags repository-port interfaces outside core/repo", func(t *testing.T) {
 		pkgs := loadInvalid(t)
 		violations := rules.CheckNaming(pkgs)
-		// handler: Service + auditLogger (direct), app: AdminOps (direct) + OrderRepo (alias)
-		wantIfaces := map[string]bool{"Service": false, "auditLogger": false, "AdminOps": false, "OrderRepo": false}
+		// handler: OrderRepository (direct repo-port interface)
+		// app: OrderRepo (alias re-exporting core/repo interface)
+		wantIfaces := map[string]bool{"OrderRepository": false, "OrderRepo": false}
+		// These consumer-defined interfaces must NOT be flagged.
+		forbidIfaces := map[string]bool{"Service": true, "auditLogger": true, "AdminOps": true}
 		for _, v := range violations {
 			if v.Rule != "structure.interface-placement" {
 				continue
@@ -33,6 +36,11 @@ func TestCheckNaming(t *testing.T) {
 			for name := range wantIfaces {
 				if strings.Contains(v.Message, `"`+name+`"`) {
 					wantIfaces[name] = true
+				}
+			}
+			for name := range forbidIfaces {
+				if strings.Contains(v.Message, `"`+name+`"`) {
+					t.Errorf("consumer-defined interface %q should NOT be flagged by structure.interface-placement: %s", name, v.String())
 				}
 			}
 		}

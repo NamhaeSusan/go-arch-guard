@@ -298,11 +298,12 @@ fmt.Println(string(data))
 
 ## DDD 전용: Cross-Domain Interface 금지
 
-도메인 내 interface는 **`core/repo/`에만** 정의 가능. cross-domain 데이터 필요 시 → `orchestration/handler/`로 이동.
+Repository 포트 interface(이름이 `Repository`/`Repo`로 끝나는 것)는 **`core/repo/`에만** 정의 가능. Consumer-defined interface(사용처에서 선언하는 Go 관례)는 `handler/`, `app/`, `svc/` 어디든 허용. cross-domain 데이터 필요 시 → `orchestration/handler/`로 이동.
 
 | 우회 시도 | 잡는 규칙 |
 |----------|----------|
-| handler/app/svc에서 interface 정의 | `structure.interface-placement` |
+| handler/app/svc에서 `*Repository`/`*Repo` interface 정의 | `structure.interface-placement` |
+| handler/app/svc에서 `type X = otherdomain.Repo` alias | `structure.interface-placement` |
 | alias.go에서 interface 직접 정의 | `structure.domain-alias-no-interface` |
 | alias.go에서 repo/svc 타입 re-export | `structure.domain-alias-contract-reexport` |
 
