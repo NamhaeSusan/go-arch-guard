@@ -544,6 +544,88 @@ func New(db *sql.DB) Repository   // 인터페이스 반환 --- 올바름
 
 프리셋별 제외 레이어(진입점, model, event, pkg)는 `InterfacePatternExclude`로 제어합니다.
 
+### `interface.cross-domain-anonymous`
+
+도메인 외부 *그리고 orchestration 외부*에서 선언된 anonymous interface가 method signature에 다른 도메인 타입을 참조하는 경우를 감지합니다. 기본 severity: **Error**.
+
+이 룰은 **cross-domain 추상화는 orchestration 패키지가 소유한다**는 컨벤션을 강제합니다. cmd/ (또는 internal/pkg/) 같은 wiring 코드가 도메인 타입에 대해 inline anonymous interface를 선언하면, 통제되지 않은 *두 번째* cross-domain 표면을 만드는 셈입니다 — 그 어댑터/추상화는 `internal/orchestration/`에 있어야 합니다.
+
+```go
+// flagged: cmd/가 도메인 타입을 추상화하는 inline interface 선언
+package main
+
+import "example.com/p/internal/domain/user"
+
+type adapter struct {
+    repo interface {                                          // ← cmd/의 cross-domain anonymous
+        GetByID(ctx context.Context, id string) (*user.User, error)
+    }
+}
+```
+
+```go
+// flagged 안 됨: 같은 모양이지만 orchestration 안 (cross-domain 조정의 지정된 장소)
+package orchestration
+
+import "example.com/p/internal/domain/user"
+
+type userInfoAdapter struct {
+    repo interface {                                          // ← anonymous지만 orchestration은 exempt
+        GetByID(ctx context.Context, id string) (*user.User, error)
+    }
+}
+```
+
+flag된 위치를 고치는 방법은 **어댑터를 orchestration 패키지로 이동**하고, wiring 코드는 자체 interface를 선언하는 대신 orchestration 생성자를 호출하는 것입니다.
+
+스킵:
+- 테스트 파일 (`_test.go`)
+- 빈 interface (`interface{}`) 및 메서드 선언 없는 interface
+- Embedded interface (`interface { io.Reader }`)
+- 같은 도메인 내 참조
+- `internal/<OrchestrationDir>/` 안의 모든 패키지 — orchestration은 cross-domain 조정의 지정된 레이어
+- `DomainDir`이 없는 플랫 레이아웃 모델 (ConsumerWorker, Batch, EventPipeline)
+
+### `interface.container-only`
+
+패키지 안에서 선언된 named interface가 **struct field 타입으로만** 사용되고 함수 파라미터나 반환 타입으로는 한 번도 사용되지 않는 경우를 감지합니다. 기본 severity: **Warning**.
+
+이는 vibe-coding 잡음 패턴으로, interface를 추상화가 아니라 *값 컨테이너*로 쓰는 신호입니다. 주로 wiring 레이어에서 어떤 값을 들고 있어야 하는데 concrete 타입이 노출되지 않아서 (예: `alias.go`가 생성자만 re-export하고 타입은 안 함), 필드 타입을 부여하기 위해 local interface를 임시로 만든 경우에 발생합니다.
+
+```go
+// flagged: container-only — 파라미터나 반환에 한 번도 안 쓰임
+type userRepo interface {
+    GetByID(id string) string
+}
+
+type holder struct {
+    r userRepo  // 유일한 사용처
+}
+```
+
+```go
+// flagged 안 됨: 정상 consumer-defined interface
+type userRepo interface {
+    GetByID(id string) string
+}
+
+func newHolder(r userRepo) *holder {  // 파라미터로 사용 → 진짜 추상화
+    return &holder{r: r}
+}
+```
+
+스킵:
+- 테스트 파일 (`_test.go`) — mock/fake fixture가 같은 모양을 갖기 때문
+- 타입 alias (`type Foo = pkg.Foo`)
+- struct의 embedded field (anonymous embedding)
+- 어디에서도 안 쓰이는 interface (다른 smell 카테고리)
+
+이 룰은 **fix를 강제하지 않습니다**. 그저 smell을 짚을 뿐. 일반적인 두 가지 해결 방법:
+1. concrete 타입을 `alias.go`에서 re-export해서 필드가 직접 들 수 있게 한다.
+2. 값을 두 함수 사이의 struct field가 아니라 한 함수 내부의 local 변수로 다시 짠다.
+
+`WithSeverity(Error)`로 hard rule로 승격할 수 있습니다.
+
 ## 블래스트 반경
 
 `rules.AnalyzeBlastRadius(pkgs, module, root, opts...)`

@@ -80,3 +80,32 @@ Do **not** optimize for:
 - purity
 - corner-case control
 - over-modeling package internals
+
+#### Warning Category vs Hard Rules
+
+The Non-Goals above apply to **hard-enforcing rules** (Error severity) that block builds. They do **not** apply to **Warning-severity smell detectors** that inform without blocking, as long as the smell:
+
+- is **mechanically detectable** with low false-positive risk,
+- correlates with a real vibe-coding regression (not theoretical purity),
+- has a clearly stated motivation in `docs/` or the rule's godoc,
+- defaults to `Warning` severity (callers can opt into `Error` via `WithSeverity`),
+- and is independent of any specific project layout.
+
+A Warning surfaces a smell to the developer without forcing a fix. This is different from "policing implementation details" because the developer remains in control. Examples that fit this category:
+
+- `interface.container-only` — interface declared but used only as a struct field, never as a function parameter or return type. This catches the wiring-layer workaround pattern where a developer declares a local interface just to give a struct field a type.
+
+When adding a new Warning-severity rule, document the motivation (the *why*, not just the *what*) and prefer to point at the *cause* of the smell rather than the *symptom*.
+
+#### When a Hard Rule Is Justified
+
+A hard rule (Error severity) is justified when:
+
+- the violation creates a parallel or uncontrolled architectural surface that bypasses an existing controlled surface (e.g. `alias.go`),
+- the project has explicitly committed to that controlled surface as a convention,
+- the violation is mechanically detectable with low false-positive risk,
+- and the fix is clear (use the controlled surface instead).
+
+Example:
+
+- `interface.cross-domain-anonymous` — anonymous interface declared outside both the source domain and the orchestration layer whose method signatures touch a foreign domain's types. The project convention is that cross-domain abstractions are owned by the orchestration package; declaring such an abstraction in `cmd/` (or other wiring code) creates a parallel uncontrolled cross-domain surface. Severity Error because the convention is firm and the fix is clear: move the adapter into `internal/orchestration/` and have wiring code call orchestration constructors instead. Orchestration packages are themselves exempt because cross-domain coordination is by design there.

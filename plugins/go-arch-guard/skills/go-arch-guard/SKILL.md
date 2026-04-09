@@ -308,6 +308,22 @@ fmt.Println(string(data))
 
 ---
 
+## Vibe-coding Smell (Warning만)
+
+빌드를 깨지 않고 개발자에게 알리는 **Warning 카테고리** 룰. 강제(error)가 아니라 *고지*다.
+
+| 룰 | 잡는 패턴 |
+|----|----------|
+| `interface.container-only` | 패키지에서 선언된 named interface가 struct field 타입으로만 쓰이고 함수 파라미터/반환에 한 번도 안 쓰임. wiring 레이어가 값을 들기 위해 만든 임시 컨테이너 interface 패턴을 잡는다. `WithSeverity(rules.Error)`로 hard rule 승격 가능. |
+
+## Cross-Domain Anonymous Interface (Hard rule, Error)
+
+| 룰 | 잡는 패턴 |
+|----|----------|
+| `interface.cross-domain-anonymous` | 도메인 외부 *그리고 orchestration 외부*에서 선언된 anonymous interface가 method signature에 다른 도메인 타입을 참조하면 위반. cmd/ 또는 internal/pkg/ 같은 wiring 코드가 도메인 타입에 대해 inline ad-hoc 추상화를 선언하는 패턴을 잡는다. **Severity: Error** — cross-domain 추상화는 orchestration 패키지가 소유한다는 컨벤션을 강제. **fix: 어댑터를 `internal/orchestration/`으로 이동하고 wiring 코드는 orchestration 생성자를 호출**. orchestration 패키지(서브패키지 포함)는 by-design exempt. |
+
+---
+
 ## Existing Project with Violations
 
 1. `architecture_test.go` 생성 후 실행 → 전체 위반 확인
