@@ -544,6 +544,43 @@ func New(db *sql.DB) Repository   // 인터페이스 반환 --- 올바름
 
 프리셋별 제외 레이어(진입점, model, event, pkg)는 `InterfacePatternExclude`로 제어합니다.
 
+### `interface.cross-domain-anonymous`
+
+도메인 외부에서 선언된 anonymous interface가 method signature에 다른 도메인 타입을 참조하는 경우를 감지합니다. 기본 severity: **Error**.
+
+wiring 레이어(cmd/)나 orchestration 패키지가 도메인 타입에 대해 ad-hoc inline 추상화를 선언하는 패턴을 잡습니다. `alias.go`가 cross-domain 접근의 *유일한* 공개 표면이라는 컨벤션을 보호합니다 — inline anonymous interface는 통제되지 않은 *두 번째* 공개 표면을 만듭니다.
+
+```go
+// flagged: cmd/가 도메인 타입을 추상화하는 inline interface 선언
+package main
+
+import "example.com/p/internal/domain/user"
+
+type adapter struct {
+    repo interface {                                          // ← cross-domain anonymous
+        GetByID(ctx context.Context, id string) (*user.User, error)
+    }
+}
+```
+
+```go
+// flagged 안 됨: alias.go에 노출된 named interface를 사용
+package main
+
+import "example.com/p/internal/domain/user"
+
+type adapter struct {
+    repo user.UserReader  // named, alias 경유
+}
+```
+
+스킵:
+- 테스트 파일 (`_test.go`)
+- 빈 interface (`interface{}`) 및 메서드 선언 없는 interface
+- Embedded interface (`interface { io.Reader }`)
+- 같은 도메인 내 참조
+- `DomainDir`이 없는 플랫 레이아웃 모델 (ConsumerWorker, Batch, EventPipeline)
+
 ### `interface.container-only`
 
 패키지 안에서 선언된 named interface가 **struct field 타입으로만** 사용되고 함수 파라미터나 반환 타입으로는 한 번도 사용되지 않는 경우를 감지합니다. 기본 severity: **Warning**.

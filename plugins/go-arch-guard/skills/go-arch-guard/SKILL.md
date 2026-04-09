@@ -316,6 +316,12 @@ fmt.Println(string(data))
 |----|----------|
 | `interface.container-only` | 패키지에서 선언된 named interface가 struct field 타입으로만 쓰이고 함수 파라미터/반환에 한 번도 안 쓰임. wiring 레이어가 값을 들기 위해 만든 임시 컨테이너 interface 패턴을 잡는다. `WithSeverity(rules.Error)`로 hard rule 승격 가능. |
 
+## Cross-Domain Anonymous Interface (Hard rule, Error)
+
+| 룰 | 잡는 패턴 |
+|----|----------|
+| `interface.cross-domain-anonymous` | 어떤 패키지든 anonymous interface가 method signature에 다른 도메인 타입을 참조하면 위반. cmd/ 또는 orchestration이 도메인 타입에 대해 inline ad-hoc 추상화를 선언하는 패턴을 잡는다. **Severity: Error** — `alias.go`가 cross-domain 접근의 *유일한* 공개 표면이라는 컨벤션을 보호. fix: 대상 도메인의 alias.go에 좁은 named interface를 노출하고 그것을 사용. |
+
 ---
 
 ## Existing Project with Violations

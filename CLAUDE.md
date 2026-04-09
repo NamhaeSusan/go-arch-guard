@@ -96,3 +96,16 @@ A Warning surfaces a smell to the developer without forcing a fix. This is diffe
 - `interface.container-only` — interface declared but used only as a struct field, never as a function parameter or return type. This catches the wiring-layer workaround pattern where a developer declares a local interface just to give a struct field a type.
 
 When adding a new Warning-severity rule, document the motivation (the *why*, not just the *what*) and prefer to point at the *cause* of the smell rather than the *symptom*.
+
+#### When a Hard Rule Is Justified
+
+A hard rule (Error severity) is justified when:
+
+- the violation creates a parallel or uncontrolled architectural surface that bypasses an existing controlled surface (e.g. `alias.go`),
+- the project has explicitly committed to that controlled surface as a convention,
+- the violation is mechanically detectable with low false-positive risk,
+- and the fix is clear (use the controlled surface instead).
+
+Example:
+
+- `interface.cross-domain-anonymous` — anonymous interface in any package whose method signatures touch a foreign domain's types. This bypasses `alias.go`'s role as the sole controlled cross-domain public surface, creating a second uncontrolled surface inline. Severity Error because the project commits to alias-only cross-domain access, and the fix is to expose a small named interface in the target domain's `alias.go` and use that named type.

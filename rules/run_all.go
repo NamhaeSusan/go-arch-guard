@@ -26,6 +26,7 @@ func RunAll(pkgs []*packages.Package, projectModule string, projectRoot string, 
 	violations = append(violations, CheckTypePatterns(pkgs, opts...)...)
 	violations = append(violations, CheckInterfacePattern(pkgs, opts...)...)
 	violations = append(violations, CheckContainerInterface(pkgs, opts...)...)
+	violations = append(violations, CheckCrossDomainAnonymous(pkgs, opts...)...)
 	violations = append(violations, AnalyzeBlastRadius(pkgs, projectModule, projectRoot, opts...)...)
 	return deduplicateMetaViolations(violations)
 }
