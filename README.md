@@ -558,6 +558,51 @@ typically signal that the package has too many responsibilities.
 
 Excluded layers per preset (entry points, model, event, pkg) are controlled by `InterfacePatternExclude`.
 
+### `interface.container-only`
+
+Detects interfaces declared in a package that are used **only as struct field types** —
+never as a function parameter or return type. Default severity is **Warning**.
+
+This is a vibe-coding smell: the interface is being used as a value container rather than
+as an abstraction. A common cause is a wiring layer that needs to hold a value whose
+concrete type is not exposed (e.g. an `alias.go` re-exports the constructor but not the
+type), so the developer declares a local interface just to give the field a type.
+
+```go
+// flagged: container-only — never used as parameter or return
+type userRepo interface {
+    GetByID(id string) string
+}
+
+type holder struct {
+    r userRepo  // only usage
+}
+```
+
+```go
+// not flagged: legitimate consumer-defined interface
+type userRepo interface {
+    GetByID(id string) string
+}
+
+func newHolder(r userRepo) *holder {  // used as parameter → real abstraction
+    return &holder{r: r}
+}
+```
+
+Skipped:
+- Test files (`_test.go`) where mock/fake fixtures naturally use this shape
+- Type aliases (`type Foo = pkg.Foo`)
+- Embedded fields (anonymous embedding) in structs
+- Interfaces that are not used at all (different smell category — out of scope)
+
+The rule does **not** prescribe a fix. It only points at the smell. Two common resolutions:
+1. Re-export the concrete type from `alias.go` so the field can hold it directly.
+2. Rewrite the wiring so the value is a local variable inside one function instead of a struct field shared between functions.
+
+Severity can be upgraded to Error via `WithSeverity(Error)` if a project wants to enforce
+the smell as a hard rule.
+
 ## Blast Radius
 
 `rules.AnalyzeBlastRadius(pkgs, module, root, opts...)`

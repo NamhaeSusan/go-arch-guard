@@ -308,6 +308,16 @@ fmt.Println(string(data))
 
 ---
 
+## Vibe-coding Smell (Warning만)
+
+빌드를 깨지 않고 개발자에게 알리는 **Warning 카테고리** 룰. 강제(error)가 아니라 *고지*다.
+
+| 룰 | 잡는 패턴 |
+|----|----------|
+| `interface.container-only` | 패키지에서 선언된 named interface가 struct field 타입으로만 쓰이고 함수 파라미터/반환에 한 번도 안 쓰임. wiring 레이어가 값을 들기 위해 만든 임시 컨테이너 interface 패턴을 잡는다. `WithSeverity(rules.Error)`로 hard rule 승격 가능. |
+
+---
+
 ## Existing Project with Violations
 
 1. `architecture_test.go` 생성 후 실행 → 전체 위반 확인

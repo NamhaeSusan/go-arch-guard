@@ -80,3 +80,19 @@ Do **not** optimize for:
 - purity
 - corner-case control
 - over-modeling package internals
+
+#### Warning Category vs Hard Rules
+
+The Non-Goals above apply to **hard-enforcing rules** (Error severity) that block builds. They do **not** apply to **Warning-severity smell detectors** that inform without blocking, as long as the smell:
+
+- is **mechanically detectable** with low false-positive risk,
+- correlates with a real vibe-coding regression (not theoretical purity),
+- has a clearly stated motivation in `docs/` or the rule's godoc,
+- defaults to `Warning` severity (callers can opt into `Error` via `WithSeverity`),
+- and is independent of any specific project layout.
+
+A Warning surfaces a smell to the developer without forcing a fix. This is different from "policing implementation details" because the developer remains in control. Examples that fit this category:
+
+- `interface.container-only` — interface declared but used only as a struct field, never as a function parameter or return type. This catches the wiring-layer workaround pattern where a developer declares a local interface just to give a struct field a type.
+
+When adding a new Warning-severity rule, document the motivation (the *why*, not just the *what*) and prefer to point at the *cause* of the smell rather than the *symptom*.
