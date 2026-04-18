@@ -257,13 +257,21 @@ func snakeToPascal(s string) string {
 	return b.String()
 }
 
-var bannedLayerSuffixes = []string{
-	"_svc", "_service", "_repo", "_repository",
-	"_handler", "_controller", "_model", "_entity",
-	"_store", "_persistence",
+func layerSuffixes(m Model) []string {
+	seen := make(map[string]bool)
+	var out []string
+	for dir := range m.LayerDirNames {
+		suffix := "_" + dir
+		if !seen[suffix] {
+			seen[suffix] = true
+			out = append(out, suffix)
+		}
+	}
+	return out
 }
 
 func checkNoLayerSuffixWith(m Model, pkg *packages.Package, cfg Config) []Violation {
+	banned := layerSuffixes(m)
 	var violations []Violation
 	seen := make(map[string]bool)
 	for _, f := range pkg.GoFiles {
@@ -288,7 +296,7 @@ func checkNoLayerSuffixWith(m Model, pkg *packages.Package, cfg Config) []Violat
 			continue
 		}
 		name := strings.TrimSuffix(base, ".go")
-		for _, suffix := range bannedLayerSuffixes {
+		for _, suffix := range banned {
 			if trimmed, ok := strings.CutSuffix(name, suffix); ok {
 				suggested := trimmed + ".go"
 				violations = append(violations, Violation{

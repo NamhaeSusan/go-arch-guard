@@ -317,4 +317,3 @@ type holder struct {
 		t.Error("expected container-only violation")
 	}
 }
-
