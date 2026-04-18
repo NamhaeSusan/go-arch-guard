@@ -92,3 +92,20 @@ func TestIsExcluded(t *testing.T) {
 		})
 	}
 }
+
+func TestWithTxBoundary_SetsConfig(t *testing.T) {
+	cfg := rules.NewConfig(rules.WithTxBoundary(rules.TxBoundaryConfig{
+		StartSymbols:  []string{"database/sql.(*DB).BeginTx"},
+		Types:         []string{"database/sql.Tx"},
+		AllowedLayers: []string{"app"},
+	}))
+	if len(cfg.TxBoundary.StartSymbols) != 1 {
+		t.Fatalf("expected 1 start symbol, got %d", len(cfg.TxBoundary.StartSymbols))
+	}
+	if len(cfg.TxBoundary.Types) != 1 {
+		t.Fatalf("expected 1 tx type, got %d", len(cfg.TxBoundary.Types))
+	}
+	if cfg.TxBoundary.AllowedLayers[0] != "app" {
+		t.Fatalf("unexpected allowed layer: %s", cfg.TxBoundary.AllowedLayers[0])
+	}
+}
