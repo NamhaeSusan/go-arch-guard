@@ -1,6 +1,10 @@
 package rules
 
-import "golang.org/x/tools/go/packages"
+import (
+	"strings"
+
+	"golang.org/x/tools/go/packages"
+)
 
 // RunAll executes the recommended built-in rule set and returns violations
 // in rule-execution order (domain isolation, layer direction, naming, structure,
@@ -30,4 +34,22 @@ func RunAll(pkgs []*packages.Package, projectModule string, projectRoot string, 
 	violations = append(violations, AnalyzeBlastRadius(pkgs, projectModule, projectRoot, opts...)...)
 	violations = append(violations, CheckTxBoundary(pkgs, projectModule, projectRoot, opts...)...)
 	return deduplicateMetaViolations(violations)
+}
+
+// deduplicateMetaViolations collapses repeated "meta.*" violations so that
+// multiple rules reporting the same project-level failure (e.g. no-matching-packages)
+// only surface once in the final output.
+func deduplicateMetaViolations(violations []Violation) []Violation {
+	seen := make(map[string]bool)
+	result := violations[:0]
+	for _, v := range violations {
+		if strings.HasPrefix(v.Rule, "meta.") {
+			if seen[v.Rule] {
+				continue
+			}
+			seen[v.Rule] = true
+		}
+		result = append(result, v)
+	}
+	return result
 }
