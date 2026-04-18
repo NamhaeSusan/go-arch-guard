@@ -3,6 +3,7 @@ package rules
 import (
 	"fmt"
 	"go/ast"
+	"go/types"
 	"sort"
 	"strings"
 
@@ -82,20 +83,6 @@ func isExcludedInterfacePatternPkg(m Model, pkg *packages.Package) bool {
 	return false
 }
 
-// interfaceMethodNames extracts method names from an interface type.
-func interfaceMethodNames(iface *ast.InterfaceType) map[string]bool {
-	methods := make(map[string]bool)
-	if iface.Methods == nil {
-		return methods
-	}
-	for _, m := range iface.Methods.List {
-		for _, name := range m.Names {
-			methods[name.Name] = true
-		}
-	}
-	return methods
-}
-
 // checkSingleInterfacePerPackage warns when a package declares more than one
 // exported interface.
 func checkSingleInterfacePerPackage(pkg *packages.Package, ifaces map[string]*ast.InterfaceType, cfg Config) []Violation {
@@ -118,25 +105,47 @@ func checkSingleInterfacePerPackage(pkg *packages.Package, ifaces map[string]*as
 
 // checkExportedImpl detects exported structs that implement an exported interface
 // in the same package — the impl should be unexported.
+// It uses go/types.Implements for full signature comparison.
 func checkExportedImpl(pkg *packages.Package, ifaces map[string]*ast.InterfaceType, cfg Config) []Violation {
-	methods := collectMethods(pkg)
+	if pkg.Types == nil {
+		return nil
+	}
+	scope := pkg.Types.Scope()
+
+	// Build a map of interface name → *types.Interface for type-level comparison.
+	typedIfaces := make(map[string]*types.Interface, len(ifaces))
+	for name := range ifaces {
+		obj := scope.Lookup(name)
+		if obj == nil {
+			continue
+		}
+		named, ok := obj.Type().(*types.Named)
+		if !ok {
+			continue
+		}
+		iface, ok := named.Underlying().(*types.Interface)
+		if !ok || iface.NumMethods() == 0 {
+			continue
+		}
+		typedIfaces[name] = iface
+	}
+
 	structs := collectExportedStructs(pkg)
 
 	var violations []Violation
 	for structName := range structs {
-		for ifaceName, iface := range ifaces {
-			ifaceMethods := interfaceMethodNames(iface)
-			if len(ifaceMethods) == 0 {
-				continue
-			}
-			allMatch := true
-			for mName := range ifaceMethods {
-				if !methods[structName+"."+mName] {
-					allMatch = false
-					break
-				}
-			}
-			if allMatch {
+		obj := scope.Lookup(structName)
+		if obj == nil {
+			continue
+		}
+		named, ok := obj.Type().(*types.Named)
+		if !ok {
+			continue
+		}
+		// Check both value and pointer receivers.
+		ptrType := types.NewPointer(named)
+		for ifaceName, iface := range typedIfaces {
+			if types.Implements(named, iface) || types.Implements(ptrType, iface) {
 				violations = append(violations, Violation{
 					File:     relativePackageFile(pkg),
 					Rule:     "interface.exported-impl",

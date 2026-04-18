@@ -260,6 +260,73 @@ type Store interface {
 	}
 }
 
+// TestCheckInterfacePattern_ExportedImpl_SignatureMismatch verifies that a struct
+// with a method whose name matches an interface method but whose signature differs
+// is NOT flagged as implementing the interface.
+func TestCheckInterfacePattern_ExportedImpl_SignatureMismatch(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/ip-sig-mismatch"
+
+	writeTestFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+
+	// StoreImpl.Find has different parameter types than Store.Find — not an impl.
+	writeTestFile(t, filepath.Join(root, "internal", "store", "store.go"),
+		`package store
+
+type Store interface {
+	Find(id string) string
+}
+
+type StoreImpl struct{}
+
+func (s *StoreImpl) Find(limit, offset int) []string { return nil }
+`)
+
+	pkgs := loadTestPackages(t, root)
+	vs := rules.CheckInterfacePattern(pkgs, rules.WithModel(rules.ConsumerWorker()))
+
+	for _, v := range vs {
+		if v.Rule == "interface.exported-impl" {
+			t.Errorf("unexpected interface.exported-impl violation when signatures do not match: %s", v.String())
+		}
+	}
+}
+
+// TestCheckInterfacePattern_ExportedImpl_SignatureMatch verifies that a struct
+// whose method names AND signatures match the interface is still flagged.
+func TestCheckInterfacePattern_ExportedImpl_SignatureMatch(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/ip-sig-match"
+
+	writeTestFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+
+	writeTestFile(t, filepath.Join(root, "internal", "store", "store.go"),
+		`package store
+
+type Store interface {
+	Find(id string) string
+}
+
+type StoreImpl struct{}
+
+func (s *StoreImpl) Find(id string) string { return "" }
+`)
+
+	pkgs := loadTestPackages(t, root)
+	vs := rules.CheckInterfacePattern(pkgs, rules.WithModel(rules.ConsumerWorker()))
+
+	found := false
+	for _, v := range vs {
+		if v.Rule == "interface.exported-impl" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected interface.exported-impl violation when signatures match")
+	}
+}
+
 func TestCheckInterfacePattern_ConstructorReturnsInterfaceValid(t *testing.T) {
 	root := t.TempDir()
 	module := "example.com/ip-ctor-iface-valid"
