@@ -144,8 +144,29 @@ func identifySublayerWith(m Model, pkgPath, internalPrefix, domain string) strin
 		if slices.Contains(m.Sublayers, nested) {
 			return nested
 		}
+		// If parts[0] is a root sublayer that has known nested sublayers defined
+		// (e.g. "core" has "core/model", "core/repo"), then an unrecognised nested
+		// path like "core/extra" must surface as unknown rather than collapsing to
+		// the root "core". Sublayers without nested siblings (e.g. "handler",
+		// "infra") keep their old behaviour of ignoring subdirectories.
+		if hasNestedSublayers(m, parts[0]) {
+			return nested
+		}
 	}
 	return parts[0]
+}
+
+// hasNestedSublayers reports whether root has at least one known nested sublayer
+// defined (e.g. "core" has "core/model", "core/repo"). Sublayers that only
+// appear as a root entry (e.g. "handler", "infra") return false.
+func hasNestedSublayers(m Model, root string) bool {
+	prefix := root + "/"
+	for _, s := range m.Sublayers {
+		if strings.HasPrefix(s, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func identifyDomainWith(m Model, pkgPath, internalPrefix string) string {

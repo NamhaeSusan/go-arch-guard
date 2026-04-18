@@ -1,6 +1,7 @@
 package rules_test
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -64,6 +65,43 @@ func TestAnalyzeBlastRadius_RespectsExclude(t *testing.T) {
 	for _, v := range violations {
 		if strings.Contains(v.File, "internal/pkg") {
 			t.Error("excluded package should not appear in violations")
+		}
+	}
+}
+
+// TestAnalyzeBlastRadius_IQRZeroSingleOutlier is a regression test for the bug where
+// iqr == 0 caused an early return nil, silently missing a single outlier package.
+func TestAnalyzeBlastRadius_IQRZeroSingleOutlier(t *testing.T) {
+	root := t.TempDir()
+	mod := "example.com/iqr-zero"
+
+	writeTestFile(t, filepath.Join(root, "go.mod"), "module "+mod+"\n\ngo 1.21\n")
+
+	// hub is imported by a, b, c, d — 4 transitive dependents; leaves have 0
+	writeTestFile(t, filepath.Join(root, "internal", "hub", "hub.go"),
+		"package hub\n\nfunc Hub() {}\n")
+	for _, leaf := range []string{"a", "b", "c", "d"} {
+		writeTestFile(t, filepath.Join(root, "internal", leaf, leaf+".go"),
+			"package "+leaf+"\n\nimport _ \""+mod+"/internal/hub\"\n")
+	}
+	// fifth leaf has no imports — leaf e is isolated
+	writeTestFile(t, filepath.Join(root, "internal", "e", "e.go"),
+		"package e\n\nfunc E() {}\n")
+
+	pkgs := loadTestPackages(t, root)
+	violations := rules.AnalyzeBlastRadius(pkgs, mod, root)
+
+	found := false
+	for _, v := range violations {
+		if v.Rule == "blast.high-coupling" && strings.Contains(v.File, "hub") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected blast.high-coupling violation for hub (IQR=0 single-outlier case)")
+		for _, v := range violations {
+			t.Log(v.String())
 		}
 	}
 }
