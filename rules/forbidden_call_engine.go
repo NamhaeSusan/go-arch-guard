@@ -72,10 +72,11 @@ func checkForbiddenCallsByLayer(
 		if !strings.HasPrefix(pkg.PkgPath, internalPrefix) {
 			continue
 		}
+		// layerOfPackage returns "" for packages that don't match any known
+		// sublayer. We intentionally do NOT skip them: an unclassified internal
+		// package is not in AllowedLayers, so forbidden calls there should
+		// still produce violations.
 		layer := layerOfPackage(m, pkg.PkgPath, internalPrefix)
-		if layer == "" {
-			continue
-		}
 		if pkg.TypesInfo == nil {
 			continue
 		}
@@ -145,9 +146,14 @@ func layerOfPackage(m Model, pkgPath, internalPrefix string) string {
 //   - "<pkg-path>.(*<Recv>).<Method>"       for pointer-receiver methods
 //   - "<pkg-path>.<Recv>.<Method>"          for value-receiver methods
 //
+// Generic instantiations (e.g. f[T](), pkg.F[T]()) arrive with Fun wrapped
+// in *ast.IndexExpr or *ast.IndexListExpr; we unwrap to the base expression
+// before resolving so these call sites are not silently skipped.
+//
 // Returns "" when the callee cannot be resolved.
 func resolveCalleeID(info *types.Info, call *ast.CallExpr) string {
-	switch fun := call.Fun.(type) {
+	fun := unwrapIndexExpr(call.Fun)
+	switch fun := fun.(type) {
 	case *ast.SelectorExpr:
 		if sel, ok := info.Selections[fun]; ok && sel != nil {
 			if fn, ok := sel.Obj().(*types.Func); ok {
@@ -167,6 +173,23 @@ func resolveCalleeID(info *types.Info, call *ast.CallExpr) string {
 		}
 	}
 	return ""
+}
+
+// unwrapIndexExpr strips *ast.IndexExpr and *ast.IndexListExpr wrappers that
+// appear when a generic function or method is called with explicit type
+// arguments (e.g. F[T]() or pkg.F[T1, T2]()). It returns the innermost
+// non-index expression, which is either a *ast.SelectorExpr or *ast.Ident.
+func unwrapIndexExpr(expr ast.Expr) ast.Expr {
+	for {
+		switch x := expr.(type) {
+		case *ast.IndexExpr:
+			expr = x.X
+		case *ast.IndexListExpr:
+			expr = x.X
+		default:
+			return expr
+		}
+	}
 }
 
 func funcQualifiedName(fn *types.Func) string {

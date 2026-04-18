@@ -48,8 +48,10 @@ func checkTypeInSignature(
 		if !strings.HasPrefix(pkg.PkgPath, internalPrefix) {
 			continue
 		}
+		// layerOfPackage returns "" for unclassified internal packages.
+		// "" is never in AllowedLayers, so we fall through and check them too.
 		layer := layerOfPackage(m, pkg.PkgPath, internalPrefix)
-		if layer == "" || allowed[layer] {
+		if allowed[layer] {
 			continue
 		}
 		if pkg.TypesInfo == nil {
