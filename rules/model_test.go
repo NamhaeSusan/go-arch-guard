@@ -591,3 +591,57 @@ func TestMatchPortSublayer_CustomLayer(t *testing.T) {
 		t.Errorf("matchPortSublayer = %q, want %q", got, "")
 	}
 }
+
+// Regression (review #1): custom flat model with a non-empty OrchestrationDir
+// must keep that directory allowed at internal/ top level.
+func TestNewModel_FlatLayout_PreservesOrchestrationDir(t *testing.T) {
+	m := NewModel(
+		WithDomainDir(""),
+		WithOrchestrationDir("workflow"),
+		WithSharedDir("pkg"),
+		WithSublayers([]string{"worker", "service", "store", "model"}),
+		WithDirection(map[string][]string{
+			"worker":  {"service", "model"},
+			"service": {"store", "model"},
+			"store":   {"model"},
+			"model":   {},
+		}),
+	)
+	if !m.InternalTopLevel["workflow"] {
+		t.Error("flat-layout NewModel must preserve non-empty OrchestrationDir in InternalTopLevel")
+	}
+	for _, sl := range []string{"worker", "service", "store", "model", "pkg"} {
+		if !m.InternalTopLevel[sl] {
+			t.Errorf("flat-layout NewModel: InternalTopLevel missing %q", sl)
+		}
+	}
+}
+
+// Regression (review #2): NewModel inherits PortLayers/ContractLayers from DDD.
+// A custom model that renames core/repo to core/ports/repo (without explicitly
+// setting the new fields) must still get port/contract semantics via the
+// basename fallback.
+func TestNewModel_InheritedPortLayers_BasenameFallback(t *testing.T) {
+	m := NewModel(
+		WithSublayers([]string{"handler", "app", "core/ports/repo", "core/svcs/svc", "core/model"}),
+		WithDirection(map[string][]string{
+			"handler":         {"app"},
+			"app":             {"core/ports/repo", "core/svcs/svc", "core/model"},
+			"core/ports/repo": {"core/model"},
+			"core/svcs/svc":   {"core/model"},
+			"core/model":      {},
+		}),
+	)
+	if !isPortSublayerFor(m, "core/ports/repo") {
+		t.Error("basename fallback: 'core/ports/repo' must still be a port sublayer")
+	}
+	if !isContractSublayerFor(m, "core/ports/repo") {
+		t.Error("basename fallback: 'core/ports/repo' must still be a contract sublayer")
+	}
+	if !isContractSublayerFor(m, "core/svcs/svc") {
+		t.Error("basename fallback: 'core/svcs/svc' must still be a contract sublayer")
+	}
+	if got := matchPortSublayer(m, "example.com/app/internal/domain/order/core/ports/repo"); got != "core/ports/repo" {
+		t.Errorf("matchPortSublayer with basename fallback = %q, want %q", got, "core/ports/repo")
+	}
+}

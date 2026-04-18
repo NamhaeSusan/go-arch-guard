@@ -6,11 +6,13 @@ import (
 )
 
 // isPortSublayerFor reports whether name is a port layer according to the model.
-// When m.PortLayers is non-empty it is authoritative; otherwise falls back to
-// hardcoded legacy names ("repo", "gateway") for backward compatibility.
+// The model's explicit PortLayers list is checked first; when it does not match,
+// the basename fallback to legacy names ("repo", "gateway") is still applied so
+// DDD-inherited custom models (which carry PortLayers=["core/repo"]) continue
+// to recognize renamed sublayers like "core/ports/repo".
 func isPortSublayerFor(m Model, name string) bool {
-	if len(m.PortLayers) > 0 {
-		return slices.Contains(m.PortLayers, name)
+	if slices.Contains(m.PortLayers, name) {
+		return true
 	}
 	base := name
 	if i := strings.LastIndex(name, "/"); i >= 0 {
@@ -20,11 +22,11 @@ func isPortSublayerFor(m Model, name string) bool {
 }
 
 // isContractSublayerFor reports whether name is a contract layer according to the model.
-// When m.ContractLayers is non-empty it is authoritative; otherwise falls back to
-// hardcoded legacy names ("repo", "gateway", "svc") for backward compatibility.
+// Same layering as isPortSublayerFor: explicit ContractLayers match first, then port
+// semantics, then basename fallback to "svc" so custom models keep working.
 func isContractSublayerFor(m Model, name string) bool {
-	if len(m.ContractLayers) > 0 {
-		return slices.Contains(m.ContractLayers, name)
+	if slices.Contains(m.ContractLayers, name) {
+		return true
 	}
 	if isPortSublayerFor(m, name) {
 		return true

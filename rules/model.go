@@ -392,14 +392,17 @@ func NewModel(opts ...ModelOption) Model {
 	if m.DomainDir != "" {
 		// Domain layout: top-level is domain/, orchestration/, shared/.
 		tl[m.DomainDir] = true
-		if m.OrchestrationDir != "" {
-			tl[m.OrchestrationDir] = true
-		}
 	} else {
 		// Flat layout: each sublayer lives directly under internal/.
 		for _, sl := range m.Sublayers {
 			tl[sl] = true
 		}
+	}
+	// OrchestrationDir is independent of layout: non-empty values always
+	// stay in InternalTopLevel so flat layouts can opt into an orchestration
+	// directory (e.g. internal/workflow/).
+	if m.OrchestrationDir != "" {
+		tl[m.OrchestrationDir] = true
 	}
 	if m.SharedDir != "" {
 		tl[m.SharedDir] = true
