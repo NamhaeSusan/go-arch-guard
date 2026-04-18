@@ -23,14 +23,27 @@ type forbiddenCallRule struct {
 	Fix     func(layer string, allowed []string) string
 }
 
-// checkForbiddenCallsByLayer walks all CallExprs in internal packages and
-// emits a violation for each call whose callee ID matches one of the rules
-// and whose package layer is outside that rule's AllowedLayers.
+// scanScope configures which packages the tx-boundary engines include and how
+// unclassified internal packages are handled. Keeps callsites concise while
+// letting callers opt in to strict coverage.
+type scanScope struct {
+	// enforceUnclassified: when true, internal packages whose layer can't be
+	// determined are treated as non-allowed (layer "") and still checked.
+	// When false (default), they are skipped to avoid noise on ad-hoc helpers.
+	enforceUnclassified bool
+}
+
+// checkForbiddenCallsByLayer walks all CallExprs in packages under
+// <module>/internal/ and <module>/cmd/ and emits a violation for each call
+// whose callee ID matches one of the rules and whose package layer is outside
+// that rule's AllowedLayers. Packages under cmd/ use the synthetic layer name
+// "cmd" so rules can allow or forbid them explicitly.
 func checkForbiddenCallsByLayer(
 	pkgs []*packages.Package,
 	projectModule, projectRoot string,
 	m Model,
 	cfg Config,
+	scope scanScope,
 	rules []forbiddenCallRule,
 ) []Violation {
 	if len(rules) == 0 {
@@ -39,6 +52,7 @@ func checkForbiddenCallsByLayer(
 	projectModule = resolveModule(pkgs, projectModule)
 	projectRoot = resolveRoot(pkgs, projectRoot)
 	internalPrefix := projectModule + "/internal/"
+	cmdPrefix := projectModule + "/cmd/"
 
 	type compiledRule struct {
 		allowed      map[string]bool
@@ -69,14 +83,10 @@ func checkForbiddenCallsByLayer(
 		if isExcludedPackage(cfg, pkg.PkgPath, projectModule) {
 			continue
 		}
-		if !strings.HasPrefix(pkg.PkgPath, internalPrefix) {
+		layer, ok := scanLayerFor(m, pkg.PkgPath, internalPrefix, cmdPrefix, scope.enforceUnclassified)
+		if !ok {
 			continue
 		}
-		// layerOfPackage returns "" for packages that don't match any known
-		// sublayer. We intentionally do NOT skip them: an unclassified internal
-		// package is not in AllowedLayers, so forbidden calls there should
-		// still produce violations.
-		layer := layerOfPackage(m, pkg.PkgPath, internalPrefix)
 		if pkg.TypesInfo == nil {
 			continue
 		}
@@ -114,6 +124,29 @@ func checkForbiddenCallsByLayer(
 		}
 	}
 	return violations
+}
+
+// scanLayerFor returns (layer, true) when pkgPath should be scanned by the
+// tx-boundary engines, and ("", false) when it should be skipped.
+//
+//   - Packages under <module>/cmd/... are scanned with the synthetic layer "cmd".
+//   - Packages under <module>/internal/... are scanned with their known sublayer.
+//   - Internal packages that don't map to any known sublayer (layer == "") are
+//     scanned only when enforceUnclassified is true; otherwise skipped to
+//     avoid noise on ad-hoc helper packages (testutil, codegen, etc.).
+//   - Everything else is skipped.
+func scanLayerFor(m Model, pkgPath, internalPrefix, cmdPrefix string, enforceUnclassified bool) (string, bool) {
+	if strings.HasPrefix(pkgPath, cmdPrefix) || pkgPath == strings.TrimSuffix(cmdPrefix, "/") {
+		return "cmd", true
+	}
+	if !strings.HasPrefix(pkgPath, internalPrefix) {
+		return "", false
+	}
+	layer := layerOfPackage(m, pkgPath, internalPrefix)
+	if layer == "" && !enforceUnclassified {
+		return "", false
+	}
+	return layer, true
 }
 
 // layerOfPackage returns the layer/sublayer for the given package path,

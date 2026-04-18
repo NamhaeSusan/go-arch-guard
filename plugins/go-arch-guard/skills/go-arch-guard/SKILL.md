@@ -278,13 +278,19 @@ rules.WithSeverity(rules.Warning)         // 실패 없이 로그만
 
 ```go
 rules.WithTxBoundary(rules.TxBoundaryConfig{
-    StartSymbols:  []string{"database/sql.(*DB).BeginTx"},
-    Types:         []string{"database/sql.Tx"},
-    AllowedLayers: []string{"app"}, // default when empty
+    StartSymbols:        []string{"database/sql.(*DB).BeginTx"},
+    Types:               []string{"database/sql.Tx"},
+    AllowedLayers:       []string{"app"}, // "cmd" 도 허용 가능
+    EnforceUnclassified: false,           // 기본: 미분류 internal 패키지 스킵
 })
 ```
 
 위반 규칙 ID: `tx.start-outside-allowed-layer`, `tx.type-in-signature`.
+
+스캔 범위: `internal/...` + `cmd/...`. `cmd/` 는 가상 레이어 `"cmd"`로 분류됩니다.
+제네릭 호출 (`F[T](...)`, `pkg.F[T](...)`, `x.M[T](...)`) 도 풀어서 식별합니다.
+`EnforceUnclassified: true` 를 켜면 미분류 internal 패키지도 검사되며, 필요한
+헬퍼는 `WithExclude` 로 제외합니다.
 
 ## Machine-readable Output
 

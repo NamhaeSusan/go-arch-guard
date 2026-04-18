@@ -667,11 +667,29 @@ violations := rules.CheckTxBoundary(pkgs, module, root,
         },
         Types:         []string{"database/sql.Tx"},
         AllowedLayers: []string{"app"}, // 비어 있으면 기본값
+        // EnforceUnclassified: true, // 엄격 모드 — 아래 설명 참조
     }),
 )
 ```
 
 발생 가능한 규칙 ID: `tx.start-outside-allowed-layer`, `tx.type-in-signature`.
+
+**스캔 범위.** `internal/...` 과 `cmd/...` 를 모두 스캔합니다. `cmd/` 하위
+패키지는 `"cmd"` 라는 가상 레이어 이름을 사용하므로, 컴포지션 루트에서
+트랜잭션을 시작하는 것이 정상적이라면 `AllowedLayers` 에 `"cmd"` 를 추가
+하세요.
+
+**제네릭 호출.** 명시적 타입 파라미터로 호출되는 경우 — 예:
+`BeginGeneric[string](...)`, `pkg.F[T1, T2](...)`, `x.M[T](...)` — 도
+`*ast.IndexExpr` / `*ast.IndexListExpr` 를 풀어 식별하므로 제네릭 금지 심볼도
+놓치지 않습니다.
+
+**미분류 internal 패키지.** `internal/` 하위에 있지만 알려진 서브레이어에
+매핑되지 않는 패키지 (예: `internal/testutil`, 코드젠 산출물, 마이그레이션
+헬퍼 등) 는 잡음을 피하기 위해 **기본값으로 스킵됩니다**. 엄격하게 커버
+하려면 `EnforceUnclassified: true` 를 설정하세요 — 이 경우 미분류 패키지는
+빈 레이어 (`""`) 로 위반을 내며, 정상적인 헬퍼는
+`WithExclude("internal/testutil/...")` 로 제외할 수 있습니다.
 
 ## 옵션
 

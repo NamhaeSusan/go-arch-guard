@@ -66,7 +66,7 @@ var (
 func loadTxBoundary(t *testing.T) []*packages.Package {
 	t.Helper()
 	txboundaryOnce.Do(func() {
-		txboundaryPkgs, txboundaryErr = analyzer.Load("../testdata/txboundary", "internal/...")
+		txboundaryPkgs, txboundaryErr = analyzer.Load("../testdata/txboundary", "internal/...", "cmd/...")
 	})
 	if txboundaryErr != nil {
 		t.Fatal(txboundaryErr)

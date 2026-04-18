@@ -3,15 +3,15 @@ package rules
 import (
 	"go/ast"
 	"go/types"
-	"strings"
 
 	"golang.org/x/tools/go/packages"
 )
 
-// checkTypeInSignature walks all FuncDecl params and results in internal
-// packages and emits a violation when a base type (after stripping
-// pointer/slice/array/map/chan wrappers) matches one of typeNames and
-// the function's package layer is outside allowedLayers.
+// checkTypeInSignature walks all FuncDecl params and results in packages
+// under <module>/internal/ and <module>/cmd/ and emits a violation when a
+// base type (after stripping pointer/slice/array/map/chan wrappers) matches
+// one of typeNames and the function's package layer is outside allowedLayers.
+// cmd/ packages use the synthetic layer name "cmd".
 //
 // message/fix are typed callbacks receiving (typeID, allowedLayers).
 func checkTypeInSignature(
@@ -19,6 +19,7 @@ func checkTypeInSignature(
 	projectModule, projectRoot string,
 	m Model,
 	cfg Config,
+	scope scanScope,
 	typeNames []string,
 	allowedLayers []string,
 	ruleName string,
@@ -30,6 +31,7 @@ func checkTypeInSignature(
 	projectModule = resolveModule(pkgs, projectModule)
 	projectRoot = resolveRoot(pkgs, projectRoot)
 	internalPrefix := projectModule + "/internal/"
+	cmdPrefix := projectModule + "/cmd/"
 
 	wanted := map[string]bool{}
 	for _, n := range typeNames {
@@ -45,12 +47,10 @@ func checkTypeInSignature(
 		if isExcludedPackage(cfg, pkg.PkgPath, projectModule) {
 			continue
 		}
-		if !strings.HasPrefix(pkg.PkgPath, internalPrefix) {
+		layer, ok := scanLayerFor(m, pkg.PkgPath, internalPrefix, cmdPrefix, scope.enforceUnclassified)
+		if !ok {
 			continue
 		}
-		// layerOfPackage returns "" for unclassified internal packages.
-		// "" is never in AllowedLayers, so we fall through and check them too.
-		layer := layerOfPackage(m, pkg.PkgPath, internalPrefix)
 		if allowed[layer] {
 			continue
 		}

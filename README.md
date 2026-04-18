@@ -687,11 +687,28 @@ violations := rules.CheckTxBoundary(pkgs, module, root,
         },
         Types:         []string{"database/sql.Tx"},
         AllowedLayers: []string{"app"}, // default when empty
+        // EnforceUnclassified: true, // opt-in strict mode — see below
     }),
 )
 ```
 
 Emitted rule IDs: `tx.start-outside-allowed-layer`, `tx.type-in-signature`.
+
+**Scope.** Both `internal/...` and `cmd/...` are scanned. Packages under
+`cmd/` use the synthetic layer name `"cmd"`; add it to `AllowedLayers` if
+your composition root legitimately starts transactions.
+
+**Generic call sites.** Calls made through explicit type parameters — e.g.
+`BeginGeneric[string](...)`, `pkg.F[T1, T2](...)`, `x.M[T](...)` — are
+resolved by unwrapping `*ast.IndexExpr` / `*ast.IndexListExpr` so forbidden
+generic symbols are caught.
+
+**Unclassified internal packages.** Packages under `internal/` that don't
+map to a known sublayer (e.g. `internal/testutil`, codegen output, migration
+helpers) are **skipped by default** to avoid noise. Set
+`EnforceUnclassified: true` for strict coverage — unclassified packages
+then produce violations with layer `""`, and you opt specific helpers out
+via `WithExclude("internal/testutil/...")`.
 
 ## Options
 

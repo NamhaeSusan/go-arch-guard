@@ -65,8 +65,7 @@ func TestCheckTxBoundary_RespectsExclude(t *testing.T) {
 		rules.WithExclude(
 			"internal/domain/order/core/repo/...",
 			"internal/domain/order/core/svc/...",
-			"internal/generic/...",
-			"internal/testutil/...",
+			"cmd/...",
 		),
 	)
 	if len(got) != 0 {
@@ -98,8 +97,8 @@ func TestCheckTxBoundary_RespectsSeverity(t *testing.T) {
 
 func TestCheckTxBoundary_AllowedLayersIncludeOffenders(t *testing.T) {
 	pkgs := loadTxBoundary(t)
-	// Exclude new fixture packages that intentionally produce violations for
-	// other test cases. This test is scoped to the original txboundary scenario.
+	// cmd/... is a composition root covered by a separate test; exclude here
+	// so this test stays scoped to internal-only sublayers.
 	got := rules.CheckTxBoundary(pkgs,
 		"github.com/kimtaeyun/testproject-txboundary",
 		"../testdata/txboundary",
@@ -108,7 +107,7 @@ func TestCheckTxBoundary_AllowedLayersIncludeOffenders(t *testing.T) {
 			Types:         []string{"database/sql.Tx"},
 			AllowedLayers: []string{"app", "core/repo", "core/svc"},
 		}),
-		rules.WithExclude("internal/generic/...", "internal/testutil/..."),
+		rules.WithExclude("cmd/..."),
 	)
 	if len(got) != 0 {
 		t.Fatalf("expected 0 violations when all layers allowed, got %d", len(got))
@@ -160,7 +159,9 @@ func TestCheckTxBoundary_StripsNonPointerWrappers(t *testing.T) {
 
 func TestCheckTxBoundary_OnlyStartSymbolsConfigured(t *testing.T) {
 	pkgs := loadTxBoundary(t)
-	// Exclude new fixture packages scoped to other test cases.
+	// Default behavior (EnforceUnclassified=false) skips internal/testutil and
+	// internal/generic. cmd/ is always scanned, so exclude it to keep this
+	// test scoped to the core/repo case.
 	got := rules.CheckTxBoundary(pkgs,
 		"github.com/kimtaeyun/testproject-txboundary",
 		"../testdata/txboundary",
@@ -168,7 +169,7 @@ func TestCheckTxBoundary_OnlyStartSymbolsConfigured(t *testing.T) {
 			StartSymbols:  []string{"database/sql.(*DB).BeginTx"},
 			AllowedLayers: []string{"app"},
 		}),
-		rules.WithExclude("internal/generic/...", "internal/testutil/..."),
+		rules.WithExclude("cmd/..."),
 	)
 	for _, v := range got {
 		if v.Rule == "tx.type-in-signature" {
@@ -186,11 +187,57 @@ func TestCheckTxBoundary_OnlyStartSymbolsConfigured(t *testing.T) {
 	}
 }
 
-// TestCheckTxBoundary_UnclassifiedInternalPackageFlagged verifies that an
-// internal package that does not belong to any known sublayer (e.g.
-// internal/testutil) is treated as non-allowed and therefore produces a
-// violation when it calls a forbidden symbol.
-func TestCheckTxBoundary_UnclassifiedInternalPackageFlagged(t *testing.T) {
+// TestCheckTxBoundary_UnclassifiedInternalSkippedByDefault verifies the
+// default behavior: internal packages that don't map to any known sublayer
+// (e.g. internal/testutil) are silently skipped so ad-hoc helper packages
+// don't produce noise.
+func TestCheckTxBoundary_UnclassifiedInternalSkippedByDefault(t *testing.T) {
+	pkgs := loadTxBoundary(t)
+	got := rules.CheckTxBoundary(pkgs,
+		"github.com/kimtaeyun/testproject-txboundary",
+		"../testdata/txboundary",
+		rules.WithTxBoundary(rules.TxBoundaryConfig{
+			StartSymbols:  []string{"database/sql.(*DB).BeginTx"},
+			AllowedLayers: []string{"app"},
+		}),
+	)
+	for _, v := range got {
+		if strings.Contains(v.File, "internal/testutil") {
+			t.Errorf("unexpected violation from unclassified internal/testutil by default: %+v", v)
+		}
+	}
+}
+
+// TestCheckTxBoundary_UnclassifiedInternalFlaggedWhenEnforced verifies that
+// turning on EnforceUnclassified catches forbidden calls in internal packages
+// that don't map to any known sublayer.
+func TestCheckTxBoundary_UnclassifiedInternalFlaggedWhenEnforced(t *testing.T) {
+	pkgs := loadTxBoundary(t)
+	got := rules.CheckTxBoundary(pkgs,
+		"github.com/kimtaeyun/testproject-txboundary",
+		"../testdata/txboundary",
+		rules.WithTxBoundary(rules.TxBoundaryConfig{
+			StartSymbols:        []string{"database/sql.(*DB).BeginTx"},
+			AllowedLayers:       []string{"app"},
+			EnforceUnclassified: true,
+		}),
+	)
+	var hit bool
+	for _, v := range got {
+		if v.Rule == "tx.start-outside-allowed-layer" && strings.Contains(v.File, "internal/testutil") {
+			hit = true
+		}
+	}
+	if !hit {
+		t.Error("expected tx.start-outside-allowed-layer violation from internal/testutil when EnforceUnclassified is true")
+	}
+}
+
+// TestCheckTxBoundary_CmdPackageFlagged verifies that cmd/ packages (the
+// composition root) are always scanned regardless of EnforceUnclassified.
+// Starting a transaction in cmd/ without adding "cmd" to AllowedLayers must
+// produce a violation.
+func TestCheckTxBoundary_CmdPackageFlagged(t *testing.T) {
 	pkgs := loadTxBoundary(t)
 	got := rules.CheckTxBoundary(pkgs,
 		"github.com/kimtaeyun/testproject-txboundary",
@@ -202,35 +249,56 @@ func TestCheckTxBoundary_UnclassifiedInternalPackageFlagged(t *testing.T) {
 	)
 	var hit bool
 	for _, v := range got {
-		if v.Rule == "tx.start-outside-allowed-layer" && strings.Contains(v.File, "testutil") {
+		if v.Rule == "tx.start-outside-allowed-layer" && strings.Contains(v.File, "cmd/app/main.go") {
 			hit = true
 		}
 	}
 	if !hit {
-		t.Error("expected tx.start-outside-allowed-layer violation from unclassified internal/testutil package")
+		t.Error("expected tx.start-outside-allowed-layer violation from cmd/app/main.go")
+	}
+}
+
+// TestCheckTxBoundary_CmdAllowedLayer verifies that adding "cmd" to
+// AllowedLayers suppresses the cmd/ violation.
+func TestCheckTxBoundary_CmdAllowedLayer(t *testing.T) {
+	pkgs := loadTxBoundary(t)
+	got := rules.CheckTxBoundary(pkgs,
+		"github.com/kimtaeyun/testproject-txboundary",
+		"../testdata/txboundary",
+		rules.WithTxBoundary(rules.TxBoundaryConfig{
+			StartSymbols:  []string{"database/sql.(*DB).BeginTx"},
+			AllowedLayers: []string{"app", "cmd"},
+		}),
+	)
+	for _, v := range got {
+		if strings.Contains(v.File, "cmd/") {
+			t.Errorf("unexpected violation in cmd/ when 'cmd' is in AllowedLayers: %+v", v)
+		}
 	}
 }
 
 // TestCheckTxBoundary_GenericCallFlagged verifies that a forbidden symbol
 // called via generic instantiation syntax (Fun is *ast.IndexExpr) is not
-// silently skipped by resolveCalleeID.
+// silently skipped by resolveCalleeID. The forbidden symbol here is a
+// generic function in core/repo, invoked as BeginGeneric[string](...).
 func TestCheckTxBoundary_GenericCallFlagged(t *testing.T) {
 	pkgs := loadTxBoundary(t)
+	const genericSymbol = "github.com/kimtaeyun/testproject-txboundary/internal/domain/order/core/repo.BeginGeneric"
 	got := rules.CheckTxBoundary(pkgs,
 		"github.com/kimtaeyun/testproject-txboundary",
 		"../testdata/txboundary",
 		rules.WithTxBoundary(rules.TxBoundaryConfig{
-			StartSymbols:  []string{"database/sql.(*DB).BeginTx"},
+			StartSymbols:  []string{genericSymbol},
 			AllowedLayers: []string{"app"},
 		}),
 	)
 	var hit bool
 	for _, v := range got {
-		if v.Rule == "tx.start-outside-allowed-layer" && strings.Contains(v.File, "generic") {
+		if v.Rule == "tx.start-outside-allowed-layer" && strings.Contains(v.File, "core/repo/generic.go") {
 			hit = true
 		}
 	}
 	if !hit {
-		t.Error("expected tx.start-outside-allowed-layer violation from internal/generic package (generic call site)")
+		t.Errorf("expected violation for BeginGeneric[string](...) call site in core/repo/generic.go; got %+v", got)
 	}
 }
