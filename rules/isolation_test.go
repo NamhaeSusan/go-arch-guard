@@ -221,10 +221,7 @@ func TestCheckDomainIsolation(t *testing.T) {
 	})
 
 	t.Run("auto-extracts module when empty string passed", func(t *testing.T) {
-		pkgs, err := analyzer.Load("../testdata/valid", "internal/...", "cmd/...")
-		if err != nil {
-			t.Fatal(err)
-		}
+		pkgs := loadValid(t)
 		violations := rules.CheckDomainIsolation(pkgs, "", "")
 		if len(violations) > 0 {
 			for _, v := range violations {

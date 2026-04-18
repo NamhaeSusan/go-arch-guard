@@ -6,7 +6,6 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/NamhaeSusan/go-arch-guard/analyzer"
 	"github.com/NamhaeSusan/go-arch-guard/rules"
 )
 
@@ -32,10 +31,7 @@ func violationRules(vs []rules.Violation) []string {
 }
 
 func TestRunAll_DefaultModelMatchesManualComposition(t *testing.T) {
-	pkgs, err := analyzer.Load("../testdata/valid", "internal/...", "cmd/...")
-	if err != nil {
-		t.Fatalf("load packages: %v", err)
-	}
+	pkgs := loadValid(t)
 
 	got := rules.RunAll(pkgs, "github.com/kimtaeyun/testproject-dc", "../testdata/valid")
 
@@ -54,10 +50,7 @@ func TestRunAll_DefaultModelMatchesManualComposition(t *testing.T) {
 }
 
 func TestRunAll_WithModelMatchesManualComposition(t *testing.T) {
-	pkgs, err := analyzer.Load("../testdata/valid", "internal/...", "cmd/...")
-	if err != nil {
-		t.Fatalf("load packages: %v", err)
-	}
+	pkgs := loadValid(t)
 
 	opts := []rules.Option{rules.WithModel(rules.Hexagonal())}
 	got := rules.RunAll(pkgs, "github.com/kimtaeyun/testproject-dc", "../testdata/valid", opts...)
@@ -77,10 +70,7 @@ func TestRunAll_WithModelMatchesManualComposition(t *testing.T) {
 }
 
 func TestRunAll_EmptyModuleAndRootAutoExtract(t *testing.T) {
-	pkgs, err := analyzer.Load("../testdata/valid", "internal/...", "cmd/...")
-	if err != nil {
-		t.Fatalf("load packages: %v", err)
-	}
+	pkgs := loadValid(t)
 
 	got := rules.RunAll(pkgs, "", "")
 	want := rules.RunAll(pkgs, "github.com/kimtaeyun/testproject-dc", "../testdata/valid")

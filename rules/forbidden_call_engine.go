@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"go/ast"
 	"go/types"
-	"path/filepath"
 	"slices"
 	"strings"
 
@@ -65,8 +64,6 @@ func checkForbiddenCallsByLayer(
 		}
 	}
 
-	absRoot, _ := filepath.Abs(projectRoot)
-
 	var violations []Violation
 	for _, pkg := range pkgs {
 		if isExcludedPackage(cfg, pkg.PkgPath, projectModule) {
@@ -97,13 +94,13 @@ func checkForbiddenCallsByLayer(
 					return true
 				}
 				pos := pkg.Fset.Position(call.Pos())
-				relFile, _ := filepath.Rel(absRoot, pos.Filename)
+				relFile := relPathFromRoot(projectRoot, pos.Filename)
 				for _, cr := range crs {
 					if cr.allowed[layer] {
 						continue
 					}
 					violations = append(violations, Violation{
-						File:     filepath.ToSlash(relFile),
+						File:     relFile,
 						Line:     pos.Line,
 						Rule:     cr.ruleName,
 						Message:  fmt.Sprintf(cr.message, layer, cr.allowedSlice),

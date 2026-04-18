@@ -26,3 +26,10 @@ func (r *Repo) Save(tx *sql.Tx, o model.Order) error {
 	_ = o
 	return nil
 }
+
+// BatchSave accepts []*sql.Tx — VIOLATION (tx.type-in-signature, slice wrapper).
+func (r *Repo) BatchSave(txs []*sql.Tx, orders []model.Order) error {
+	_ = txs
+	_ = orders
+	return nil
+}
