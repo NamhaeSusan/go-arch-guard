@@ -18,11 +18,10 @@ type forbiddenCallRule struct {
 	Symbols       []string
 	AllowedLayers []string
 	RuleName      string
-	// Message is a fmt template. The engine formats it with AllowedLayers
-	// as the sole %v argument.
+	// Message and Fix are fmt templates formatted with (layer string, allowedLayers []string).
+	// Use %q for the layer and %v for allowedLayers.
 	Message string
-	// Fix is a fmt template formatted with AllowedLayers.
-	Fix string
+	Fix     string
 }
 
 // checkForbiddenCallsByLayer walks all CallExprs in internal packages and
@@ -49,7 +48,7 @@ func checkForbiddenCallsByLayer(
 		fix          string
 		allowedSlice []string
 	}
-	byName := map[string]compiledRule{}
+	byName := map[string][]compiledRule{}
 	for _, r := range rules {
 		cr := compiledRule{
 			allowed:      map[string]bool{},
@@ -62,7 +61,7 @@ func checkForbiddenCallsByLayer(
 			cr.allowed[l] = true
 		}
 		for _, s := range r.Symbols {
-			byName[s] = cr
+			byName[s] = append(byName[s], cr)
 		}
 	}
 
@@ -93,23 +92,25 @@ func checkForbiddenCallsByLayer(
 				if id == "" {
 					return true
 				}
-				cr, ok := byName[id]
+				crs, ok := byName[id]
 				if !ok {
-					return true
-				}
-				if cr.allowed[layer] {
 					return true
 				}
 				pos := pkg.Fset.Position(call.Pos())
 				relFile, _ := filepath.Rel(absRoot, pos.Filename)
-				violations = append(violations, Violation{
-					File:     filepath.ToSlash(relFile),
-					Line:     pos.Line,
-					Rule:     cr.ruleName,
-					Message:  fmt.Sprintf(cr.message, cr.allowedSlice),
-					Fix:      fmt.Sprintf(cr.fix, cr.allowedSlice),
-					Severity: cfg.Sev,
-				})
+				for _, cr := range crs {
+					if cr.allowed[layer] {
+						continue
+					}
+					violations = append(violations, Violation{
+						File:     filepath.ToSlash(relFile),
+						Line:     pos.Line,
+						Rule:     cr.ruleName,
+						Message:  fmt.Sprintf(cr.message, layer, cr.allowedSlice),
+						Fix:      fmt.Sprintf(cr.fix, layer, cr.allowedSlice),
+						Severity: cfg.Sev,
+					})
+				}
 				return true
 			})
 		}

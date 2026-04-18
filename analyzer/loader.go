@@ -46,22 +46,17 @@ func Load(dir string, patterns ...string) ([]*packages.Package, error) {
 			result = append(result, pkg)
 			continue
 		}
-		// IllTyped indicates type-checking failed but AST/syntax is available.
-		// Type-checking errors (e.g., undefined) are tolerated; parsing errors are not.
-		// Parser errors contain phrases like "expected ')", "missing ','", etc.
-		hasSyntaxError := false
+		// Tolerate pure type-check failures (e.g., undefined identifier) because
+		// downstream rules can still inspect the AST/imports. Reject parse and
+		// list errors since those leave TypesInfo unreliable.
+		onlyTypeErrors := pkg.IllTyped
 		for _, e := range pkg.Errors {
-			errMsg := e.Error()
-			// Look for parser-specific patterns: expected/unexpected followed by quotes,
-			// or "missing" followed by a quote or comma phrase.
-			if strings.Contains(errMsg, "expected '") || strings.Contains(errMsg, "unexpected") ||
-				strings.Contains(errMsg, "missing '") || strings.Contains(errMsg, "syntax error") {
-				hasSyntaxError = true
+			if e.Kind != packages.TypeError {
+				onlyTypeErrors = false
 				break
 			}
 		}
-		if pkg.IllTyped && !hasSyntaxError {
-			// Type-checking only; package is usable for analysis.
+		if onlyTypeErrors {
 			result = append(result, pkg)
 			continue
 		}

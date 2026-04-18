@@ -32,8 +32,8 @@ func TestForbiddenCallEngine_SymbolMatch_OutsideAllowedLayer(t *testing.T) {
 		Symbols:       []string{"database/sql.(*DB).BeginTx"},
 		AllowedLayers: []string{"app"},
 		RuleName:      "tx.start-outside-allowed-layer",
-		Message:       "transaction must start in allowed layers: %v",
-		Fix:           "move tx start into one of: %v",
+		Message:       "layer %q is not in allowed: %v",
+		Fix:           "move call out of %q into one of: %v",
 	}}
 	cfg := NewConfig()
 	m := DDD()
@@ -61,8 +61,8 @@ func TestForbiddenCallEngine_SymbolMatch_InsideAllowedLayer(t *testing.T) {
 		Symbols:       []string{"database/sql.(*DB).BeginTx"},
 		AllowedLayers: []string{"app", "core/repo"},
 		RuleName:      "tx.start-outside-allowed-layer",
-		Message:       "tx must start in: %v",
-		Fix:           "move to: %v",
+		Message:       "layer %q not allowed; allowed: %v",
+		Fix:           "move out of %q to: %v",
 	}}
 	got := checkForbiddenCallsByLayer(pkgs,
 		"github.com/kimtaeyun/testproject-txboundary",
@@ -79,8 +79,8 @@ func TestForbiddenCallEngine_NoSymbolMatch(t *testing.T) {
 		Symbols:       []string{"some/unknown/pkg.Nothing"},
 		AllowedLayers: []string{"app"},
 		RuleName:      "x.test",
-		Message:       "%v",
-		Fix:           "%v",
+		Message:       "%q %v",
+		Fix:           "%q %v",
 	}}
 	got := checkForbiddenCallsByLayer(pkgs,
 		"github.com/kimtaeyun/testproject-txboundary",
@@ -97,8 +97,8 @@ func TestForbiddenCallEngine_RespectsExclude(t *testing.T) {
 		Symbols:       []string{"database/sql.(*DB).BeginTx"},
 		AllowedLayers: []string{"app"},
 		RuleName:      "tx.start-outside-allowed-layer",
-		Message:       "%v",
-		Fix:           "%v",
+		Message:       "%q %v",
+		Fix:           "%q %v",
 	}}
 	cfg := NewConfig(WithExclude("internal/domain/order/core/repo/..."))
 	got := checkForbiddenCallsByLayer(pkgs,
@@ -116,8 +116,8 @@ func TestForbiddenCallEngine_RespectsSeverity(t *testing.T) {
 		Symbols:       []string{"database/sql.(*DB).BeginTx"},
 		AllowedLayers: []string{"app"},
 		RuleName:      "tx.start-outside-allowed-layer",
-		Message:       "%v",
-		Fix:           "%v",
+		Message:       "%q %v",
+		Fix:           "%q %v",
 	}}
 	cfg := NewConfig(WithSeverity(Warning))
 	got := checkForbiddenCallsByLayer(pkgs,

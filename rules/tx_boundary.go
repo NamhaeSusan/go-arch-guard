@@ -34,8 +34,8 @@ func CheckTxBoundary(
 					Symbols:       tc.StartSymbols,
 					AllowedLayers: allowed,
 					RuleName:      "tx.start-outside-allowed-layer",
-					Message:       "transaction must not start here; allowed layers: %v",
-					Fix:           "move the transaction-starting call into an allowed layer: %v",
+					Message:       "transaction must not start in layer %q; allowed layers: %v",
+					Fix:           "move the transaction-starting call out of %q into an allowed layer: %v",
 				}})...,
 		)
 	}
