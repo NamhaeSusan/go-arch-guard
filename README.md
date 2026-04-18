@@ -669,6 +669,30 @@ Surfaces internal packages with abnormally high coupling via IQR-based statistic
 | Instability | Ce / (Ca + Ce) |
 | Transitive Dependents | full reverse-reachable set via BFS |
 
+## Tx Boundary
+
+### `CheckTxBoundary` (opt-in)
+
+Gates where transactions may **start** and prevents transaction types from
+**leaking** into function signatures outside an allowed layer. Fully opt-in —
+does nothing unless you configure it. Included in `RunAll` automatically
+(no-op until configured).
+
+```go
+violations := rules.CheckTxBoundary(pkgs, module, root,
+    rules.WithTxBoundary(rules.TxBoundaryConfig{
+        StartSymbols: []string{
+            "database/sql.(*DB).BeginTx",
+            "database/sql.(*DB).Begin",
+        },
+        Types:         []string{"database/sql.Tx"},
+        AllowedLayers: []string{"app"}, // default when empty
+    }),
+)
+```
+
+Emitted rule IDs: `tx.start-outside-allowed-layer`, `tx.type-in-signature`.
+
 ## Options
 
 ### Severity
@@ -710,6 +734,7 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `rules.CheckStructure(root, opts...)` | filesystem structure checks |
 | `rules.AnalyzeBlastRadius(pkgs, module, root, opts...)` | coupling outlier detection |
 | `rules.CheckInterfacePattern(pkgs, opts...)` | interface pattern best practices |
+| `rules.CheckTxBoundary(pkgs, module, root, opts...)` | transaction boundary enforcement (opt-in) |
 | `rules.RunAll(pkgs, module, root, opts...)` | run the recommended built-in rule bundle |
 | `report.AssertNoViolations(t, violations)` | fail test on Error violations |
 | `report.BuildJSONReport(violations)` | build a machine-readable JSON-friendly report |
@@ -730,6 +755,7 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `rules.WithSeverity(rules.Warning)` | downgrade to warnings |
 | `rules.WithExclude("path/...")` | skip a subtree |
 | `rules.WithMaxRepoInterfaceMethods(10)` | limit repo interface method count |
+| `rules.WithTxBoundary(cfg)` | configure transaction boundary checks |
 
 ## Machine-readable JSON Output
 
