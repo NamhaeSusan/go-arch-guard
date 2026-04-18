@@ -39,4 +39,17 @@ func TestLoad(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("skips root package whose dependency has a syntax error", func(t *testing.T) {
+		pkgs, err := analyzer.Load("../testdata/load_broken_dep", "internal/...")
+		if err == nil {
+			t.Fatal("expected error describing skipped packages with broken dependencies")
+		}
+		// The root package imports a broken dep; it must not appear in results.
+		for _, pkg := range pkgs {
+			if pkg.PkgPath == "github.com/kimtaeyun/testproject-load-broken-dep/internal/root" {
+				t.Error("root package with broken dependency should have been skipped")
+			}
+		}
+	})
 }

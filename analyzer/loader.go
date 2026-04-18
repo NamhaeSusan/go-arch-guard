@@ -42,13 +42,18 @@ func Load(dir string, patterns ...string) ([]*packages.Package, error) {
 	var result []*packages.Package
 	var loadErrs []string
 	for _, pkg := range pkgs {
+		if depErr := firstNonTypeErrorInDeps(pkg); depErr != "" {
+			loadErrs = append(loadErrs, depErr)
+			continue
+		}
 		if len(pkg.Errors) == 0 {
 			result = append(result, pkg)
 			continue
 		}
-		// Tolerate pure type-check failures (e.g., undefined identifier) because
-		// downstream rules can still inspect the AST/imports. Reject parse and
-		// list errors since those leave TypesInfo unreliable.
+		// Tolerate pure type-check failures on the root package itself (e.g.,
+		// undefined identifier) because downstream rules can still inspect the
+		// AST/imports. Reject parse and list errors since those leave TypesInfo
+		// unreliable.
 		onlyTypeErrors := pkg.IllTyped
 		for _, e := range pkg.Errors {
 			if e.Kind != packages.TypeError {
@@ -60,7 +65,7 @@ func Load(dir string, patterns ...string) ([]*packages.Package, error) {
 			result = append(result, pkg)
 			continue
 		}
-		// Syntax or load errors are reported and packages skipped.
+		// Syntax or load errors on the root package are reported and it is skipped.
 		for _, e := range pkg.Errors {
 			loadErrs = append(loadErrs, e.Error())
 		}
@@ -69,4 +74,23 @@ func Load(dir string, patterns ...string) ([]*packages.Package, error) {
 		return result, fmt.Errorf("packages with errors were skipped: %s", strings.Join(loadErrs, "; "))
 	}
 	return result, nil
+}
+
+// firstNonTypeErrorInDeps traverses the transitive import graph of pkg
+// (excluding pkg itself) and returns the first non-TypeError error string
+// found in any dependency. An empty string means all deps are clean.
+func firstNonTypeErrorInDeps(root *packages.Package) string {
+	var found string
+	packages.Visit([]*packages.Package{root}, nil, func(dep *packages.Package) {
+		if found != "" || dep == root {
+			return
+		}
+		for _, e := range dep.Errors {
+			if e.Kind != packages.TypeError {
+				found = fmt.Sprintf("dependency %s: %s", dep.PkgPath, e.Error())
+				return
+			}
+		}
+	})
+	return found
 }
