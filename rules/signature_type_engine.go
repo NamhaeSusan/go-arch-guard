@@ -1,7 +1,6 @@
 package rules
 
 import (
-	"fmt"
 	"go/ast"
 	"go/types"
 	"strings"
@@ -14,7 +13,7 @@ import (
 // pointer/slice/array/map/chan wrappers) matches one of typeNames and
 // the function's package layer is outside allowedLayers.
 //
-// message/fix are fmt templates formatted with (typeID string, allowedLayers []string).
+// message/fix are typed callbacks receiving (typeID, allowedLayers).
 func checkTypeInSignature(
 	pkgs []*packages.Package,
 	projectModule, projectRoot string,
@@ -22,7 +21,8 @@ func checkTypeInSignature(
 	cfg Config,
 	typeNames []string,
 	allowedLayers []string,
-	ruleName, message, fix string,
+	ruleName string,
+	message, fix func(typeID string, allowed []string) string,
 ) []Violation {
 	if len(typeNames) == 0 {
 		return nil
@@ -75,7 +75,8 @@ func checkFieldList(
 	wanted map[string]bool,
 	projectRoot string,
 	cfg Config,
-	ruleName, message, fix string,
+	ruleName string,
+	message, fix func(typeID string, allowed []string) string,
 	allowedLayers []string,
 	out *[]Violation,
 ) {
@@ -97,8 +98,8 @@ func checkFieldList(
 			File:     relFile,
 			Line:     pos.Line,
 			Rule:     ruleName,
-			Message:  fmt.Sprintf(message, id, allowedLayers),
-			Fix:      fmt.Sprintf(fix, id, allowedLayers),
+			Message:  message(id, allowedLayers),
+			Fix:      fix(id, allowedLayers),
 			Severity: cfg.Sev,
 		})
 	}

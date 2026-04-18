@@ -1,6 +1,8 @@
 package rules
 
 import (
+	"fmt"
+
 	"golang.org/x/tools/go/packages"
 )
 
@@ -34,8 +36,12 @@ func CheckTxBoundary(
 					Symbols:       tc.StartSymbols,
 					AllowedLayers: allowed,
 					RuleName:      "tx.start-outside-allowed-layer",
-					Message:       "transaction must not start in layer %q; allowed layers: %v",
-					Fix:           "move the transaction-starting call out of %q into an allowed layer: %v",
+					Message: func(layer string, allowed []string) string {
+						return fmt.Sprintf("transaction must not start in layer %q; allowed layers: %v", layer, allowed)
+					},
+					Fix: func(layer string, allowed []string) string {
+						return fmt.Sprintf("move the transaction-starting call out of %q into an allowed layer: %v", layer, allowed)
+					},
 				}})...,
 		)
 	}
@@ -45,8 +51,12 @@ func CheckTxBoundary(
 			checkTypeInSignature(pkgs, projectModule, projectRoot, m, cfg,
 				tc.Types, allowed,
 				"tx.type-in-signature",
-				"tx type %q must not appear in function signature outside allowed layers: %v",
-				"keep %q confined to allowed layers: %v",
+				func(typeID string, allowed []string) string {
+					return fmt.Sprintf("tx type %q must not appear in function signature outside allowed layers: %v", typeID, allowed)
+				},
+				func(typeID string, allowed []string) string {
+					return fmt.Sprintf("keep %q confined to allowed layers: %v", typeID, allowed)
+				},
 			)...,
 		)
 	}
