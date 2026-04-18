@@ -327,6 +327,87 @@ func (s *StoreImpl) Find(id string) string { return "" }
 	}
 }
 
+// TestCheckInterfacePattern_ExportedImpl_AliasInterface verifies that an
+// exported alias of an anonymous interface is still treated as an interface,
+// so an exported struct implementing it is flagged. Regression for the
+// Go 1.26 *types.Alias case that was silently skipped.
+func TestCheckInterfacePattern_ExportedImpl_AliasInterface(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/ip-alias-iface"
+
+	writeTestFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+
+	writeTestFile(t, filepath.Join(root, "internal", "store", "store.go"),
+		`package store
+
+type Store = interface {
+	Get(id string) string
+}
+
+type StoreImpl struct{}
+
+func (s *StoreImpl) Get(id string) string { return "" }
+`)
+
+	pkgs := loadTestPackages(t, root)
+	vs := rules.CheckInterfacePattern(pkgs, rules.WithModel(rules.ConsumerWorker()))
+
+	found := false
+	for _, v := range vs {
+		if v.Rule == "interface.exported-impl" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected interface.exported-impl violation for alias-based interface")
+	}
+}
+
+// TestCheckInterfacePattern_ExportedImpl_IllTyped verifies that when a package
+// has unrelated type errors (pkg.Types missing or objects unresolvable), the
+// rule still reports via the AST name-based fallback instead of silently
+// dropping coverage.
+func TestCheckInterfacePattern_ExportedImpl_IllTyped(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/ip-illtyped"
+
+	writeTestFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+
+	// Exported struct implements the interface (same name + signature), but the
+	// file also contains an unrelated type error so the package is IllTyped.
+	// The fallback must still emit interface.exported-impl.
+	// The method receiver references an undefined parameter type, so the
+	// *types.Named for DBStore lacks a usable Get method and types.Implements
+	// returns false. But AST inspection still shows method name Get matching.
+	// The fallback must emit the violation.
+	writeTestFile(t, filepath.Join(root, "internal", "store", "store.go"),
+		`package store
+
+type Store interface {
+	Get(id string) string
+}
+
+type DBStore struct{}
+
+func (s *DBStore) Get(id UndefinedType) string { return "" }
+`)
+
+	pkgs := loadTestPackages(t, root)
+	vs := rules.CheckInterfacePattern(pkgs, rules.WithModel(rules.ConsumerWorker()))
+
+	found := false
+	for _, v := range vs {
+		if v.Rule == "interface.exported-impl" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected interface.exported-impl violation in ill-typed package (via AST fallback)")
+	}
+}
+
 func TestCheckInterfacePattern_ConstructorReturnsInterfaceValid(t *testing.T) {
 	root := t.TempDir()
 	module := "example.com/ip-ctor-iface-valid"

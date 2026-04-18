@@ -105,47 +105,62 @@ func checkSingleInterfacePerPackage(pkg *packages.Package, ifaces map[string]*as
 
 // checkExportedImpl detects exported structs that implement an exported interface
 // in the same package — the impl should be unexported.
-// It uses go/types.Implements for full signature comparison.
+//
+// For fully-typed packages it uses go/types.Implements so signatures are
+// compared properly. When the package is ill-typed (pkg.Types nil, or a
+// specific interface/struct type object cannot be recovered from scope), it
+// falls back to AST name-only matching. The fallback preserves the previous
+// behavior's false-positive surface — a looser but strictly better outcome
+// than silently dropping diagnostics during partially broken refactors.
 func checkExportedImpl(pkg *packages.Package, ifaces map[string]*ast.InterfaceType, cfg Config) []Violation {
-	if pkg.Types == nil {
+	structs := collectExportedStructs(pkg)
+	if len(structs) == 0 || len(ifaces) == 0 {
 		return nil
 	}
-	scope := pkg.Types.Scope()
 
-	// Build a map of interface name → *types.Interface for type-level comparison.
-	typedIfaces := make(map[string]*types.Interface, len(ifaces))
-	for name := range ifaces {
-		obj := scope.Lookup(name)
-		if obj == nil {
-			continue
-		}
-		named, ok := obj.Type().(*types.Named)
-		if !ok {
-			continue
-		}
-		iface, ok := named.Underlying().(*types.Interface)
-		if !ok || iface.NumMethods() == 0 {
-			continue
-		}
-		typedIfaces[name] = iface
+	var scope *types.Scope
+	if pkg.Types != nil {
+		scope = pkg.Types.Scope()
 	}
 
-	structs := collectExportedStructs(pkg)
+	// Resolve each interface to a *types.Interface when possible (treats
+	// type aliases via types.Unalias). Interfaces that cannot be resolved are
+	// left for the AST fallback.
+	typedIfaces := make(map[string]*types.Interface, len(ifaces))
+	if scope != nil {
+		for name := range ifaces {
+			if iface := lookupInterface(scope, name); iface != nil && iface.NumMethods() > 0 {
+				typedIfaces[name] = iface
+			}
+		}
+	}
 
 	var violations []Violation
 	for structName := range structs {
-		obj := scope.Lookup(structName)
-		if obj == nil {
-			continue
+		var named *types.Named
+		if scope != nil {
+			if obj := scope.Lookup(structName); obj != nil {
+				named, _ = types.Unalias(obj.Type()).(*types.Named)
+			}
 		}
-		named, ok := obj.Type().(*types.Named)
-		if !ok {
-			continue
-		}
-		// Check both value and pointer receivers.
-		ptrType := types.NewPointer(named)
-		for ifaceName, iface := range typedIfaces {
-			if types.Implements(named, iface) || types.Implements(ptrType, iface) {
+
+		for ifaceName, astIface := range ifaces {
+			matched := false
+			iface, ifaceOK := typedIfaces[ifaceName]
+			typedPathAvailable := named != nil && ifaceOK
+			if typedPathAvailable {
+				// Fully-typed path: signature-aware via types.Implements.
+				ptrType := types.NewPointer(named)
+				matched = types.Implements(named, iface) || types.Implements(ptrType, iface)
+			}
+			// Fallback to AST name-only match when:
+			//   - the type objects could not be recovered, or
+			//   - the package is ill-typed and the typed check said "no match"
+			//     (signatures may be unreliable when types are incomplete).
+			if !matched && (!typedPathAvailable || pkg.IllTyped) {
+				matched = structMatchesInterfaceByName(pkg, structName, astIface)
+			}
+			if matched {
 				violations = append(violations, Violation{
 					File:     relativePackageFile(pkg),
 					Rule:     "interface.exported-impl",
@@ -157,6 +172,40 @@ func checkExportedImpl(pkg *packages.Package, ifaces map[string]*ast.InterfaceTy
 		}
 	}
 	return violations
+}
+
+// lookupInterface resolves name in scope to a *types.Interface, unwrapping
+// type aliases. Returns nil when name is not an interface type.
+func lookupInterface(scope *types.Scope, name string) *types.Interface {
+	obj := scope.Lookup(name)
+	if obj == nil {
+		return nil
+	}
+	t := types.Unalias(obj.Type())
+	if iface, ok := t.Underlying().(*types.Interface); ok {
+		return iface
+	}
+	return nil
+}
+
+// structMatchesInterfaceByName returns true when every method name declared on
+// the interface has a corresponding method declared on structName in pkg's AST.
+// Signatures are not compared — used only as an ill-typed fallback.
+func structMatchesInterfaceByName(pkg *packages.Package, structName string, iface *ast.InterfaceType) bool {
+	if iface == nil || iface.Methods == nil || len(iface.Methods.List) == 0 {
+		return false
+	}
+	methods := collectMethods(pkg)
+	seen := false
+	for _, m := range iface.Methods.List {
+		for _, name := range m.Names {
+			seen = true
+			if !methods[structName+"."+name.Name] {
+				return false
+			}
+		}
+	}
+	return seen
 }
 
 // collectExportedStructs returns names of all exported struct types in a package.
