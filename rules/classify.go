@@ -1,6 +1,9 @@
 package rules
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 type internalKind int
 
@@ -58,11 +61,8 @@ func classifyInternalPackage(m Model, pkgPath, internalPrefix string) classified
 	if parts[0] == "" {
 		return classified{Kind: kindUnclassified}
 	}
-	for _, sl := range m.Sublayers {
-		if sl == parts[0] {
-			return classified{Kind: kindDomain, Sublayer: parts[0]}
-		}
+	if slices.Contains(m.Sublayers, parts[0]) {
+		return classified{Kind: kindDomain, Sublayer: parts[0]}
 	}
-
 	return classified{Kind: kindUnclassified}
 }

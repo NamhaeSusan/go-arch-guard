@@ -70,6 +70,50 @@ func TestCheckNaming_ModularMonolith_ApplicationSuffix(t *testing.T) {
 	}
 }
 
+func TestCheckNaming_CustomModel_UsecaseSuffix(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/custom-naming"
+
+	// Custom model with sublayer "usecase" that isn't in DDD's LayerDirNames.
+	m := rules.NewModel(
+		rules.WithDomainDir(""),
+		rules.WithOrchestrationDir(""),
+		rules.WithSublayers([]string{"usecase", "gateway", "model"}),
+		rules.WithDirection(map[string][]string{
+			"usecase": {"gateway", "model"},
+			"gateway": {"model"},
+			"model":   {},
+		}),
+		rules.WithPkgRestricted(map[string]bool{"model": true}),
+	)
+
+	writeTestFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+	// foo_usecase.go in usecase/ must trigger no-layer-suffix even though
+	// DDD's LayerDirNames does not include "usecase".
+	writeTestFile(t, filepath.Join(root, "internal", "usecase", "foo_usecase.go"),
+		"package usecase\n\ntype Foo struct{}\n")
+
+	pkgs, err := analyzer.Load(root, "internal/...")
+	if err != nil {
+		t.Fatal(err)
+	}
+	violations := rules.CheckNaming(pkgs, rules.WithModel(m))
+
+	found := false
+	for _, v := range violations {
+		if v.Rule == "naming.no-layer-suffix" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected naming.no-layer-suffix violation for foo_usecase.go in custom model with WithSublayers")
+		for _, v := range violations {
+			t.Log(v.String())
+		}
+	}
+}
+
 func TestCheckNaming_DDD_HandlerSuffix_StillWorks(t *testing.T) {
 	root := t.TempDir()
 	module := "example.com/ddd-naming"

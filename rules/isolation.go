@@ -40,11 +40,11 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 				if !strings.HasPrefix(impPath, internalPrefix) {
 					continue
 				}
-				impDomain := identifyDomainWith(m, impPath, internalPrefix)
-				if impDomain == "" {
-					continue
-				}
-				if isDomainAliasWith(m, impPath, internalPrefix, impDomain) {
+				imp := classifyInternalPackage(m, impPath, internalPrefix)
+				// Only domain sub-packages (kindDomain) trigger cmd-deep-import.
+				// Domain root (alias) is allowed; shared/orchestration/unclassified
+				// are not domain imports and fall outside this rule.
+				if imp.Kind != kindDomain {
 					continue
 				}
 				file, line := findImportPosition(pkg, impPath, projectRoot)
@@ -53,7 +53,7 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 					Line:     line,
 					Rule:     "isolation.cmd-deep-import",
 					Message:  fmt.Sprintf("cmd/ must only import domain alias, not sub-package %q", impPath),
-					Fix:      fmt.Sprintf("import the domain alias package instead: %s%s/%s", internalPrefix, m.DomainDir, impDomain),
+					Fix:      fmt.Sprintf("import the domain alias package instead: %s%s/%s", internalPrefix, m.DomainDir, imp.Domain),
 					Severity: cfg.Sev,
 				})
 			}
@@ -64,30 +64,35 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 			continue
 		}
 
-		srcDomain := identifyDomainWith(m, pkg.PkgPath, internalPrefix)
-		srcIsOrchestration := isOrchestrationPkgWith(m, pkg.PkgPath, internalPrefix)
-		srcIsPkg := isPkgPkgWith(m, pkg.PkgPath, internalPrefix)
+		src := classifyInternalPackage(m, pkg.PkgPath, internalPrefix)
+		// kindUnclassified sources are packages under internal/ that don't fit
+		// any known bucket (domain/, orchestration/, shared/). They may still
+		// import domains/orchestration and must be checked as "stray" sources.
 
 		for impPath := range pkg.Imports {
 			if !strings.HasPrefix(impPath, internalPrefix) {
 				continue
 			}
 
-			impDomain := identifyDomainWith(m, impPath, internalPrefix)
+			imp := classifyInternalPackage(m, impPath, internalPrefix)
 
-			// Rule 2: import pkg/ → always allowed
-			if isPkgPkgWith(m, impPath, internalPrefix) {
+			// Rule 2: import pkg/ → always allowed for anyone except pkg/ itself
+			// (pkg/ → pkg/ is just intra-shared and still allowed).
+			if imp.Kind == kindShared && src.Kind != kindShared {
 				continue
 			}
 
-			// Rule 1: same domain → always allowed
-			if srcDomain != "" && impDomain == srcDomain {
+			// Rule 1: same domain → always allowed (kindDomain or kindDomainRoot
+			// in the same domain).
+			if (src.Kind == kindDomain || src.Kind == kindDomainRoot) &&
+				(imp.Kind == kindDomain || imp.Kind == kindDomainRoot) &&
+				src.Domain != "" && src.Domain == imp.Domain {
 				continue
 			}
 
-			// Orchestration rules
-			if srcIsOrchestration {
-				if impDomain == "" {
+			// Orchestration sources
+			if src.Kind == kindOrchestration {
+				if imp.Kind != kindDomain && imp.Kind != kindDomainRoot {
 					continue
 				}
 				// When alias is not required, orchestration may import
@@ -95,9 +100,10 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 				if !m.RequireAlias {
 					continue
 				}
-				if isDomainAliasWith(m, impPath, internalPrefix, impDomain) {
+				if imp.Kind == kindDomainRoot {
 					continue
 				}
+				// imp is a domain sub-package (kindDomain) and alias is required.
 				label := m.OrchestrationDir
 				if isOrchestrationHandlerWith(m, pkg.PkgPath, internalPrefix) {
 					label = m.OrchestrationDir + " handler"
@@ -108,27 +114,27 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 					Line:     line,
 					Rule:     "isolation.orchestration-deep-import",
 					Message:  fmt.Sprintf("%s must only import domain alias, not sub-package %q", label, impPath),
-					Fix:      fmt.Sprintf("import the domain alias package instead: %s%s/%s", internalPrefix, m.DomainDir, impDomain),
+					Fix:      fmt.Sprintf("import the domain alias package instead: %s%s/%s", internalPrefix, m.DomainDir, imp.Domain),
 					Severity: cfg.Sev,
 				})
 				continue
 			}
 
 			// pkg/ must stay domain-unaware and orchestration-unaware
-			if srcIsPkg {
-				if impDomain != "" {
+			if src.Kind == kindShared {
+				if imp.Kind == kindDomain || imp.Kind == kindDomainRoot {
 					file, line := findImportPosition(pkg, impPath, projectRoot)
 					violations = append(violations, Violation{
 						File:     file,
 						Line:     line,
 						Rule:     "isolation.pkg-imports-domain",
-						Message:  fmt.Sprintf("%s/ must not import domain %q", m.SharedDir, impDomain),
+						Message:  fmt.Sprintf("%s/ must not import domain %q", m.SharedDir, imp.Domain),
 						Fix:      fmt.Sprintf("%s/ should only contain shared utilities with no domain or orchestration dependencies", m.SharedDir),
 						Severity: cfg.Sev,
 					})
 					continue
 				}
-				if isOrchestrationPkgWith(m, impPath, internalPrefix) {
+				if imp.Kind == kindOrchestration {
 					file, line := findImportPosition(pkg, impPath, projectRoot)
 					violations = append(violations, Violation{
 						File:     file,
@@ -142,14 +148,14 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 				}
 			}
 
-			if isOrchestrationPkgWith(m, impPath, internalPrefix) {
-				if srcDomain != "" {
+			if imp.Kind == kindOrchestration {
+				if src.Kind == kindDomain || src.Kind == kindDomainRoot {
 					file, line := findImportPosition(pkg, impPath, projectRoot)
 					violations = append(violations, Violation{
 						File:     file,
 						Line:     line,
 						Rule:     "isolation.domain-imports-orchestration",
-						Message:  fmt.Sprintf("domain %q must not import %s", srcDomain, m.OrchestrationDir),
+						Message:  fmt.Sprintf("domain %q must not import %s", src.Domain, m.OrchestrationDir),
 						Fix:      fmt.Sprintf("move cross-domain coordination to internal/%s callers instead of domain internals", m.OrchestrationDir),
 						Severity: cfg.Sev,
 					})
@@ -168,27 +174,31 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 			}
 
 			// Rule 7: domain A importing domain B → violation
-			if srcDomain != "" && impDomain != "" && srcDomain != impDomain {
+			if (src.Kind == kindDomain || src.Kind == kindDomainRoot) &&
+				(imp.Kind == kindDomain || imp.Kind == kindDomainRoot) &&
+				src.Domain != "" && imp.Domain != "" && src.Domain != imp.Domain {
 				file, line := findImportPosition(pkg, impPath, projectRoot)
 				violations = append(violations, Violation{
 					File:     file,
 					Line:     line,
 					Rule:     "isolation.cross-domain",
-					Message:  fmt.Sprintf("domain %q must not import domain %q", srcDomain, impDomain),
+					Message:  fmt.Sprintf("domain %q must not import domain %q", src.Domain, imp.Domain),
 					Fix:      fmt.Sprintf("use %s/ for cross-domain orchestration or move shared types to %s/", m.OrchestrationDir, m.SharedDir),
 					Severity: cfg.Sev,
 				})
 				continue
 			}
 
-			// Rule 8: non-domain internal packages other than orchestration/cmd/pkg must not import domains
-			if srcDomain == "" && impDomain != "" {
+			// Rule 8: unclassified internal packages must not import domains
+			// (kindUnclassified is handled explicitly here, not silently skipped).
+			if src.Kind == kindUnclassified &&
+				(imp.Kind == kindDomain || imp.Kind == kindDomainRoot) {
 				file, line := findImportPosition(pkg, impPath, projectRoot)
 				violations = append(violations, Violation{
 					File:     file,
 					Line:     line,
 					Rule:     "isolation.stray-imports-domain",
-					Message:  fmt.Sprintf("package %q must not import domain %q", pkg.PkgPath, impDomain),
+					Message:  fmt.Sprintf("package %q must not import domain %q", pkg.PkgPath, imp.Domain),
 					Fix:      fmt.Sprintf("move domain orchestration to internal/%s or app wiring to cmd/", m.OrchestrationDir),
 					Severity: cfg.Sev,
 				})
@@ -205,18 +215,6 @@ func isUnderInternalDir(pkgPath, internalPrefix, dir string) bool {
 	}
 	rel := strings.TrimPrefix(pkgPath, internalPrefix)
 	return rel == dir || strings.HasPrefix(rel, dir+"/")
-}
-
-func isOrchestrationPkgWith(m Model, pkgPath, internalPrefix string) bool {
-	return isUnderInternalDir(pkgPath, internalPrefix, m.OrchestrationDir)
-}
-
-func isPkgPkgWith(m Model, pkgPath, internalPrefix string) bool {
-	return isUnderInternalDir(pkgPath, internalPrefix, m.SharedDir)
-}
-
-func isDomainAliasWith(m Model, importPath, internalPrefix, domain string) bool {
-	return importPath == internalPrefix+m.DomainDir+"/"+domain
 }
 
 func isOrchestrationHandlerWith(m Model, pkgPath, internalPrefix string) bool {
