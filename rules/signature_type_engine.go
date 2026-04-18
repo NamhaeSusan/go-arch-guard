@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"go/ast"
 	"go/types"
-	"path/filepath"
 	"strings"
 
 	"golang.org/x/tools/go/packages"
@@ -30,7 +29,6 @@ func checkTypeInSignature(
 	}
 	projectModule = resolveModule(pkgs, projectModule)
 	projectRoot = resolveRoot(pkgs, projectRoot)
-	absRoot, _ := filepath.Abs(projectRoot)
 	internalPrefix := projectModule + "/internal/"
 
 	wanted := map[string]bool{}
@@ -63,8 +61,8 @@ func checkTypeInSignature(
 				if !ok || fd.Type == nil {
 					continue
 				}
-				checkFieldList(pkg, fd.Type.Params, wanted, absRoot, cfg, ruleName, message, fix, allowedLayers, &violations)
-				checkFieldList(pkg, fd.Type.Results, wanted, absRoot, cfg, ruleName, message, fix, allowedLayers, &violations)
+				checkFieldList(pkg, fd.Type.Params, wanted, projectRoot, cfg, ruleName, message, fix, allowedLayers, &violations)
+				checkFieldList(pkg, fd.Type.Results, wanted, projectRoot, cfg, ruleName, message, fix, allowedLayers, &violations)
 			}
 		}
 	}
@@ -75,7 +73,7 @@ func checkFieldList(
 	pkg *packages.Package,
 	fields *ast.FieldList,
 	wanted map[string]bool,
-	absRoot string,
+	projectRoot string,
 	cfg Config,
 	ruleName, message, fix string,
 	allowedLayers []string,
@@ -94,12 +92,9 @@ func checkFieldList(
 			continue
 		}
 		pos := pkg.Fset.Position(f.Pos())
-		relFile, err := filepath.Rel(absRoot, pos.Filename)
-		if err != nil {
-			relFile = pos.Filename
-		}
+		relFile := relPathFromRoot(projectRoot, pos.Filename)
 		*out = append(*out, Violation{
-			File:     filepath.ToSlash(relFile),
+			File:     relFile,
 			Line:     pos.Line,
 			Rule:     ruleName,
 			Message:  fmt.Sprintf(message, id, allowedLayers),

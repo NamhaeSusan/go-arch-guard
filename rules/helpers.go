@@ -12,28 +12,33 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
+// relPathFromRoot turns an absolute file path into a forward-slash path
+// relative to projectRoot. Falls back to the original path on error.
+func relPathFromRoot(projectRoot, filename string) string {
+	absRoot, err := filepath.Abs(projectRoot)
+	if err != nil {
+		return filename
+	}
+	rel, err := filepath.Rel(absRoot, filename)
+	if err != nil {
+		return filename
+	}
+	return filepath.ToSlash(rel)
+}
+
 func findImportPosition(pkg *packages.Package, importPath, projectRoot string) (string, int) {
-	absRoot, _ := filepath.Abs(projectRoot)
 	fset := pkg.Fset
 	for _, file := range pkg.Syntax {
 		for _, imp := range file.Imports {
 			path := strings.Trim(imp.Path.Value, `"`)
 			if path == importPath {
 				pos := fset.Position(imp.Pos())
-				rel, err := filepath.Rel(absRoot, pos.Filename)
-				if err != nil {
-					return pos.Filename, pos.Line
-				}
-				return filepath.ToSlash(rel), pos.Line
+				return relPathFromRoot(projectRoot, pos.Filename), pos.Line
 			}
 		}
 	}
 	if len(pkg.GoFiles) > 0 {
-		rel, err := filepath.Rel(absRoot, pkg.GoFiles[0])
-		if err != nil {
-			return pkg.GoFiles[0], 0
-		}
-		return filepath.ToSlash(rel), 0
+		return relPathFromRoot(projectRoot, pkg.GoFiles[0]), 0
 	}
 	return pkg.PkgPath, 0
 }
