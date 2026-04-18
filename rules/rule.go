@@ -43,6 +43,7 @@ type Option func(*Config)
 
 type Config struct {
 	Sev                     Severity
+	sevExplicit             bool // true if WithSeverity was called explicitly
 	ExcludePatterns         []string
 	archModel               *Model
 	MaxRepoInterfaceMethods int
@@ -64,7 +65,17 @@ func NewConfig(opts ...Option) Config {
 }
 
 func WithSeverity(s Severity) Option {
-	return func(c *Config) { c.Sev = s }
+	return func(c *Config) {
+		c.Sev = s
+		c.sevExplicit = true
+	}
+}
+
+// SeverityExplicit reports whether WithSeverity was called explicitly by the
+// caller. Rules that have a non-default severity (e.g. warnings) use this to
+// decide whether to honor the caller's override or use their own default.
+func (c Config) SeverityExplicit() bool {
+	return c.sevExplicit
 }
 
 func WithModel(m Model) Option {

@@ -564,6 +564,94 @@ typically signal that the package has too many responsibilities.
 
 Excluded layers per preset (entry points, model, event, pkg) are controlled by `InterfacePatternExclude`.
 
+### `interface.cross-domain-anonymous`
+
+Detects anonymous interfaces declared outside of their referenced domain — and outside the designated orchestration layer — whose method signatures touch types from another domain. Default severity is **Error**.
+
+This rule enforces the convention that **cross-domain abstractions are owned by the orchestration package**, not by arbitrary wiring code. A `cmd/` (or `internal/pkg/`) package that declares an inline anonymous interface over a domain type is creating a parallel uncontrolled cross-domain surface; that adapter/abstraction belongs in `internal/orchestration/`.
+
+```go
+// flagged: cmd/ declares inline interface that abstracts a domain type
+package main
+
+import "example.com/p/internal/domain/user"
+
+type adapter struct {
+    repo interface {                                          // ← cross-domain anonymous in cmd/
+        GetByID(ctx context.Context, id string) (*user.User, error)
+    }
+}
+```
+
+```go
+// not flagged: same shape but inside the orchestration layer where
+// cross-domain coordination is by design
+package orchestration
+
+import "example.com/p/internal/domain/user"
+
+type userInfoAdapter struct {
+    repo interface {                                          // ← anonymous, but orchestration is exempt
+        GetByID(ctx context.Context, id string) (*user.User, error)
+    }
+}
+```
+
+The fix for a flagged occurrence is to **move the adapter into the orchestration package** and have wiring code call orchestration constructors instead of declaring its own interfaces.
+
+Skipped:
+- Test files (`_test.go`) where mock/fake fixtures naturally use this shape
+- Empty interfaces (`interface{}`) and interfaces without method declarations
+- Embedded interface types (e.g. `interface { io.Reader }`)
+- Same-domain references (anonymous interface inside `internal/domain/X` referencing `internal/domain/X` types)
+- Packages inside `internal/<OrchestrationDir>/` — orchestration is the designated cross-domain coordination layer
+- Models with no `DomainDir` (flat layouts like ConsumerWorker, Batch, EventPipeline)
+
+### `interface.container-only`
+
+Detects interfaces declared in a package that are used **only as struct field types** —
+never as a function parameter or return type. Default severity is **Warning**.
+
+This is a vibe-coding smell: the interface is being used as a value container rather than
+as an abstraction. A common cause is a wiring layer that needs to hold a value whose
+concrete type is not exposed (e.g. an `alias.go` re-exports the constructor but not the
+type), so the developer declares a local interface just to give the field a type.
+
+```go
+// flagged: container-only — never used as parameter or return
+type userRepo interface {
+    GetByID(id string) string
+}
+
+type holder struct {
+    r userRepo  // only usage
+}
+```
+
+```go
+// not flagged: legitimate consumer-defined interface
+type userRepo interface {
+    GetByID(id string) string
+}
+
+func newHolder(r userRepo) *holder {  // used as parameter → real abstraction
+    return &holder{r: r}
+}
+```
+
+Skipped:
+- Test files (`_test.go`) where mock/fake fixtures naturally use this shape
+- Type aliases (`type Foo = pkg.Foo`)
+- Embedded fields (anonymous embedding) in structs
+- Interfaces that are not used at all (different smell category — out of scope)
+
+The rule does **not** prescribe a fix. It only points at the smell. Two common resolutions:
+1. Re-export the concrete type from `alias.go` so the field can hold it directly.
+2. Rewrite the wiring so the value is a local variable inside one function instead of a struct field shared between functions.
+
+Severity can be upgraded to Error via `WithSeverity(Error)` if a project wants to enforce
+the smell as a hard rule.
+
 ## Blast Radius
 
 `rules.AnalyzeBlastRadius(pkgs, module, root, opts...)`
