@@ -30,7 +30,8 @@ func Load(dir string, patterns ...string) ([]*packages.Package, error) {
 
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedImports | packages.NeedFiles |
-			packages.NeedSyntax | packages.NeedModule,
+			packages.NeedSyntax | packages.NeedModule |
+			packages.NeedTypes | packages.NeedTypesInfo | packages.NeedDeps,
 		Dir: absDir,
 	}
 	pkgs, err := packages.Load(cfg, prefixed...)
@@ -41,13 +42,28 @@ func Load(dir string, patterns ...string) ([]*packages.Package, error) {
 	var result []*packages.Package
 	var loadErrs []string
 	for _, pkg := range pkgs {
-		if len(pkg.Errors) > 0 {
-			for _, e := range pkg.Errors {
-				loadErrs = append(loadErrs, e.Error())
-			}
+		if len(pkg.Errors) == 0 {
+			result = append(result, pkg)
 			continue
 		}
-		result = append(result, pkg)
+		// Tolerate pure type-check failures (e.g., undefined identifier) because
+		// downstream rules can still inspect the AST/imports. Reject parse and
+		// list errors since those leave TypesInfo unreliable.
+		onlyTypeErrors := pkg.IllTyped
+		for _, e := range pkg.Errors {
+			if e.Kind != packages.TypeError {
+				onlyTypeErrors = false
+				break
+			}
+		}
+		if onlyTypeErrors {
+			result = append(result, pkg)
+			continue
+		}
+		// Syntax or load errors are reported and packages skipped.
+		for _, e := range pkg.Errors {
+			loadErrs = append(loadErrs, e.Error())
+		}
 	}
 	if len(loadErrs) > 0 {
 		return result, fmt.Errorf("packages with errors were skipped: %s", strings.Join(loadErrs, "; "))

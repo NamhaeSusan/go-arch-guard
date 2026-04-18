@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"maps"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"golang.org/x/tools/go/packages"
@@ -154,12 +156,7 @@ func isContractSublayer(name string) bool {
 
 // hasPortSublayer reports whether the model has any port sublayer.
 func hasPortSublayer(m Model) bool {
-	for _, sl := range m.Sublayers {
-		if isPortSublayer(sl) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(m.Sublayers, isPortSublayer)
 }
 
 // matchPortSublayer returns the port sublayer name if pkgPath references one, "" otherwise.
@@ -271,9 +268,7 @@ func collectInterfacesFromFile(file *ast.File, exportedOnly bool) map[string]*as
 func collectExportedInterfacesFromPkg(pkg *packages.Package) map[string]*ast.InterfaceType {
 	result := make(map[string]*ast.InterfaceType)
 	for _, file := range pkg.Syntax {
-		for name, iface := range collectInterfacesFromFile(file, true) {
-			result[name] = iface
-		}
+		maps.Copy(result, collectInterfacesFromFile(file, true))
 	}
 	return result
 }

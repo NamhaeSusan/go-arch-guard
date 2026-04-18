@@ -47,6 +47,21 @@ type Config struct {
 	ExcludePatterns         []string
 	archModel               *Model
 	MaxRepoInterfaceMethods int
+	TxBoundary              TxBoundaryConfig
+}
+
+// TxBoundaryConfig configures CheckTxBoundary. Empty config → rule is a no-op.
+type TxBoundaryConfig struct {
+	// Fully-qualified symbols that start a transaction.
+	// Examples: "database/sql.(*DB).BeginTx", "database/sql.(*DB).Begin"
+	StartSymbols []string
+	// Fully-qualified transaction type names.
+	// Examples: "database/sql.Tx", "github.com/jackc/pgx/v5.Tx"
+	Types []string
+	// Layers allowed to both start tx and name tx types in signatures.
+	// Uses the same notation as Model.Sublayers ("app", "core/repo", flat names).
+	// Defaults to []string{"app"} when empty.
+	AllowedLayers []string
 }
 
 func (c Config) model() Model {
@@ -84,6 +99,10 @@ func WithModel(m Model) Option {
 
 func WithMaxRepoInterfaceMethods(n int) Option {
 	return func(c *Config) { c.MaxRepoInterfaceMethods = n }
+}
+
+func WithTxBoundary(cfg TxBoundaryConfig) Option {
+	return func(c *Config) { c.TxBoundary = cfg }
 }
 
 func WithExclude(patterns ...string) Option {

@@ -57,6 +57,23 @@ func loadBlast(t *testing.T) []*packages.Package {
 	return blastPkgs
 }
 
+var (
+	txboundaryOnce sync.Once
+	txboundaryPkgs []*packages.Package
+	txboundaryErr  error
+)
+
+func loadTxBoundary(t *testing.T) []*packages.Package {
+	t.Helper()
+	txboundaryOnce.Do(func() {
+		txboundaryPkgs, txboundaryErr = analyzer.Load("../testdata/txboundary", "internal/...")
+	})
+	if txboundaryErr != nil {
+		t.Fatal(txboundaryErr)
+	}
+	return txboundaryPkgs
+}
+
 func writeTestFile(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
