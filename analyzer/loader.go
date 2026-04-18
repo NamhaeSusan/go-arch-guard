@@ -42,7 +42,7 @@ func Load(dir string, patterns ...string) ([]*packages.Package, error) {
 	var result []*packages.Package
 	var loadErrs []string
 	for _, pkg := range pkgs {
-		if depErr := firstNonTypeErrorInDeps(pkg); depErr != "" {
+		if depErr := firstFatalErrorInDeps(pkg); depErr != "" {
 			loadErrs = append(loadErrs, depErr)
 			continue
 		}
@@ -76,17 +76,19 @@ func Load(dir string, patterns ...string) ([]*packages.Package, error) {
 	return result, nil
 }
 
-// firstNonTypeErrorInDeps traverses the transitive import graph of pkg
-// (excluding pkg itself) and returns the first non-TypeError error string
-// found in any dependency. An empty string means all deps are clean.
-func firstNonTypeErrorInDeps(root *packages.Package) string {
+// firstFatalErrorInDeps traverses the transitive import graph of pkg
+// (excluding pkg itself) and returns the first fatal error (ParseError or
+// ListError) found in any dependency. TypeError and UnknownError are
+// tolerated to avoid false positives from transient toolchain/export-data
+// issues. An empty string means all deps are clean.
+func firstFatalErrorInDeps(root *packages.Package) string {
 	var found string
 	packages.Visit([]*packages.Package{root}, nil, func(dep *packages.Package) {
 		if found != "" || dep == root {
 			return
 		}
 		for _, e := range dep.Errors {
-			if e.Kind != packages.TypeError {
+			if e.Kind == packages.ParseError || e.Kind == packages.ListError {
 				found = fmt.Sprintf("dependency %s: %s", dep.PkgPath, e.Error())
 				return
 			}
