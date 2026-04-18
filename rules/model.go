@@ -20,6 +20,12 @@ type Model struct {
 	LayerDirNames           map[string]bool
 	TypePatterns            []TypePattern
 	InterfacePatternExclude map[string]bool // layers to skip for interface pattern checks
+	// PortLayers lists sublayer names that are port/contract layers (e.g. repo, gateway, store).
+	// When non-empty, helpers use this list instead of the hardcoded defaults.
+	PortLayers []string
+	// ContractLayers lists sublayer names that are contract layers (port layers + svc-like layers).
+	// When non-empty, helpers use this list instead of the hardcoded defaults.
+	ContractLayers []string
 }
 
 // TypePattern defines an AST-based naming/structure convention for a directory.
@@ -83,6 +89,8 @@ func DDD() Model {
 		InterfacePatternExclude: map[string]bool{
 			"handler": true, "app": true, "core/model": true, "core/repo": true, "event": true,
 		},
+		PortLayers:     []string{"core/repo"},
+		ContractLayers: []string{"core/repo", "core/svc"},
 	}
 }
 
@@ -124,6 +132,8 @@ func CleanArch() Model {
 		InterfacePatternExclude: map[string]bool{
 			"handler": true, "entity": true,
 		},
+		PortLayers:     []string{"gateway"},
+		ContractLayers: []string{"gateway"},
 	}
 }
 
@@ -380,10 +390,16 @@ func NewModel(opts ...ModelOption) Model {
 	}
 	tl := make(map[string]bool)
 	if m.DomainDir != "" {
+		// Domain layout: top-level is domain/, orchestration/, shared/.
 		tl[m.DomainDir] = true
-	}
-	if m.OrchestrationDir != "" {
-		tl[m.OrchestrationDir] = true
+		if m.OrchestrationDir != "" {
+			tl[m.OrchestrationDir] = true
+		}
+	} else {
+		// Flat layout: each sublayer lives directly under internal/.
+		for _, sl := range m.Sublayers {
+			tl[sl] = true
+		}
 	}
 	if m.SharedDir != "" {
 		tl[m.SharedDir] = true
@@ -450,4 +466,12 @@ func WithLayerDirNames(names map[string]bool) ModelOption {
 
 func WithInterfacePatternExclude(exclude map[string]bool) ModelOption {
 	return func(m *Model) { m.InterfacePatternExclude = exclude }
+}
+
+func WithPortLayers(layers []string) ModelOption {
+	return func(m *Model) { m.PortLayers = layers }
+}
+
+func WithContractLayers(layers []string) ModelOption {
+	return func(m *Model) { m.ContractLayers = layers }
 }

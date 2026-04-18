@@ -422,3 +422,172 @@ func validateModelConsistency(t *testing.T, m Model) {
 		t.Errorf("InternalTopLevel missing SharedDir %q", m.SharedDir)
 	}
 }
+
+// Item A: flat-layout NewModel must promote Sublayers into InternalTopLevel.
+func TestNewModel_FlatLayout_PromotesSublayers(t *testing.T) {
+	m := NewModel(
+		WithDomainDir(""),
+		WithOrchestrationDir(""),
+		WithSharedDir("pkg"),
+		WithSublayers([]string{"worker", "service", "store", "model"}),
+		WithDirection(map[string][]string{
+			"worker":  {"service", "model"},
+			"service": {"store", "model"},
+			"store":   {"model"},
+			"model":   {},
+		}),
+	)
+	for _, sl := range []string{"worker", "service", "store", "model", "pkg"} {
+		if !m.InternalTopLevel[sl] {
+			t.Errorf("flat-layout NewModel: InternalTopLevel missing %q", sl)
+		}
+	}
+	if m.InternalTopLevel["domain"] {
+		t.Error("flat-layout NewModel: InternalTopLevel must not contain old DomainDir")
+	}
+	if m.InternalTopLevel["orchestration"] {
+		t.Error("flat-layout NewModel: InternalTopLevel must not contain old OrchestrationDir")
+	}
+}
+
+// Item A: when DomainDir is set, domain-layout behavior is unchanged.
+func TestNewModel_DomainLayout_UnchangedBehavior(t *testing.T) {
+	m := NewModel(
+		WithDomainDir("domain"),
+		WithOrchestrationDir("orchestration"),
+		WithSharedDir("pkg"),
+		WithSublayers([]string{"handler", "app", "core"}),
+		WithDirection(map[string][]string{
+			"handler": {"app"},
+			"app":     {"core"},
+			"core":    {},
+		}),
+	)
+	if !m.InternalTopLevel["domain"] {
+		t.Error("domain-layout: InternalTopLevel must include DomainDir")
+	}
+	if !m.InternalTopLevel["orchestration"] {
+		t.Error("domain-layout: InternalTopLevel must include OrchestrationDir")
+	}
+	if !m.InternalTopLevel["pkg"] {
+		t.Error("domain-layout: InternalTopLevel must include SharedDir")
+	}
+	// Sublayers must NOT be promoted in domain layout.
+	if m.InternalTopLevel["handler"] {
+		t.Error("domain-layout: InternalTopLevel must not include sublayer 'handler'")
+	}
+}
+
+// Item B: Model has PortLayers and ContractLayers fields.
+func TestModel_PortLayersContractLayersFields(t *testing.T) {
+	m := Model{
+		PortLayers:     []string{"store", "port"},
+		ContractLayers: []string{"store", "port", "svc"},
+	}
+	if len(m.PortLayers) != 2 {
+		t.Errorf("PortLayers len = %d, want 2", len(m.PortLayers))
+	}
+	if len(m.ContractLayers) != 3 {
+		t.Errorf("ContractLayers len = %d, want 3", len(m.ContractLayers))
+	}
+}
+
+// Item B: WithPortLayers and WithContractLayers options exist.
+func TestNewModel_WithPortLayersContractLayers(t *testing.T) {
+	m := NewModel(
+		WithPortLayers([]string{"store", "port"}),
+		WithContractLayers([]string{"store", "port", "svc"}),
+	)
+	if !slices.Contains(m.PortLayers, "store") {
+		t.Error("PortLayers must contain 'store'")
+	}
+	if !slices.Contains(m.ContractLayers, "svc") {
+		t.Error("ContractLayers must contain 'svc'")
+	}
+}
+
+// Item B: presets populate PortLayers/ContractLayers for DDD.
+func TestDDD_HasPortAndContractLayers(t *testing.T) {
+	m := DDD()
+	if !slices.Contains(m.PortLayers, "core/repo") {
+		t.Error("DDD PortLayers must contain 'core/repo'")
+	}
+	if !slices.Contains(m.ContractLayers, "core/svc") {
+		t.Error("DDD ContractLayers must contain 'core/svc'")
+	}
+}
+
+// Item B: presets populate PortLayers/ContractLayers for CleanArch.
+func TestCleanArch_HasPortLayers(t *testing.T) {
+	m := CleanArch()
+	if !slices.Contains(m.PortLayers, "gateway") {
+		t.Error("CleanArch PortLayers must contain 'gateway'")
+	}
+}
+
+// Item B: Hexagonal uses no explicit PortLayers (falls back to hardcoded defaults).
+// The port sublayer in Hexagonal does not follow the DDD repo-file-interface pattern.
+func TestHexagonal_PortLayersEmpty(t *testing.T) {
+	m := Hexagonal()
+	if len(m.PortLayers) != 0 {
+		t.Errorf("Hexagonal PortLayers must be empty (use fallback), got %v", m.PortLayers)
+	}
+}
+
+// Item B: isPortSublayer consults model PortLayers when non-empty.
+func TestIsPortSublayer_ConsultsModel(t *testing.T) {
+	m := Model{
+		Sublayers:  []string{"store", "model"},
+		PortLayers: []string{"store"},
+	}
+	if !isPortSublayerFor(m, "store") {
+		t.Error("isPortSublayerFor must return true for 'store' when PortLayers=['store']")
+	}
+	if isPortSublayerFor(m, "model") {
+		t.Error("isPortSublayerFor must return false for 'model' when PortLayers=['store']")
+	}
+	// legacy default: model without PortLayers falls back to hardcoded names
+	mFallback := Model{Sublayers: []string{"core/repo"}}
+	if !isPortSublayerFor(mFallback, "core/repo") {
+		t.Error("fallback: isPortSublayerFor must return true for 'core/repo' when PortLayers is empty")
+	}
+}
+
+// Item B: isContractSublayer consults model ContractLayers when non-empty.
+func TestIsContractSublayer_ConsultsModel(t *testing.T) {
+	m := Model{
+		Sublayers:      []string{"store", "svc", "model"},
+		PortLayers:     []string{"store"},
+		ContractLayers: []string{"store", "svc"},
+	}
+	if !isContractSublayerFor(m, "store") {
+		t.Error("isContractSublayerFor must return true for 'store'")
+	}
+	if !isContractSublayerFor(m, "svc") {
+		t.Error("isContractSublayerFor must return true for 'svc'")
+	}
+	if isContractSublayerFor(m, "model") {
+		t.Error("isContractSublayerFor must return false for 'model'")
+	}
+	// legacy default: model without ContractLayers falls back to hardcoded names
+	mFallback := Model{Sublayers: []string{"core/repo"}}
+	if !isContractSublayerFor(mFallback, "core/repo") {
+		t.Error("fallback: isContractSublayerFor must return true for 'core/repo'")
+	}
+}
+
+// Item B: matchPortSublayer uses PortLayers from the model.
+func TestMatchPortSublayer_CustomLayer(t *testing.T) {
+	m := Model{
+		Sublayers:  []string{"store", "model"},
+		PortLayers: []string{"store"},
+	}
+	got := matchPortSublayer(m, "github.com/example/myapp/internal/store")
+	if got != "store" {
+		t.Errorf("matchPortSublayer = %q, want %q", got, "store")
+	}
+	got = matchPortSublayer(m, "github.com/example/myapp/internal/model")
+	if got != "" {
+		t.Errorf("matchPortSublayer = %q, want %q", got, "")
+	}
+}
