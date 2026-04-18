@@ -142,3 +142,38 @@ func (s *StoreImpl) Find() error { return nil }
 		t.Error("RunAll should include interface.exported-impl from CheckInterfacePattern")
 	}
 }
+
+func TestRunAll_TxBoundary_OptInEmitsViolations(t *testing.T) {
+	pkgs := loadTxBoundary(t)
+	got := rules.RunAll(pkgs,
+		"github.com/kimtaeyun/testproject-txboundary",
+		"../testdata/txboundary",
+		rules.WithTxBoundary(rules.TxBoundaryConfig{
+			StartSymbols:  []string{"database/sql.(*DB).BeginTx"},
+			Types:         []string{"database/sql.Tx"},
+			AllowedLayers: []string{"app"},
+		}),
+	)
+	var txHits int
+	for _, v := range got {
+		if v.Rule == "tx.start-outside-allowed-layer" || v.Rule == "tx.type-in-signature" {
+			txHits++
+		}
+	}
+	if txHits == 0 {
+		t.Fatal("expected tx violations through RunAll")
+	}
+}
+
+func TestRunAll_TxBoundary_DefaultDisabled(t *testing.T) {
+	pkgs := loadTxBoundary(t)
+	got := rules.RunAll(pkgs,
+		"github.com/kimtaeyun/testproject-txboundary",
+		"../testdata/txboundary",
+	)
+	for _, v := range got {
+		if v.Rule == "tx.start-outside-allowed-layer" || v.Rule == "tx.type-in-signature" {
+			t.Errorf("expected no tx violations by default, got: %+v", v)
+		}
+	}
+}
