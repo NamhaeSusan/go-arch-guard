@@ -5,6 +5,6 @@ import "github.com/kimtaeyun/testproject-txboundary/internal/domain/order/core/m
 type Handler struct{}
 
 func (h *Handler) Serve(o model.Order) error {
-    _ = o
-    return nil
+	_ = o
+	return nil
 }
