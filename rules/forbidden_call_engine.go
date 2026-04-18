@@ -1,7 +1,6 @@
 package rules
 
 import (
-	"fmt"
 	"go/ast"
 	"go/types"
 	"slices"
@@ -17,10 +16,11 @@ type forbiddenCallRule struct {
 	Symbols       []string
 	AllowedLayers []string
 	RuleName      string
-	// Message and Fix are fmt templates formatted with (layer string, allowedLayers []string).
-	// Use %q for the layer and %v for allowedLayers.
-	Message string
-	Fix     string
+	// Message and Fix receive the offending layer and the allowed-layer list.
+	// Typed callbacks replace former fmt-template strings so misuse fails at
+	// compile time instead of producing %!(EXTRA...) output at runtime.
+	Message func(layer string, allowed []string) string
+	Fix     func(layer string, allowed []string) string
 }
 
 // checkForbiddenCallsByLayer walks all CallExprs in internal packages and
@@ -43,8 +43,8 @@ func checkForbiddenCallsByLayer(
 	type compiledRule struct {
 		allowed      map[string]bool
 		ruleName     string
-		message      string
-		fix          string
+		message      func(string, []string) string
+		fix          func(string, []string) string
 		allowedSlice []string
 	}
 	byName := map[string][]compiledRule{}
@@ -103,8 +103,8 @@ func checkForbiddenCallsByLayer(
 						File:     relFile,
 						Line:     pos.Line,
 						Rule:     cr.ruleName,
-						Message:  fmt.Sprintf(cr.message, layer, cr.allowedSlice),
-						Fix:      fmt.Sprintf(cr.fix, layer, cr.allowedSlice),
+						Message:  cr.message(layer, cr.allowedSlice),
+						Fix:      cr.fix(layer, cr.allowedSlice),
 						Severity: cfg.Sev,
 					})
 				}
