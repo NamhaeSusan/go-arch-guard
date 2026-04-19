@@ -2,6 +2,8 @@
 
 Detailed layout diagrams and direction tables for each built-in preset.
 
+For custom models, see [Model Concepts](model-concepts.md).
+
 ## DDD Layout
 
 ```text

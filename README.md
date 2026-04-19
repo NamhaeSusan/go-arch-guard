@@ -183,6 +183,8 @@ m := rules.NewModel(
 )
 ```
 
+For conceptual explanations of each option — what it means, why it exists, and when to set it — see [Model Concepts](docs/model-concepts.md).
+
 All model options:
 
 | Option | Description |
