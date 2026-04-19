@@ -3,15 +3,17 @@ package rules
 import (
 	"go/ast"
 	"go/types"
-	"strings"
 
 	"golang.org/x/tools/go/packages"
 )
 
-// checkTypeInSignature walks all FuncDecl params and results in internal
-// packages and emits a violation when a base type (after stripping
-// pointer/slice/array/map/chan wrappers) matches one of typeNames and
-// the function's package layer is outside allowedLayers.
+// checkTypeInSignature walks all FuncDecl params and results in packages
+// under <module>/internal/ (and optionally <module>/cmd/ when
+// scanScope.enforceCmdRoot is true) and emits a violation when a base type
+// (after stripping pointer/slice/array/map/chan wrappers) matches one of
+// typeNames and the function's package layer is outside allowedLayers.
+// Composition-root packages bypass allowedLayers entirely — they are
+// controlled by scanScope.enforceCmdRoot (see scanLayerFor).
 //
 // message/fix are typed callbacks receiving (typeID, allowedLayers).
 func checkTypeInSignature(
@@ -19,6 +21,7 @@ func checkTypeInSignature(
 	projectModule, projectRoot string,
 	m Model,
 	cfg Config,
+	scope scanScope,
 	typeNames []string,
 	allowedLayers []string,
 	ruleName string,
@@ -30,6 +33,7 @@ func checkTypeInSignature(
 	projectModule = resolveModule(pkgs, projectModule)
 	projectRoot = resolveRoot(pkgs, projectRoot)
 	internalPrefix := projectModule + "/internal/"
+	cmdPrefix := projectModule + "/cmd/"
 
 	wanted := map[string]bool{}
 	for _, n := range typeNames {
@@ -45,11 +49,13 @@ func checkTypeInSignature(
 		if isExcludedPackage(cfg, pkg.PkgPath, projectModule) {
 			continue
 		}
-		if !strings.HasPrefix(pkg.PkgPath, internalPrefix) {
+		decision := scanLayerFor(m, pkg.PkgPath, internalPrefix, cmdPrefix, scope)
+		if !decision.scan {
 			continue
 		}
-		layer := layerOfPackage(m, pkg.PkgPath, internalPrefix)
-		if layer == "" || allowed[layer] {
+		// Composition-root packages bypass AllowedLayers: their policy
+		// is controlled exclusively by EnforceCmdRoot.
+		if !decision.isCmdRoot && allowed[decision.layer] {
 			continue
 		}
 		if pkg.TypesInfo == nil {

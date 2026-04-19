@@ -687,11 +687,38 @@ violations := rules.CheckTxBoundary(pkgs, module, root,
         },
         Types:         []string{"database/sql.Tx"},
         AllowedLayers: []string{"app"}, // default when empty
+        // EnforceCmdRoot:      true, // opt-in: also enforce in <module>/cmd/...
+        // EnforceUnclassified: true, // opt-in: also enforce in unclassified internal/
     }),
 )
 ```
 
 Emitted rule IDs: `tx.start-outside-allowed-layer`, `tx.type-in-signature`.
+
+**Scope.** Internal packages under `<module>/internal/...` are scanned by
+default. Composition-root packages under `<module>/cmd/...` are controlled
+by a dedicated `EnforceCmdRoot` flag — see *Composition root* below.
+
+**Composition root (`cmd/`).** By default, the rule does **not** flag
+tx-starts in `<module>/cmd/...` — this keeps upgrade paths backward-compat
+for projects that legitimately start transactions from `main`. Set
+`EnforceCmdRoot: true` for strict composition-root enforcement: tx-starts
+under `cmd/` then produce violations regardless of `AllowedLayers`.
+`EnforceCmdRoot` is a dedicated field rather than a magic layer name in
+`AllowedLayers`, so a user-defined sublayer literally called `cmd` cannot
+accidentally toggle composition-root behavior.
+
+**Generic call sites.** Calls made through explicit type parameters — e.g.
+`BeginGeneric[string](...)`, `pkg.F[T1, T2](...)`, `x.M[T](...)` — are
+resolved by unwrapping `*ast.IndexExpr` / `*ast.IndexListExpr` so forbidden
+generic symbols are caught.
+
+**Unclassified internal packages.** Packages under `internal/` that don't
+map to a known sublayer (e.g. `internal/testutil`, codegen output, migration
+helpers) are **skipped by default** to avoid noise. Set
+`EnforceUnclassified: true` for strict coverage — unclassified packages
+then produce violations with layer `""`, and you opt specific helpers out
+via `WithExclude("internal/testutil/...")`.
 
 ## Options
 

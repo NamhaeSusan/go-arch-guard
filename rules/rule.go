@@ -61,7 +61,38 @@ type TxBoundaryConfig struct {
 	// Layers allowed to both start tx and name tx types in signatures.
 	// Uses the same notation as Model.Sublayers ("app", "core/repo", flat names).
 	// Defaults to []string{"app"} when empty.
+	//
+	// Note: packages under <module>/cmd/... are NOT controlled by this list.
+	// Use EnforceCmdRoot instead — see its docs for the rationale.
 	AllowedLayers []string
+	// EnforceUnclassified controls how internal packages that do not map to any
+	// known sublayer (e.g. internal/testutil, internal/generic, codegen output)
+	// are treated.
+	//   false (default): skip — preserves old behavior, avoids noise on ad-hoc
+	//                    helper packages.
+	//   true:            treat as non-allowed — a forbidden call there produces
+	//                    a violation. Use when the team wants strict coverage
+	//                    and is willing to add explicit WithExclude for
+	//                    legitimate helper packages.
+	//
+	// Packages under <module>/cmd/... are controlled by EnforceCmdRoot, not
+	// this flag.
+	EnforceUnclassified bool
+	// EnforceCmdRoot controls whether composition-root packages under
+	// <module>/cmd/... are checked for forbidden tx starts and tx-type
+	// signatures.
+	//   false (default): cmd/ packages are skipped — backward-compat, avoids
+	//                    flagging existing projects that call BeginTx from
+	//                    main or other cmd/ entry points.
+	//   true:            cmd/ packages are scanned and forbidden calls there
+	//                    produce a violation. Strict mode — recommended when
+	//                    the team wants to keep composition roots thin.
+	//
+	// This is a dedicated field rather than a magic layer name in
+	// AllowedLayers so it can't collide with a user-defined sublayer
+	// literally called "cmd". Follows the same opt-in-to-strict semantics
+	// as EnforceUnclassified.
+	EnforceCmdRoot bool
 }
 
 func (c Config) model() Model {
