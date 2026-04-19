@@ -77,10 +77,18 @@ func Load(dir string, patterns ...string) ([]*packages.Package, error) {
 }
 
 // firstFatalErrorInDeps traverses the transitive import graph of pkg
-// (excluding pkg itself) and returns the first fatal error (ParseError or
-// ListError) found in any dependency. TypeError and UnknownError are
-// tolerated to avoid false positives from transient toolchain/export-data
-// issues. An empty string means all deps are clean.
+// (excluding pkg itself) and returns the first fatal error found in any
+// dependency. Any non-TypeError in a dep is treated as fatal:
+//   - ParseError / ListError are clearly fatal.
+//   - UnknownError is also treated as fatal because go/packages uses it for
+//     missing-or-unreadable export data and toolchain/source skew, which
+//     leave the root's TypesInfo incomplete. With NeedTypes|NeedTypesInfo|
+//     NeedDeps enabled, downstream rules consume TypesInfo and would silently
+//     misreport if we tolerated UnknownError here.
+//
+// Only TypeError in a dep is tolerated, mirroring the root-package policy:
+// rules can still inspect AST/imports meaningfully when a dep has a pure
+// type-check failure. An empty string means all deps are clean.
 func firstFatalErrorInDeps(root *packages.Package) string {
 	var found string
 	packages.Visit([]*packages.Package{root}, nil, func(dep *packages.Package) {
@@ -88,7 +96,7 @@ func firstFatalErrorInDeps(root *packages.Package) string {
 			return
 		}
 		for _, e := range dep.Errors {
-			if e.Kind == packages.ParseError || e.Kind == packages.ListError {
+			if e.Kind != packages.TypeError {
 				found = fmt.Sprintf("dependency %s: %s", dep.PkgPath, e.Error())
 				return
 			}
