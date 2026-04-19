@@ -42,13 +42,18 @@ func Load(dir string, patterns ...string) ([]*packages.Package, error) {
 	var result []*packages.Package
 	var loadErrs []string
 	for _, pkg := range pkgs {
+		if depErr := firstFatalErrorInDeps(pkg); depErr != "" {
+			loadErrs = append(loadErrs, depErr)
+			continue
+		}
 		if len(pkg.Errors) == 0 {
 			result = append(result, pkg)
 			continue
 		}
-		// Tolerate pure type-check failures (e.g., undefined identifier) because
-		// downstream rules can still inspect the AST/imports. Reject parse and
-		// list errors since those leave TypesInfo unreliable.
+		// Tolerate pure type-check failures on the root package itself (e.g.,
+		// undefined identifier) because downstream rules can still inspect the
+		// AST/imports. Reject parse and list errors since those leave TypesInfo
+		// unreliable.
 		onlyTypeErrors := pkg.IllTyped
 		for _, e := range pkg.Errors {
 			if e.Kind != packages.TypeError {
@@ -60,7 +65,7 @@ func Load(dir string, patterns ...string) ([]*packages.Package, error) {
 			result = append(result, pkg)
 			continue
 		}
-		// Syntax or load errors are reported and packages skipped.
+		// Syntax or load errors on the root package are reported and it is skipped.
 		for _, e := range pkg.Errors {
 			loadErrs = append(loadErrs, e.Error())
 		}
@@ -69,4 +74,33 @@ func Load(dir string, patterns ...string) ([]*packages.Package, error) {
 		return result, fmt.Errorf("packages with errors were skipped: %s", strings.Join(loadErrs, "; "))
 	}
 	return result, nil
+}
+
+// firstFatalErrorInDeps traverses the transitive import graph of pkg
+// (excluding pkg itself) and returns the first fatal error found in any
+// dependency. Any non-TypeError in a dep is treated as fatal:
+//   - ParseError / ListError are clearly fatal.
+//   - UnknownError is also treated as fatal because go/packages uses it for
+//     missing-or-unreadable export data and toolchain/source skew, which
+//     leave the root's TypesInfo incomplete. With NeedTypes|NeedTypesInfo|
+//     NeedDeps enabled, downstream rules consume TypesInfo and would silently
+//     misreport if we tolerated UnknownError here.
+//
+// Only TypeError in a dep is tolerated, mirroring the root-package policy:
+// rules can still inspect AST/imports meaningfully when a dep has a pure
+// type-check failure. An empty string means all deps are clean.
+func firstFatalErrorInDeps(root *packages.Package) string {
+	var found string
+	packages.Visit([]*packages.Package{root}, nil, func(dep *packages.Package) {
+		if found != "" || dep == root {
+			return
+		}
+		for _, e := range dep.Errors {
+			if e.Kind != packages.TypeError {
+				found = fmt.Sprintf("dependency %s: %s", dep.PkgPath, e.Error())
+				return
+			}
+		}
+	})
+	return found
 }

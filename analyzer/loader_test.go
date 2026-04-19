@@ -39,4 +39,59 @@ func TestLoad(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("skips root package whose dependency has a syntax error", func(t *testing.T) {
+		pkgs, err := analyzer.Load("../testdata/load_broken_dep", "internal/...")
+		if err == nil {
+			t.Fatal("expected error describing skipped packages with broken dependencies")
+		}
+		// The root package imports a broken dep; it must not appear in results.
+		for _, pkg := range pkgs {
+			if pkg.PkgPath == "github.com/kimtaeyun/testproject-load-broken-dep/internal/root" {
+				t.Error("root package with broken dependency should have been skipped")
+			}
+		}
+	})
+
+	t.Run("skips root package whose transitive dependency has a syntax error", func(t *testing.T) {
+		pkgs, err := analyzer.Load("../testdata/load_broken_dep_transitive", "internal/...")
+		if err == nil {
+			t.Fatal("expected error describing skipped packages with broken transitive dependencies")
+		}
+		// root -> middle -> broken: both root and middle must be skipped;
+		// the unrelated clean package must still be returned.
+		var sawClean bool
+		for _, pkg := range pkgs {
+			switch pkg.PkgPath {
+			case "github.com/kimtaeyun/testproject-load-broken-dep-transitive/internal/root":
+				t.Error("root (transitive broken dep) should have been skipped")
+			case "github.com/kimtaeyun/testproject-load-broken-dep-transitive/internal/middle":
+				t.Error("middle (direct broken dep) should have been skipped")
+			case "github.com/kimtaeyun/testproject-load-broken-dep-transitive/internal/clean":
+				sawClean = true
+			}
+		}
+		if !sawClean {
+			t.Error("expected unrelated clean package to still be loaded")
+		}
+	})
+
+	t.Run("skips root package whose dependency has a list error", func(t *testing.T) {
+		pkgs, err := analyzer.Load("../testdata/load_missing_dep", "internal/...")
+		if err == nil {
+			t.Fatal("expected error describing skipped packages with missing dependencies")
+		}
+		var sawClean bool
+		for _, pkg := range pkgs {
+			switch pkg.PkgPath {
+			case "github.com/kimtaeyun/testproject-load-missing-dep/internal/root":
+				t.Error("root (missing dep, ListError) should have been skipped")
+			case "github.com/kimtaeyun/testproject-load-missing-dep/internal/clean":
+				sawClean = true
+			}
+		}
+		if !sawClean {
+			t.Error("expected unrelated clean package to still be loaded")
+		}
+	})
 }
