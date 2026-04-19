@@ -25,12 +25,18 @@ func CheckInterfacePattern(pkgs []*packages.Package, opts ...Option) []Violation
 		}
 
 		ifaces := collectExportedInterfacesFromPkg(pkg)
+
+		// checkExportedImpl also needs to see alias chains (AST-invisible),
+		// so let it examine the package even when the AST collector returned
+		// nothing — it performs its own types-based augmentation. Other
+		// checks only operate on AST-collected interfaces and can be skipped
+		// when there are none.
+		violations = append(violations, checkExportedImpl(pkg, ifaces, cfg)...)
 		if len(ifaces) == 0 {
 			continue
 		}
 
 		violations = append(violations, checkSingleInterfacePerPackage(pkg, ifaces, cfg)...)
-		violations = append(violations, checkExportedImpl(pkg, ifaces, cfg)...)
 		violations = append(violations, checkConstructorName(pkg, cfg)...)
 		violations = append(violations, checkConstructorReturnsInterface(pkg, ifaces, cfg)...)
 	}
@@ -107,14 +113,22 @@ func checkSingleInterfacePerPackage(pkg *packages.Package, ifaces map[string]*as
 // in the same package — the impl should be unexported.
 //
 // For fully-typed packages it uses go/types.Implements so signatures are
-// compared properly. When the package is ill-typed (pkg.Types nil, or a
-// specific interface/struct type object cannot be recovered from scope), it
-// falls back to AST name-only matching. The fallback preserves the previous
-// behavior's false-positive surface — a looser but strictly better outcome
-// than silently dropping diagnostics during partially broken refactors.
+// compared properly. The set of interfaces to check is the union of two
+// sources:
+//   - AST-collected direct interfaces (e.g. `type Store interface{...}` and
+//     `type Store = interface{...}`), and
+//   - types-resolved aliases whose resolved underlying type is `*types.Interface`
+//     (e.g. alias chains like `type Base = interface{...}; type Store = Base`).
+//
+// A fallback to AST name-only matching is used only when the type objects for
+// a given (struct, iface) pair cannot be recovered from scope. The fallback
+// preserves the previous behavior's false-positive surface for that narrow
+// case, but is strictly better than silently dropping diagnostics. A package
+// being IllTyped elsewhere does NOT gate the fallback — if both type objects
+// resolve cleanly, types.Implements is trusted.
 func checkExportedImpl(pkg *packages.Package, ifaces map[string]*ast.InterfaceType, cfg Config) []Violation {
 	structs := collectExportedStructs(pkg)
-	if len(structs) == 0 || len(ifaces) == 0 {
+	if len(structs) == 0 {
 		return nil
 	}
 
@@ -123,9 +137,7 @@ func checkExportedImpl(pkg *packages.Package, ifaces map[string]*ast.InterfaceTy
 		scope = pkg.Types.Scope()
 	}
 
-	// Resolve each interface to a *types.Interface when possible (treats
-	// type aliases via types.Unalias). Interfaces that cannot be resolved are
-	// left for the AST fallback.
+	// Resolve each AST-collected interface to a *types.Interface when possible.
 	typedIfaces := make(map[string]*types.Interface, len(ifaces))
 	if scope != nil {
 		for name := range ifaces {
@@ -133,6 +145,32 @@ func checkExportedImpl(pkg *packages.Package, ifaces map[string]*ast.InterfaceTy
 				typedIfaces[name] = iface
 			}
 		}
+	}
+
+	// Augment with exported alias chains whose resolved underlying is an
+	// interface but whose AST RHS is not an *ast.InterfaceType (so the
+	// AST-only collector missed them).
+	allIfaces := make(map[string]*ast.InterfaceType, len(ifaces))
+	for k, v := range ifaces {
+		allIfaces[k] = v
+	}
+	if scope != nil {
+		for _, name := range scope.Names() {
+			if _, seen := allIfaces[name]; seen {
+				continue
+			}
+			if !ast.IsExported(name) {
+				continue
+			}
+			if iface := lookupInterface(scope, name); iface != nil && iface.NumMethods() > 0 {
+				allIfaces[name] = nil // no AST body available; typed path only
+				typedIfaces[name] = iface
+			}
+		}
+	}
+
+	if len(allIfaces) == 0 {
+		return nil
 	}
 
 	var violations []Violation
@@ -144,20 +182,20 @@ func checkExportedImpl(pkg *packages.Package, ifaces map[string]*ast.InterfaceTy
 			}
 		}
 
-		for ifaceName, astIface := range ifaces {
-			matched := false
+		for ifaceName, astIface := range allIfaces {
 			iface, ifaceOK := typedIfaces[ifaceName]
 			typedPathAvailable := named != nil && ifaceOK
+
+			matched := false
 			if typedPathAvailable {
-				// Fully-typed path: signature-aware via types.Implements.
+				// Fully-typed path: signature-aware. Trust the result even if
+				// the package is IllTyped elsewhere.
 				ptrType := types.NewPointer(named)
 				matched = types.Implements(named, iface) || types.Implements(ptrType, iface)
-			}
-			// Fallback to AST name-only match when:
-			//   - the type objects could not be recovered, or
-			//   - the package is ill-typed and the typed check said "no match"
-			//     (signatures may be unreliable when types are incomplete).
-			if !matched && (!typedPathAvailable || pkg.IllTyped) {
+			} else {
+				// Fall back to AST name-only matching when either the struct
+				// or the interface cannot be recovered as a typed object.
+				// Requires an AST body to compare against.
 				matched = structMatchesInterfaceByName(pkg, structName, astIface)
 			}
 			if matched {
@@ -175,7 +213,8 @@ func checkExportedImpl(pkg *packages.Package, ifaces map[string]*ast.InterfaceTy
 }
 
 // lookupInterface resolves name in scope to a *types.Interface, unwrapping
-// type aliases. Returns nil when name is not an interface type.
+// type aliases (including alias chains). Returns nil when name is not an
+// interface type.
 func lookupInterface(scope *types.Scope, name string) *types.Interface {
 	obj := scope.Lookup(name)
 	if obj == nil {

@@ -2,6 +2,7 @@ package rules_test
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/NamhaeSusan/go-arch-guard/rules"
@@ -364,33 +365,29 @@ func (s *StoreImpl) Get(id string) string { return "" }
 	}
 }
 
-// TestCheckInterfacePattern_ExportedImpl_IllTyped verifies that when a package
-// has unrelated type errors (pkg.Types missing or objects unresolvable), the
-// rule still reports via the AST name-based fallback instead of silently
-// dropping coverage.
-func TestCheckInterfacePattern_ExportedImpl_IllTyped(t *testing.T) {
+// TestCheckInterfacePattern_ExportedImpl_AliasChain verifies that an alias
+// chain whose AST RHS is an Ident (not an InterfaceType) is resolved via
+// go/types. Only `Store` is exported here — the interface lives in an
+// unexported `baseStore` — so the AST-only collector cannot see any exported
+// interface in this file. Without the fix, Store would be silently dropped.
+func TestCheckInterfacePattern_ExportedImpl_AliasChain(t *testing.T) {
 	root := t.TempDir()
-	module := "example.com/ip-illtyped"
+	module := "example.com/ip-alias-chain"
 
 	writeTestFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
 
-	// Exported struct implements the interface (same name + signature), but the
-	// file also contains an unrelated type error so the package is IllTyped.
-	// The fallback must still emit interface.exported-impl.
-	// The method receiver references an undefined parameter type, so the
-	// *types.Named for DBStore lacks a usable Get method and types.Implements
-	// returns false. But AST inspection still shows method name Get matching.
-	// The fallback must emit the violation.
 	writeTestFile(t, filepath.Join(root, "internal", "store", "store.go"),
 		`package store
 
-type Store interface {
+type baseStore = interface {
 	Get(id string) string
 }
 
-type DBStore struct{}
+type Store = baseStore
 
-func (s *DBStore) Get(id UndefinedType) string { return "" }
+type StoreImpl struct{}
+
+func (s *StoreImpl) Get(id string) string { return "" }
 `)
 
 	pkgs := loadTestPackages(t, root)
@@ -399,12 +396,58 @@ func (s *DBStore) Get(id UndefinedType) string { return "" }
 	found := false
 	for _, v := range vs {
 		if v.Rule == "interface.exported-impl" {
-			found = true
-			break
+			// Must be reported against the EXPORTED Store, not the unexported
+			// intermediate baseStore.
+			if strings.Contains(v.Message, `interface "Store"`) {
+				found = true
+				break
+			}
 		}
 	}
 	if !found {
-		t.Error("expected interface.exported-impl violation in ill-typed package (via AST fallback)")
+		t.Error(`expected interface.exported-impl violation against exported alias-chain interface "Store"`)
+	}
+}
+
+// TestCheckInterfacePattern_ExportedImpl_IllTypedSignatureMismatch verifies
+// that when a package is IllTyped due to an UNRELATED error but both the
+// interface and struct type objects resolve cleanly, the rule trusts
+// types.Implements and does NOT fall back to name-only. A struct with a
+// matching method name but different signature must not be flagged.
+func TestCheckInterfacePattern_ExportedImpl_IllTypedSignatureMismatch(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/ip-illtyped-sig-mismatch"
+
+	writeTestFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+
+	// Store and StoreImpl resolve cleanly. An unrelated type error in the
+	// same package (undefined identifier used as a type) marks the package
+	// IllTyped. StoreImpl.Find has a different signature than Store.Find —
+	// types.Implements returns false and must be trusted.
+	writeTestFile(t, filepath.Join(root, "internal", "store", "store.go"),
+		`package store
+
+type Store interface {
+	Find(id string) string
+}
+
+type StoreImpl struct{}
+
+func (s *StoreImpl) Find(limit, offset int) []string { return nil }
+
+// Unrelated error: undefined identifier as a type.
+type Broken struct {
+	X UndefinedType
+}
+`)
+
+	pkgs := loadTestPackages(t, root)
+	vs := rules.CheckInterfacePattern(pkgs, rules.WithModel(rules.ConsumerWorker()))
+
+	for _, v := range vs {
+		if v.Rule == "interface.exported-impl" {
+			t.Errorf("unexpected interface.exported-impl violation in ill-typed package with signature mismatch: %s", v.String())
+		}
 	}
 }
 
