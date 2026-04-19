@@ -23,7 +23,7 @@ The library is neutral infrastructure. It enforces whatever shape you commit to.
 
 **What:** the complete list of layer names that may exist inside a domain (for domain layouts) or directly under `internal/` (for flat layouts).
 
-**Why:** `CheckLayerDirection` uses this list to detect unknown sublayers. A package that lands in a directory not named in `Sublayers` triggers `layer.unknown-sublayer` — the rule cannot reason about a layer it doesn't know about.
+**Why:** `CheckLayerDirection` uses this list to detect unknown sublayers. In domain layouts, a package that lands in a directory not named in `Sublayers` triggers `layer.unknown-sublayer`. In flat layouts, unknown top-level directories under `internal/` are classified as `kindUnclassified` and silently skipped — no violation is emitted. For flat custom models, keep `Sublayers` and `InternalTopLevel` aligned manually so that `CheckStructure` (which does enforce `InternalTopLevel`) catches accidental additions.
 
 **Example (DDD):**
 
@@ -36,7 +36,7 @@ rules.WithSublayers([]string{
 
 Slash notation (`core/model`) represents a subdirectory inside `core/`. The rule matches on the suffix of the package path, so `internal/domain/order/core/model` matches `core/model`.
 
-**Common mistake:** adding a new directory (e.g. `cache/`) without adding it here. Every package in that directory will fail with `layer.unknown-sublayer`.
+**Common mistake (domain layouts):** adding a new directory (e.g. `cache/`) inside a domain without adding it here. Every package in that directory will fail with `layer.unknown-sublayer`.
 
 ---
 
@@ -61,7 +61,12 @@ rules.WithDirection(map[string][]string{
 })
 ```
 
-**Gotcha:** if a layer is in `Sublayers` but has no entry in `Direction`, the rule treats it as "may import nothing." An empty slice `{}` is explicit; a missing key behaves the same way. Add an explicit empty entry for clarity.
+**Gotcha — missing key vs. empty slice:** these are not equivalent.
+
+- `"foo": {}` — explicit deny-all: `foo` may import nothing (except `SharedDir`). Any cross-layer import from `foo` triggers `layer.direction`.
+- missing key for `foo` — direction enforcement is **disabled** for `foo`: the rule skips it entirely (`if !known { continue }`). Imports from `foo` are not checked.
+
+Always add an explicit entry for every layer you want enforced. A layer absent from `Direction` is effectively ungoverned, which is a silent trap when building custom models.
 
 **Gotcha:** `Direction` only governs cross-layer imports *within* the same domain. Cross-domain imports are handled by `CheckDomainIsolation`, not `CheckLayerDirection`.
 
@@ -125,13 +130,12 @@ rules.WithSharedDir("pkg")  // internal/pkg/ (DDD default)
 
 **Why:** `CheckStructure` emits `structure.internal-top-level` for any directory under `internal/` that is not in this set. This catches typos and accidental package placement (e.g. someone creates `internal/utils/` by mistake).
 
-**You should not set this manually.** `NewModel(...)` derives it automatically from `DomainDir`, `OrchestrationDir`, and `SharedDir` after applying all options:
+**You should not set this manually.** `NewModel(...)` derives it automatically after applying all options:
 
-```
-InternalTopLevel = {DomainDir, OrchestrationDir, SharedDir} (non-empty values only)
-```
+- **Domain layout** (`DomainDir != ""`): `InternalTopLevel = {DomainDir, OrchestrationDir, SharedDir}` (non-empty values only).
+- **Flat layout** (`DomainDir == ""`): `InternalTopLevel` is populated from every entry in `Sublayers`, plus `OrchestrationDir` and `SharedDir` when non-empty.
 
-For flat layouts where `DomainDir == ""` and `OrchestrationDir == ""`, only `SharedDir` (and the sublayer directories themselves, which you add to `InternalTopLevel` manually) are allowed. If you use a flat layout with `NewModel`, set `InternalTopLevel` explicitly via a raw field assignment or list the sublayer dirs in a custom option, because `NewModel` only includes `SharedDir` automatically.
+This means flat custom models built with `NewModel` + `WithSublayers(...)` automatically allow those directories under `internal/` without any manual patching.
 
 ---
 
@@ -157,17 +161,47 @@ Set to `nil` or an empty map to allow all layers to import `pkg/`.
 
 ---
 
-### Port and contract detection
+### `PortLayers` and `ContractLayers`
 
-The library uses two internal concepts — **port sublayers** and **contract sublayers** — that are derived from `Sublayers` by convention, not by a separate Model field.
+**What:** explicit lists of sublayer names that the library treats as port layers and contract layers respectively.
 
-**Port sublayer:** a sublayer whose basename is `repo` or `gateway`. These are pure interface-declaration layers (no implementations, just contracts for external dependencies).
+**PortLayers:** sublayers that only declare interfaces — pure contracts for external dependencies (repository interfaces, gateway interfaces). No implementations, no concrete types.
 
-**Contract sublayer:** port sublayers plus any sublayer whose basename is `svc` (service interface). Used by re-export checks that reason about "interfaces consumed by callers."
+**ContractLayers:** a broader set that includes port layers plus service-interface layers (`svc`-like layers). Semantically `ContractLayers ⊇ PortLayers`. Helpers union the two lists at check time, so you do not need to repeat port names in `ContractLayers`.
 
-**Implication for custom models:** if your port layer uses a different name (e.g. `store`, `boundary`, `port`), the built-in port detection will not recognize it. The rules that rely on port detection (`interface.single-per-package`, `interface.max-methods`, etc.) use a basename suffix fallback and will fall back to `core/repo` if nothing matches. You can work around this by naming your port layer with basename `repo` or `gateway`.
+**Which rules use these:** rules that check alias re-export patterns (`structure.alias-*`) consult `matchContractSublayer` to identify interface-only layers. Port detection is also used by `CheckStructure`'s alias checks to determine whether a domain export surface is exposing implementation details.
 
-This is an intentional simplification: the library matches on a well-known basename convention rather than requiring a new Model field for every semantic concept.
+Note: `interface.single-per-package` and `interface.exported-impl` are NOT gated by port/contract detection — they run on all packages not listed in `InterfacePatternExclude`.
+
+**Defaults:**
+
+| Preset | `PortLayers` | `ContractLayers` |
+|--------|-------------|-----------------|
+| `DDD()` | `["core/repo"]` | `["core/repo", "core/svc"]` |
+| `CleanArch()` | `["gateway"]` | `["gateway"]` |
+| All others | `[]` (basename fallback) | `[]` (basename fallback) |
+
+**Basename fallback:** when both `PortLayers` and `ContractLayers` are empty, the helpers fall back to hardcoded basename matching — sublayers whose last path component is `repo` or `gateway` are treated as ports; add `svc` for contracts. This preserves backward compatibility for presets and custom models that don't set these fields.
+
+**When to set:** if your custom model uses a non-standard name for port layers (e.g. `store`, `boundary`, `outbound`), set `PortLayers` explicitly so the library recognizes them. If you want the basename fallback despite inheriting DDD defaults, clear both with `WithPortLayers(nil)` and `WithContractLayers(nil)`.
+
+```go
+// Custom model with a "store" port layer
+m := rules.NewModel(
+    rules.WithSublayers([]string{"handler", "service", "store", "model"}),
+    rules.WithPortLayers([]string{"store"}),
+    rules.WithContractLayers([]string{"store"}), // no svc-equivalent here
+    // ... other options
+)
+
+// Clear to force basename fallback (undoes DDD defaults)
+m := rules.NewModel(
+    rules.WithPortLayers(nil),
+    rules.WithContractLayers(nil),
+)
+```
+
+**Gotcha:** `WithSublayers` does NOT clear `PortLayers`/`ContractLayers`. If you replace sublayers with a completely different set, the inherited DDD port/contract lists may no longer match any sublayer in your model — effectively becoming dead config. Set them explicitly whenever you call `WithSublayers` with a non-DDD list.
 
 ---
 
@@ -228,10 +262,13 @@ LegacyPkgNames:  []string{"router", "bootstrap"}
 
 These names are common in codebases that haven't committed to a layer structure. The rule is a guardrail against vague naming during vibe coding, not a semantic check.
 
-**To extend the list:**
+**To override the list** (the defaults are unexported; copy and extend as needed):
 
 ```go
-rules.WithBannedPkgNames(append(rules.DefaultBannedPkgNames, "managers", "handlers"))
+rules.WithBannedPkgNames([]string{
+    "util", "common", "misc", "helper", "shared", "services", // defaults
+    "managers", "handlers", // team additions
+})
 ```
 
 ---
@@ -344,20 +381,7 @@ m := rules.NewModel(
 opts := []rules.Option{rules.WithModel(m)}
 ```
 
-Because `DomainDir` is `""`, `NewModel` sets `InternalTopLevel` to `{"pkg": true}` only. You need to explicitly allow the sublayer directories:
-
-```go
-// After NewModel, patch InternalTopLevel if using flat layout
-m.InternalTopLevel = map[string]bool{
-    "publisher":  true,
-    "subscriber": true,
-    "broker":     true,
-    "dto":        true,
-    "pkg":        true,
-}
-```
-
-> This is a known rough edge with flat layouts. `NewModel` auto-populates `InternalTopLevel` from the three directory fields, not from `Sublayers`. For flat layouts, patch it manually after construction.
+Because `DomainDir` is `""`, `NewModel` automatically promotes every entry in `Sublayers` into `InternalTopLevel`, plus `SharedDir`. The resulting `InternalTopLevel` will be `{publisher, subscriber, broker, dto, pkg}` — no manual patching needed.
 
 ---
 
@@ -372,7 +396,7 @@ Key consequence: **options you don't set keep their DDD values.** For example:
 
 When building a model that is substantially different from DDD, set every relevant option explicitly. Partial overrides that assume DDD defaults can produce surprising violations.
 
-`InternalTopLevel` is always recomputed by `NewModel` from `DomainDir`, `OrchestrationDir`, and `SharedDir` after all options are applied. Any manual assignment to `InternalTopLevel` inside an option will be overwritten. Set it manually *after* `NewModel` returns if you need fine-grained control (flat layouts especially).
+`InternalTopLevel` is always recomputed by `NewModel` after all options are applied. Any manual assignment to `InternalTopLevel` inside an option will be overwritten. For domain layouts the set is derived from `DomainDir`, `OrchestrationDir`, and `SharedDir`. For flat layouts it is derived from `Sublayers` plus `OrchestrationDir` and `SharedDir`. If you need a directory in `InternalTopLevel` that doesn't come from those sources, set it on the returned model directly after `NewModel` returns.
 
 ---
 
@@ -384,6 +408,6 @@ When building a model that is substantially different from DDD, set every releva
 | Your layout matches a preset but you rename one or two layers | `NewModel` with `WithSublayers` + `WithDirection` overrides |
 | Your layout matches a preset but you change directory names (`domain/` → `module/`) | `NewModel` with `WithDomainDir` + relevant overrides |
 | Your architecture is a variant of a preset with extra sublayers | `NewModel` starting from DDD, add layers to `Sublayers` and `Direction` |
-| Your architecture is fundamentally different (flat layout, non-standard grouping) | `NewModel` with explicit everything; patch `InternalTopLevel` after construction |
+| Your architecture is fundamentally different (flat layout, non-standard grouping) | `NewModel` with explicit everything; flat layouts auto-populate `InternalTopLevel` from `Sublayers` |
 
 The eight presets cover most Go service shapes. Start there and narrow down which fields you actually need to override before writing a full custom model.
