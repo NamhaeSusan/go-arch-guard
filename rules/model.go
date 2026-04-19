@@ -411,8 +411,18 @@ func NewModel(opts ...ModelOption) Model {
 	return m
 }
 
+// WithSublayers replaces the model's Sublayers list. Because NewModel inherits
+// PortLayers/ContractLayers from DDD defaults, WithSublayers also clears those
+// lists so custom sublayer callers do not leak DDD's port/contract names into
+// an unrelated architecture. After WithSublayers, port/contract classification
+// falls back to the built-in basename heuristic; callers can set explicit
+// lists via WithPortLayers / WithContractLayers *after* WithSublayers.
 func WithSublayers(sublayers []string) ModelOption {
-	return func(m *Model) { m.Sublayers = sublayers }
+	return func(m *Model) {
+		m.Sublayers = sublayers
+		m.PortLayers = nil
+		m.ContractLayers = nil
+	}
 }
 
 func WithDirection(direction map[string][]string) ModelOption {

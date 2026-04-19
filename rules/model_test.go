@@ -645,3 +645,63 @@ func TestNewModel_InheritedPortLayers_BasenameFallback(t *testing.T) {
 		t.Errorf("matchPortSublayer with basename fallback = %q, want %q", got, "core/ports/repo")
 	}
 }
+
+// Regression (review #3): Explicit WithPortLayers is authoritative — sublayers
+// whose basename is "repo" or "gateway" must NOT leak into port semantics when
+// the caller opted into a custom PortLayers list.
+func TestWithPortLayers_ExactMatchIsAuthoritative(t *testing.T) {
+	m := NewModel(
+		WithSublayers([]string{"worker", "store", "model", "legacy/repo"}),
+		WithDirection(map[string][]string{
+			"worker":      {"store", "model"},
+			"store":       {"model"},
+			"model":       {},
+			"legacy/repo": {"model"},
+		}),
+		WithPortLayers([]string{"store"}),
+	)
+	if !isPortSublayerFor(m, "store") {
+		t.Error("explicit PortLayers: 'store' must be a port sublayer")
+	}
+	if isPortSublayerFor(m, "legacy/repo") {
+		t.Error("explicit PortLayers is authoritative: 'legacy/repo' must NOT be a port sublayer")
+	}
+	if matchPortSublayer(m, "example.com/app/internal/legacy/repo") != "" {
+		t.Error("explicit PortLayers is authoritative: matchPortSublayer must not find 'legacy/repo'")
+	}
+}
+
+// Regression (review #3): Explicit WithContractLayers is authoritative too —
+// "svc"-basename sublayers must not leak when caller set a custom list.
+func TestWithContractLayers_ExactMatchIsAuthoritative(t *testing.T) {
+	m := NewModel(
+		WithSublayers([]string{"worker", "store", "model", "legacy/svc"}),
+		WithDirection(map[string][]string{
+			"worker":     {"store", "model"},
+			"store":      {"model"},
+			"model":      {},
+			"legacy/svc": {"model"},
+		}),
+		WithContractLayers([]string{"store"}),
+	)
+	if !isContractSublayerFor(m, "store") {
+		t.Error("explicit ContractLayers: 'store' must be a contract sublayer")
+	}
+	if isContractSublayerFor(m, "legacy/svc") {
+		t.Error("explicit ContractLayers is authoritative: 'legacy/svc' must NOT be a contract sublayer")
+	}
+}
+
+// Regression (review #3): WithSublayers alone must clear inherited DDD
+// PortLayers/ContractLayers so basename fallback applies.
+func TestWithSublayers_ClearsInheritedPortContractLayers(t *testing.T) {
+	m := NewModel(
+		WithSublayers([]string{"worker", "store", "model"}),
+	)
+	if len(m.PortLayers) != 0 {
+		t.Errorf("WithSublayers must clear inherited PortLayers, got %v", m.PortLayers)
+	}
+	if len(m.ContractLayers) != 0 {
+		t.Errorf("WithSublayers must clear inherited ContractLayers, got %v", m.ContractLayers)
+	}
+}
