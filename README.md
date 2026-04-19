@@ -687,6 +687,7 @@ violations := rules.CheckTxBoundary(pkgs, module, root,
         },
         Types:         []string{"database/sql.Tx"},
         AllowedLayers: []string{"app"}, // default when empty
+        // AllowCmdRoot:        true, // exempt <module>/cmd/... — see below
         // EnforceUnclassified: true, // opt-in strict mode — see below
     }),
 )
@@ -694,9 +695,18 @@ violations := rules.CheckTxBoundary(pkgs, module, root,
 
 Emitted rule IDs: `tx.start-outside-allowed-layer`, `tx.type-in-signature`.
 
-**Scope.** Both `internal/...` and `cmd/...` are scanned. Packages under
-`cmd/` use the synthetic layer name `"cmd"`; add it to `AllowedLayers` if
-your composition root legitimately starts transactions.
+**Scope.** Both `internal/...` and `cmd/...` are scanned. Internal packages
+use their sublayer name (matched against `AllowedLayers`); composition-root
+packages under `cmd/...` are controlled by a dedicated flag — see
+*Composition root* below.
+
+**Composition root (`cmd/`).** Packages under `<module>/cmd/...` are
+**scanned by default** and bypass `AllowedLayers` — starting a transaction
+there always produces a violation, which catches the common mistake of
+calling `BeginTx` directly from `main`. Set `AllowCmdRoot: true` to exempt
+them. `AllowCmdRoot` is a dedicated field rather than a magic layer name
+in `AllowedLayers` so a user-defined sublayer literally called `cmd`
+cannot accidentally exempt the composition root.
 
 **Generic call sites.** Calls made through explicit type parameters — e.g.
 `BeginGeneric[string](...)`, `pkg.F[T1, T2](...)`, `x.M[T](...)` — are

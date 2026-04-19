@@ -60,8 +60,10 @@ type TxBoundaryConfig struct {
 	Types []string
 	// Layers allowed to both start tx and name tx types in signatures.
 	// Uses the same notation as Model.Sublayers ("app", "core/repo", flat names).
-	// The special layer name "cmd" covers every package under <module>/cmd/...
 	// Defaults to []string{"app"} when empty.
+	//
+	// Note: packages under <module>/cmd/... are NOT controlled by this list.
+	// Use AllowCmdRoot instead — see its docs for the rationale.
 	AllowedLayers []string
 	// EnforceUnclassified controls how internal packages that do not map to any
 	// known sublayer (e.g. internal/testutil, internal/generic, codegen output)
@@ -76,6 +78,17 @@ type TxBoundaryConfig struct {
 	// Packages under <module>/cmd/... are always scanned regardless of this
 	// flag because cmd/ is a well-defined composition-root layer.
 	EnforceUnclassified bool
+	// AllowCmdRoot controls whether composition-root packages under
+	// <module>/cmd/... may start transactions or name tx types in their
+	// signatures.
+	//   false (default): cmd/ packages are scanned and forbidden calls there
+	//                    produce a violation. This catches the common mistake
+	//                    of calling BeginTx directly from main.
+	//   true:            cmd/ packages are exempt from tx-boundary checks.
+	//
+	// This is a dedicated field rather than a magic layer name in AllowedLayers
+	// so it can't collide with a user-defined sublayer literally called "cmd".
+	AllowCmdRoot bool
 }
 
 func (c Config) model() Model {
