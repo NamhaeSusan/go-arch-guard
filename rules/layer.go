@@ -31,12 +31,15 @@ func CheckLayerDirection(pkgs []*packages.Package, projectModule string, project
 			continue
 		}
 
-		srcDomain := identifyDomainWith(m, pkg.PkgPath, internalPrefix)
-		if srcDomain == "" {
+		src := classifyInternalPackage(m, pkg.PkgPath, internalPrefix)
+		// The layer rule only reasons about domain-shaped sources. Domain
+		// root / orchestration / shared / unclassified are not subject to
+		// direction checks here; they are handled by isolation or skipped.
+		if src.Kind != kindDomain {
 			continue
 		}
-
-		srcSublayer := identifySublayerWith(m, pkg.PkgPath, internalPrefix, srcDomain)
+		srcDomain := src.Domain
+		srcSublayer := src.Sublayer
 		if srcSublayer != "" && !isKnownSublayerIn(m, srcSublayer) {
 			violations = append(violations, Violation{
 				File:     relativePackageFile(pkg),
@@ -53,7 +56,10 @@ func CheckLayerDirection(pkgs []*packages.Package, projectModule string, project
 				continue
 			}
 
-			if isPkgPkgWith(m, impPath, internalPrefix) {
+			imp := classifyInternalPackage(m, impPath, internalPrefix)
+
+			switch imp.Kind {
+			case kindShared:
 				if m.PkgRestricted[srcSublayer] {
 					file, line := findImportPosition(pkg, impPath, projectRoot)
 					violations = append(violations, Violation{
@@ -66,26 +72,19 @@ func CheckLayerDirection(pkgs []*packages.Package, projectModule string, project
 					})
 				}
 				continue
-			}
-
-			// Skip imports to orchestration/
-			if isOrchestrationPkgWith(m, impPath, internalPrefix) {
+			case kindOrchestration, kindUnclassified:
+				// Orchestration imports are governed by isolation rules.
+				// Unclassified imports have no direction to enforce.
 				continue
 			}
 
-			impDomain := identifyDomainWith(m, impPath, internalPrefix)
-			// Only check intra-domain imports
-			if impDomain != srcDomain {
+			// From here: imp.Kind is kindDomain or kindDomainRoot.
+			// Only check intra-domain imports.
+			if imp.Domain != srcDomain {
 				continue
 			}
 
-			impSublayer := identifySublayerWith(m, impPath, internalPrefix, impDomain)
-
-			// Domain root (alias.go) is a facade — it may import any sublayer
-			// within its own domain. Cross-domain isolation is enforced elsewhere.
-			if srcSublayer == "" {
-				continue
-			}
+			impSublayer := imp.Sublayer
 
 			if impSublayer != "" && !isKnownSublayerIn(m, impSublayer) {
 				file, line := findImportPosition(pkg, impPath, projectRoot)
@@ -192,17 +191,24 @@ func checkFlatLayerDirection(pkgs []*packages.Package, m Model, cfg Config, proj
 			continue
 		}
 
-		srcSublayer := identifyFlatSublayer(m, pkg.PkgPath, internalPrefix)
-		if srcSublayer == "" {
+		src := classifyInternalPackage(m, pkg.PkgPath, internalPrefix)
+		// Flat layout: layer rule applies to packages classified as a known
+		// sublayer (kindDomain in flat mode). Shared and unclassified are
+		// skipped intentionally.
+		if src.Kind != kindDomain {
 			continue
 		}
+		srcSublayer := src.Sublayer
 
 		for impPath := range pkg.Imports {
 			if !strings.HasPrefix(impPath, internalPrefix) {
 				continue
 			}
 
-			if isPkgPkgWith(m, impPath, internalPrefix) {
+			imp := classifyInternalPackage(m, impPath, internalPrefix)
+
+			switch imp.Kind {
+			case kindShared:
 				if m.PkgRestricted[srcSublayer] {
 					file, line := findImportPosition(pkg, impPath, projectRoot)
 					violations = append(violations, Violation{
@@ -215,9 +221,12 @@ func checkFlatLayerDirection(pkgs []*packages.Package, m Model, cfg Config, proj
 					})
 				}
 				continue
+			case kindOrchestration, kindUnclassified:
+				// No direction to enforce for these kinds in flat layout.
+				continue
 			}
 
-			impSublayer := identifyFlatSublayer(m, impPath, internalPrefix)
+			impSublayer := imp.Sublayer
 			if impSublayer == "" || srcSublayer == impSublayer {
 				continue
 			}
@@ -242,18 +251,6 @@ func checkFlatLayerDirection(pkgs []*packages.Package, m Model, cfg Config, proj
 		}
 	}
 	return violations
-}
-
-func identifyFlatSublayer(m Model, pkgPath, internalPrefix string) string {
-	rel := strings.TrimPrefix(pkgPath, internalPrefix)
-	parts := strings.SplitN(rel, "/", 2)
-	if parts[0] == "" {
-		return ""
-	}
-	if slices.Contains(m.Sublayers, parts[0]) {
-		return parts[0]
-	}
-	return ""
 }
 
 func relativePackageFile(pkg *packages.Package) string {

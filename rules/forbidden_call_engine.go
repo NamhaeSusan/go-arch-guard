@@ -119,24 +119,14 @@ func checkForbiddenCallsByLayer(
 // using domain or flat identification depending on the model.
 // Returns "" if the package is not under any known layer.
 func layerOfPackage(m Model, pkgPath, internalPrefix string) string {
-	if !strings.HasPrefix(pkgPath, internalPrefix) {
+	c := classifyInternalPackage(m, pkgPath, internalPrefix)
+	if c.Kind != kindDomain {
 		return ""
 	}
-	if m.DomainDir != "" {
-		domain := identifyDomainWith(m, pkgPath, internalPrefix)
-		if domain == "" {
-			return ""
-		}
-		sub := identifySublayerWith(m, pkgPath, internalPrefix, domain)
-		if sub == "" {
-			return ""
-		}
-		if !slices.Contains(m.Sublayers, sub) {
-			return ""
-		}
-		return sub
+	if !slices.Contains(m.Sublayers, c.Sublayer) {
+		return ""
 	}
-	return identifyFlatSublayer(m, pkgPath, internalPrefix)
+	return c.Sublayer
 }
 
 // resolveCalleeID returns the fully-qualified identifier of a CallExpr's

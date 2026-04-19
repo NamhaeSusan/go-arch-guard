@@ -257,13 +257,56 @@ func snakeToPascal(s string) string {
 	return b.String()
 }
 
-var bannedLayerSuffixes = []string{
-	"_svc", "_service", "_repo", "_repository",
-	"_handler", "_controller", "_model", "_entity",
-	"_store", "_persistence",
+// layerSuffixes returns the banned filename suffixes for the given model.
+// It unions two sources:
+//  1. m.Sublayers — split nested sublayers like "core/repo" into components
+//     ("core", "repo") so custom models (NewModel(WithSublayers([...])))
+//     automatically ban their own layer names as suffixes.
+//  2. m.LayerDirNames — explicit overrides / extra names teams want banned
+//     (e.g. legacy "_controller", "_persistence" in DDD).
+func layerSuffixes(m Model) []string {
+	seen := make(map[string]bool)
+	var out []string
+	add := func(dir string) {
+		if dir == "" {
+			return
+		}
+		suffix := "_" + dir
+		if !seen[suffix] {
+			seen[suffix] = true
+			out = append(out, suffix)
+		}
+	}
+	for _, sl := range m.Sublayers {
+		for _, part := range strings.Split(sl, "/") {
+			add(part)
+		}
+	}
+	for dir := range m.LayerDirNames {
+		add(dir)
+	}
+	return out
+}
+
+// layerDirEligible reports whether a directory is a layer directory whose
+// files should be subject to the no-layer-suffix check. Derived from the
+// union of m.Sublayers components and m.LayerDirNames.
+func layerDirEligible(m Model, dir string) bool {
+	if m.LayerDirNames[dir] {
+		return true
+	}
+	for _, sl := range m.Sublayers {
+		for _, part := range strings.Split(sl, "/") {
+			if part == dir {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func checkNoLayerSuffixWith(m Model, pkg *packages.Package, cfg Config) []Violation {
+	banned := layerSuffixes(m)
 	var violations []Violation
 	seen := make(map[string]bool)
 	for _, f := range pkg.GoFiles {
@@ -280,7 +323,7 @@ func checkNoLayerSuffixWith(m Model, pkg *packages.Package, cfg Config) []Violat
 			continue
 		}
 		dir := filepath.Base(filepath.Dir(f))
-		if !m.LayerDirNames[dir] {
+		if !layerDirEligible(m, dir) {
 			continue
 		}
 		// Skip files matching a TypePattern prefix (e.g. worker_xxx.go in worker/)
@@ -288,7 +331,7 @@ func checkNoLayerSuffixWith(m Model, pkg *packages.Package, cfg Config) []Violat
 			continue
 		}
 		name := strings.TrimSuffix(base, ".go")
-		for _, suffix := range bannedLayerSuffixes {
+		for _, suffix := range banned {
 			if trimmed, ok := strings.CutSuffix(name, suffix); ok {
 				suggested := trimmed + ".go"
 				violations = append(violations, Violation{
