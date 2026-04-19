@@ -202,6 +202,10 @@ All model options:
 | `WithLegacyPkgNames([]string{...})` | package names that trigger migration warnings |
 | `WithLayerDirNames(map[string]bool{...})` | directory names considered "layer-like" for naming checks |
 | `WithInterfacePatternExclude(map[string]bool{...})` | layers to skip for interface pattern checks |
+| `WithPortLayers([]string{...})` | sublayers classified as port layers (pure interface definitions). Authoritative when non-empty (exact match only). |
+| `WithContractLayers([]string{...})` | sublayers classified as contract layers (ports + svc-like). `ContractLayers ⊇ PortLayers`; helpers union the two lists at check time. |
+
+`NewModel` starts from `DDD()` defaults, so custom models inherit `PortLayers=["core/repo"]` and `ContractLayers=["core/repo","core/svc"]` unless overridden. To restore the basename fallback (`repo`/`gateway`/`svc`), clear BOTH lists explicitly: `WithPortLayers(nil), WithContractLayers(nil)`. Clearing only one keeps the authoritative exact-match path active (see the `NewModel` godoc).
 
 ## Isolation Rules
 

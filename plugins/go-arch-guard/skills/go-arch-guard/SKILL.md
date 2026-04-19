@@ -246,7 +246,9 @@ m := rules.NewModel(
 )
 ```
 
-전체 옵션: `WithSublayers`, `WithDirection`, `WithPkgRestricted`, `WithDomainDir`, `WithOrchestrationDir`, `WithSharedDir`, `WithRequireAlias`, `WithAliasFileName`, `WithRequireModel`, `WithModelPath`, `WithDTOAllowedLayers`, `WithBannedPkgNames`, `WithLegacyPkgNames`, `WithLayerDirNames`, `WithInterfacePatternExclude`
+전체 옵션: `WithSublayers`, `WithDirection`, `WithPkgRestricted`, `WithDomainDir`, `WithOrchestrationDir`, `WithSharedDir`, `WithRequireAlias`, `WithAliasFileName`, `WithRequireModel`, `WithModelPath`, `WithDTOAllowedLayers`, `WithBannedPkgNames`, `WithLegacyPkgNames`, `WithLayerDirNames`, `WithInterfacePatternExclude`, `WithPortLayers`, `WithContractLayers`
+
+> **Port/Contract 레이어 상속:** `NewModel`은 `DDD()` 기본값에서 시작하므로 커스텀 모델은 `PortLayers=["core/repo"]`, `ContractLayers=["core/repo","core/svc"]`를 상속합니다. 한쪽이라도 비어있지 않으면 helper는 두 목록을 union하여 authoritative(정확히 일치) 판정합니다. basename fallback(`repo`/`gateway`/`svc`)을 복원하려면 **두 목록 모두** 명시적으로 `nil`로 설정해야 합니다: `rules.WithPortLayers(nil), rules.WithContractLayers(nil)`.
 
 ---
 

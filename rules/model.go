@@ -20,6 +20,19 @@ type Model struct {
 	LayerDirNames           map[string]bool
 	TypePatterns            []TypePattern
 	InterfacePatternExclude map[string]bool // layers to skip for interface pattern checks
+	// PortLayers lists sublayer names that are port layers (pure interface
+	// definitions like repo, gateway, store). When non-empty, helpers treat
+	// this list as authoritative (exact match only, no basename leakage).
+	// When empty, basename fallback ("repo"/"gateway") runs only if
+	// ContractLayers is also empty — see ContractLayers for details.
+	PortLayers []string
+	// ContractLayers lists sublayer names that are contract layers
+	// (port layers + svc-like layers). ContractLayers ⊇ PortLayers
+	// semantically; helpers union the two lists at check time so callers do
+	// not need to repeat port names here. When EITHER list is non-empty the
+	// union is authoritative (exact match only). Basename fallback
+	// ("repo"/"gateway"/"svc") runs only when BOTH lists are empty.
+	ContractLayers []string
 }
 
 // TypePattern defines an AST-based naming/structure convention for a directory.
@@ -83,6 +96,8 @@ func DDD() Model {
 		InterfacePatternExclude: map[string]bool{
 			"handler": true, "app": true, "core/model": true, "core/repo": true, "event": true,
 		},
+		PortLayers:     []string{"core/repo"},
+		ContractLayers: []string{"core/repo", "core/svc"},
 	}
 }
 
@@ -124,6 +139,8 @@ func CleanArch() Model {
 		InterfacePatternExclude: map[string]bool{
 			"handler": true, "entity": true,
 		},
+		PortLayers:     []string{"gateway"},
+		ContractLayers: []string{"gateway"},
 	}
 }
 
@@ -372,7 +389,17 @@ func EventPipeline() Model {
 	}
 }
 
-// NewModel creates a Model starting from DDD defaults, then applies options.
+// NewModel starts from DDD() defaults and applies options in order.
+// Options that don't touch PortLayers/ContractLayers inherit DDD's values
+// (currently ["core/repo"] / ["core/repo", "core/svc"]).
+//
+// To restore the basename fallback ("repo"/"gateway"/"svc") for port/contract
+// detection, callers must clear BOTH lists:
+//
+//	NewModel(WithPortLayers(nil), WithContractLayers(nil), ...)
+//
+// Clearing only one keeps the authoritative exact-match path active (the
+// helpers union PortLayers and ContractLayers when either is non-empty).
 func NewModel(opts ...ModelOption) Model {
 	m := DDD()
 	for _, o := range opts {
@@ -380,8 +407,17 @@ func NewModel(opts ...ModelOption) Model {
 	}
 	tl := make(map[string]bool)
 	if m.DomainDir != "" {
+		// Domain layout: top-level is domain/, orchestration/, shared/.
 		tl[m.DomainDir] = true
+	} else {
+		// Flat layout: each sublayer lives directly under internal/.
+		for _, sl := range m.Sublayers {
+			tl[sl] = true
+		}
 	}
+	// OrchestrationDir is independent of layout: non-empty values always
+	// stay in InternalTopLevel so flat layouts can opt into an orchestration
+	// directory (e.g. internal/workflow/).
 	if m.OrchestrationDir != "" {
 		tl[m.OrchestrationDir] = true
 	}
@@ -392,6 +428,9 @@ func NewModel(opts ...ModelOption) Model {
 	return m
 }
 
+// WithSublayers replaces the model's Sublayers list. PortLayers/ContractLayers
+// are NOT cleared: callers who need a clean slate should pass WithPortLayers(nil)
+// and/or WithContractLayers(nil) explicitly (see NewModel godoc).
 func WithSublayers(sublayers []string) ModelOption {
 	return func(m *Model) { m.Sublayers = sublayers }
 }
@@ -450,4 +489,12 @@ func WithLayerDirNames(names map[string]bool) ModelOption {
 
 func WithInterfacePatternExclude(exclude map[string]bool) ModelOption {
 	return func(m *Model) { m.InterfacePatternExclude = exclude }
+}
+
+func WithPortLayers(layers []string) ModelOption {
+	return func(m *Model) { m.PortLayers = layers }
+}
+
+func WithContractLayers(layers []string) ModelOption {
+	return func(m *Model) { m.ContractLayers = layers }
 }
