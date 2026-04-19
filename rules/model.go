@@ -23,13 +23,15 @@ type Model struct {
 	// PortLayers lists sublayer names that are port layers (pure interface
 	// definitions like repo, gateway, store). When non-empty, helpers treat
 	// this list as authoritative (exact match only, no basename leakage).
+	// When empty, basename fallback ("repo"/"gateway") runs only if
+	// ContractLayers is also empty — see ContractLayers for details.
 	PortLayers []string
 	// ContractLayers lists sublayer names that are contract layers
-	// (port layers + svc-like layers). Semantically ContractLayers ⊇ PortLayers:
-	// every port is a contract. Helpers union PortLayers and ContractLayers
-	// when classifying contract membership, so callers do not need to repeat
-	// the port names here. When both lists are empty, the basename fallback
-	// ("repo"/"gateway"/"svc") is used.
+	// (port layers + svc-like layers). ContractLayers ⊇ PortLayers
+	// semantically; helpers union the two lists at check time so callers do
+	// not need to repeat port names here. When EITHER list is non-empty the
+	// union is authoritative (exact match only). Basename fallback
+	// ("repo"/"gateway"/"svc") runs only when BOTH lists are empty.
 	ContractLayers []string
 }
 
@@ -389,9 +391,15 @@ func EventPipeline() Model {
 
 // NewModel starts from DDD() defaults and applies options in order.
 // Options that don't touch PortLayers/ContractLayers inherit DDD's values
-// (currently ["core/repo"] / ["core/repo", "core/svc"]). Call WithPortLayers(nil)
-// or WithContractLayers(nil) to clear inherited port/contract semantics
-// explicitly — the helpers then fall back to the basename heuristic.
+// (currently ["core/repo"] / ["core/repo", "core/svc"]).
+//
+// To restore the basename fallback ("repo"/"gateway"/"svc") for port/contract
+// detection, callers must clear BOTH lists:
+//
+//	NewModel(WithPortLayers(nil), WithContractLayers(nil), ...)
+//
+// Clearing only one keeps the authoritative exact-match path active (the
+// helpers union PortLayers and ContractLayers when either is non-empty).
 func NewModel(opts ...ModelOption) Model {
 	m := DDD()
 	for _, o := range opts {

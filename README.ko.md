@@ -189,6 +189,10 @@ m := rules.NewModel(
 | `WithLegacyPkgNames([]string{...})` | 마이그레이션 경고 패키지명 |
 | `WithLayerDirNames(map[string]bool{...})` | 네이밍 체크 시 "레이어" 디렉토리 이름 |
 | `WithInterfacePatternExclude(map[string]bool{...})` | 인터페이스 패턴 검사 제외 레이어 |
+| `WithPortLayers([]string{...})` | 포트 레이어(순수 인터페이스 정의)로 분류할 서브레이어. 비어있지 않으면 authoritative (정확히 일치해야 함). |
+| `WithContractLayers([]string{...})` | 계약 레이어(포트 + svc류)로 분류할 서브레이어. `ContractLayers ⊇ PortLayers`; 헬퍼는 두 목록을 union하여 판정한다. |
+
+`NewModel`은 `DDD()` 기본값에서 시작하므로, 커스텀 모델은 별도 지정이 없으면 `PortLayers=["core/repo"]`, `ContractLayers=["core/repo","core/svc"]`를 상속한다. basename fallback(`repo`/`gateway`/`svc`)을 다시 쓰려면 **두 목록을 모두** 명시적으로 비워야 한다: `WithPortLayers(nil), WithContractLayers(nil)`. 한쪽만 비우면 authoritative exact-match 경로가 유지된다 (자세한 내용은 `NewModel` godoc 참조).
 
 ## 격리 규칙
 

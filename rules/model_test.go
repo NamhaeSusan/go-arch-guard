@@ -736,3 +736,28 @@ func TestIsContractSublayerFor_UnionsPortLayers(t *testing.T) {
 		t.Error("'model' (in neither list) must not be a contract sublayer")
 	}
 }
+
+// Regression (review #5): clearing only one of PortLayers/ContractLayers
+// keeps the union exact-match path active — basename fallback must NOT run.
+// Matches NewModel godoc: "To restore the basename fallback, clear BOTH lists."
+func TestIsContractSublayerFor_PartialClear_NoBasenameFallback(t *testing.T) {
+	// PortLayers cleared, ContractLayers still populated → union path.
+	m1 := Model{
+		Sublayers:      []string{"legacy/repo", "svc", "model"},
+		PortLayers:     nil,
+		ContractLayers: []string{"svc"},
+	}
+	if isContractSublayerFor(m1, "legacy/repo") {
+		t.Error("partial-clear (PortLayers=nil, ContractLayers set): 'legacy/repo' must NOT fall back to basename")
+	}
+
+	// ContractLayers cleared, PortLayers still populated → union path.
+	m2 := Model{
+		Sublayers:      []string{"legacy/svc", "store", "model"},
+		PortLayers:     []string{"store"},
+		ContractLayers: nil,
+	}
+	if isContractSublayerFor(m2, "legacy/svc") {
+		t.Error("partial-clear (ContractLayers=nil, PortLayers set): 'legacy/svc' must NOT fall back to basename")
+	}
+}
