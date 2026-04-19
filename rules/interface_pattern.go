@@ -3,6 +3,7 @@ package rules
 import (
 	"fmt"
 	"go/ast"
+	"go/types"
 	"sort"
 	"strings"
 
@@ -23,13 +24,16 @@ func CheckInterfacePattern(pkgs []*packages.Package, opts ...Option) []Violation
 			continue
 		}
 
+		// checkExportedImpl is scope-driven (covers alias chains) and is
+		// independent of AST-collected interfaces.
+		violations = append(violations, checkExportedImpl(pkg, cfg)...)
+
 		ifaces := collectExportedInterfacesFromPkg(pkg)
 		if len(ifaces) == 0 {
 			continue
 		}
 
 		violations = append(violations, checkSingleInterfacePerPackage(pkg, ifaces, cfg)...)
-		violations = append(violations, checkExportedImpl(pkg, ifaces, cfg)...)
 		violations = append(violations, checkConstructorName(pkg, cfg)...)
 		violations = append(violations, checkConstructorReturnsInterface(pkg, ifaces, cfg)...)
 	}
@@ -82,20 +86,6 @@ func isExcludedInterfacePatternPkg(m Model, pkg *packages.Package) bool {
 	return false
 }
 
-// interfaceMethodNames extracts method names from an interface type.
-func interfaceMethodNames(iface *ast.InterfaceType) map[string]bool {
-	methods := make(map[string]bool)
-	if iface.Methods == nil {
-		return methods
-	}
-	for _, m := range iface.Methods.List {
-		for _, name := range m.Names {
-			methods[name.Name] = true
-		}
-	}
-	return methods
-}
-
 // checkSingleInterfacePerPackage warns when a package declares more than one
 // exported interface.
 func checkSingleInterfacePerPackage(pkg *packages.Package, ifaces map[string]*ast.InterfaceType, cfg Config) []Violation {
@@ -116,27 +106,54 @@ func checkSingleInterfacePerPackage(pkg *packages.Package, ifaces map[string]*as
 	}}
 }
 
-// checkExportedImpl detects exported structs that implement an exported interface
-// in the same package — the impl should be unexported.
-func checkExportedImpl(pkg *packages.Package, ifaces map[string]*ast.InterfaceType, cfg Config) []Violation {
-	methods := collectMethods(pkg)
+// checkExportedImpl detects exported struct types that implement exported
+// interfaces. Uses go/types.Implements; silently skips pairs where either
+// type object cannot be recovered (e.g. IllTyped packages with missing
+// type info). This is intentional — name-only comparison was the bug we
+// were fixing in #17, and running an architecture rule on broken code
+// produces low-signal noise regardless.
+//
+// The set of interfaces considered is scope-driven: any exported name in
+// pkg.Types.Scope() whose unaliased underlying type is *types.Interface.
+// This covers direct definitions, direct aliases, and alias chains.
+func checkExportedImpl(pkg *packages.Package, cfg Config) []Violation {
+	if pkg.Types == nil {
+		return nil
+	}
 	structs := collectExportedStructs(pkg)
+	if len(structs) == 0 {
+		return nil
+	}
+	scope := pkg.Types.Scope()
+
+	// Collect exported interfaces from scope (covers alias chains too).
+	typedIfaces := make(map[string]*types.Interface)
+	for _, name := range scope.Names() {
+		if !ast.IsExported(name) {
+			continue
+		}
+		if iface := lookupInterface(scope, name); iface != nil && iface.NumMethods() > 0 {
+			typedIfaces[name] = iface
+		}
+	}
+	if len(typedIfaces) == 0 {
+		return nil
+	}
 
 	var violations []Violation
 	for structName := range structs {
-		for ifaceName, iface := range ifaces {
-			ifaceMethods := interfaceMethodNames(iface)
-			if len(ifaceMethods) == 0 {
-				continue
-			}
-			allMatch := true
-			for mName := range ifaceMethods {
-				if !methods[structName+"."+mName] {
-					allMatch = false
-					break
-				}
-			}
-			if allMatch {
+		obj := scope.Lookup(structName)
+		if obj == nil {
+			continue
+		}
+		named, ok := types.Unalias(obj.Type()).(*types.Named)
+		if !ok {
+			continue
+		}
+		ptrType := types.NewPointer(named)
+
+		for ifaceName, iface := range typedIfaces {
+			if types.Implements(named, iface) || types.Implements(ptrType, iface) {
 				violations = append(violations, Violation{
 					File:     relativePackageFile(pkg),
 					Rule:     "interface.exported-impl",
@@ -148,6 +165,21 @@ func checkExportedImpl(pkg *packages.Package, ifaces map[string]*ast.InterfaceTy
 		}
 	}
 	return violations
+}
+
+// lookupInterface resolves name in scope to a *types.Interface, unwrapping
+// type aliases (including alias chains). Returns nil when name is not an
+// interface type.
+func lookupInterface(scope *types.Scope, name string) *types.Interface {
+	obj := scope.Lookup(name)
+	if obj == nil {
+		return nil
+	}
+	t := types.Unalias(obj.Type())
+	if iface, ok := t.Underlying().(*types.Interface); ok {
+		return iface
+	}
+	return nil
 }
 
 // collectExportedStructs returns names of all exported struct types in a package.
