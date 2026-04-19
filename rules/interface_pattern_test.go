@@ -412,8 +412,9 @@ func (s *StoreImpl) Get(id string) string { return "" }
 // TestCheckInterfacePattern_ExportedImpl_IllTypedSignatureMismatch verifies
 // that when a package is IllTyped due to an UNRELATED error but both the
 // interface and struct type objects resolve cleanly, the rule trusts
-// types.Implements and does NOT fall back to name-only. A struct with a
-// matching method name but different signature must not be flagged.
+// types.Implements. A struct with a matching method name but different
+// signature must not be flagged — this is the exact false-positive #17
+// was filed against.
 func TestCheckInterfacePattern_ExportedImpl_IllTypedSignatureMismatch(t *testing.T) {
 	root := t.TempDir()
 	module := "example.com/ip-illtyped-sig-mismatch"

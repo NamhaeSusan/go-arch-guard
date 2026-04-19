@@ -24,14 +24,11 @@ func CheckInterfacePattern(pkgs []*packages.Package, opts ...Option) []Violation
 			continue
 		}
 
-		ifaces := collectExportedInterfacesFromPkg(pkg)
+		// checkExportedImpl is scope-driven (covers alias chains) and is
+		// independent of AST-collected interfaces.
+		violations = append(violations, checkExportedImpl(pkg, cfg)...)
 
-		// checkExportedImpl also needs to see alias chains (AST-invisible),
-		// so let it examine the package even when the AST collector returned
-		// nothing — it performs its own types-based augmentation. Other
-		// checks only operate on AST-collected interfaces and can be skipped
-		// when there are none.
-		violations = append(violations, checkExportedImpl(pkg, ifaces, cfg)...)
+		ifaces := collectExportedInterfacesFromPkg(pkg)
 		if len(ifaces) == 0 {
 			continue
 		}
@@ -109,96 +106,54 @@ func checkSingleInterfacePerPackage(pkg *packages.Package, ifaces map[string]*as
 	}}
 }
 
-// checkExportedImpl detects exported structs that implement an exported interface
-// in the same package — the impl should be unexported.
+// checkExportedImpl detects exported struct types that implement exported
+// interfaces. Uses go/types.Implements; silently skips pairs where either
+// type object cannot be recovered (e.g. IllTyped packages with missing
+// type info). This is intentional — name-only comparison was the bug we
+// were fixing in #17, and running an architecture rule on broken code
+// produces low-signal noise regardless.
 //
-// For fully-typed packages it uses go/types.Implements so signatures are
-// compared properly. The set of interfaces to check is the union of two
-// sources:
-//   - AST-collected direct interfaces (e.g. `type Store interface{...}` and
-//     `type Store = interface{...}`), and
-//   - types-resolved aliases whose resolved underlying type is `*types.Interface`
-//     (e.g. alias chains like `type Base = interface{...}; type Store = Base`).
-//
-// A fallback to AST name-only matching is used only when the type objects for
-// a given (struct, iface) pair cannot be recovered from scope. The fallback
-// preserves the previous behavior's false-positive surface for that narrow
-// case, but is strictly better than silently dropping diagnostics. A package
-// being IllTyped elsewhere does NOT gate the fallback — if both type objects
-// resolve cleanly, types.Implements is trusted.
-func checkExportedImpl(pkg *packages.Package, ifaces map[string]*ast.InterfaceType, cfg Config) []Violation {
+// The set of interfaces considered is scope-driven: any exported name in
+// pkg.Types.Scope() whose unaliased underlying type is *types.Interface.
+// This covers direct definitions, direct aliases, and alias chains.
+func checkExportedImpl(pkg *packages.Package, cfg Config) []Violation {
+	if pkg.Types == nil {
+		return nil
+	}
 	structs := collectExportedStructs(pkg)
 	if len(structs) == 0 {
 		return nil
 	}
+	scope := pkg.Types.Scope()
 
-	var scope *types.Scope
-	if pkg.Types != nil {
-		scope = pkg.Types.Scope()
-	}
-
-	// Resolve each AST-collected interface to a *types.Interface when possible.
-	typedIfaces := make(map[string]*types.Interface, len(ifaces))
-	if scope != nil {
-		for name := range ifaces {
-			if iface := lookupInterface(scope, name); iface != nil && iface.NumMethods() > 0 {
-				typedIfaces[name] = iface
-			}
+	// Collect exported interfaces from scope (covers alias chains too).
+	typedIfaces := make(map[string]*types.Interface)
+	for _, name := range scope.Names() {
+		if !ast.IsExported(name) {
+			continue
+		}
+		if iface := lookupInterface(scope, name); iface != nil && iface.NumMethods() > 0 {
+			typedIfaces[name] = iface
 		}
 	}
-
-	// Augment with exported alias chains whose resolved underlying is an
-	// interface but whose AST RHS is not an *ast.InterfaceType (so the
-	// AST-only collector missed them).
-	allIfaces := make(map[string]*ast.InterfaceType, len(ifaces))
-	for k, v := range ifaces {
-		allIfaces[k] = v
-	}
-	if scope != nil {
-		for _, name := range scope.Names() {
-			if _, seen := allIfaces[name]; seen {
-				continue
-			}
-			if !ast.IsExported(name) {
-				continue
-			}
-			if iface := lookupInterface(scope, name); iface != nil && iface.NumMethods() > 0 {
-				allIfaces[name] = nil // no AST body available; typed path only
-				typedIfaces[name] = iface
-			}
-		}
-	}
-
-	if len(allIfaces) == 0 {
+	if len(typedIfaces) == 0 {
 		return nil
 	}
 
 	var violations []Violation
 	for structName := range structs {
-		var named *types.Named
-		if scope != nil {
-			if obj := scope.Lookup(structName); obj != nil {
-				named, _ = types.Unalias(obj.Type()).(*types.Named)
-			}
+		obj := scope.Lookup(structName)
+		if obj == nil {
+			continue
 		}
+		named, ok := types.Unalias(obj.Type()).(*types.Named)
+		if !ok {
+			continue
+		}
+		ptrType := types.NewPointer(named)
 
-		for ifaceName, astIface := range allIfaces {
-			iface, ifaceOK := typedIfaces[ifaceName]
-			typedPathAvailable := named != nil && ifaceOK
-
-			matched := false
-			if typedPathAvailable {
-				// Fully-typed path: signature-aware. Trust the result even if
-				// the package is IllTyped elsewhere.
-				ptrType := types.NewPointer(named)
-				matched = types.Implements(named, iface) || types.Implements(ptrType, iface)
-			} else {
-				// Fall back to AST name-only matching when either the struct
-				// or the interface cannot be recovered as a typed object.
-				// Requires an AST body to compare against.
-				matched = structMatchesInterfaceByName(pkg, structName, astIface)
-			}
-			if matched {
+		for ifaceName, iface := range typedIfaces {
+			if types.Implements(named, iface) || types.Implements(ptrType, iface) {
 				violations = append(violations, Violation{
 					File:     relativePackageFile(pkg),
 					Rule:     "interface.exported-impl",
@@ -225,26 +180,6 @@ func lookupInterface(scope *types.Scope, name string) *types.Interface {
 		return iface
 	}
 	return nil
-}
-
-// structMatchesInterfaceByName returns true when every method name declared on
-// the interface has a corresponding method declared on structName in pkg's AST.
-// Signatures are not compared — used only as an ill-typed fallback.
-func structMatchesInterfaceByName(pkg *packages.Package, structName string, iface *ast.InterfaceType) bool {
-	if iface == nil || iface.Methods == nil || len(iface.Methods.List) == 0 {
-		return false
-	}
-	methods := collectMethods(pkg)
-	seen := false
-	for _, m := range iface.Methods.List {
-		for _, name := range m.Names {
-			seen = true
-			if !methods[structName+"."+name.Name] {
-				return false
-			}
-		}
-	}
-	return seen
 }
 
 // collectExportedStructs returns names of all exported struct types in a package.
