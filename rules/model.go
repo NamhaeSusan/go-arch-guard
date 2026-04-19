@@ -20,11 +20,16 @@ type Model struct {
 	LayerDirNames           map[string]bool
 	TypePatterns            []TypePattern
 	InterfacePatternExclude map[string]bool // layers to skip for interface pattern checks
-	// PortLayers lists sublayer names that are port/contract layers (e.g. repo, gateway, store).
-	// When non-empty, helpers use this list instead of the hardcoded defaults.
+	// PortLayers lists sublayer names that are port layers (pure interface
+	// definitions like repo, gateway, store). When non-empty, helpers treat
+	// this list as authoritative (exact match only, no basename leakage).
 	PortLayers []string
-	// ContractLayers lists sublayer names that are contract layers (port layers + svc-like layers).
-	// When non-empty, helpers use this list instead of the hardcoded defaults.
+	// ContractLayers lists sublayer names that are contract layers
+	// (port layers + svc-like layers). Semantically ContractLayers ⊇ PortLayers:
+	// every port is a contract. Helpers union PortLayers and ContractLayers
+	// when classifying contract membership, so callers do not need to repeat
+	// the port names here. When both lists are empty, the basename fallback
+	// ("repo"/"gateway"/"svc") is used.
 	ContractLayers []string
 }
 
@@ -382,7 +387,11 @@ func EventPipeline() Model {
 	}
 }
 
-// NewModel creates a Model starting from DDD defaults, then applies options.
+// NewModel starts from DDD() defaults and applies options in order.
+// Options that don't touch PortLayers/ContractLayers inherit DDD's values
+// (currently ["core/repo"] / ["core/repo", "core/svc"]). Call WithPortLayers(nil)
+// or WithContractLayers(nil) to clear inherited port/contract semantics
+// explicitly — the helpers then fall back to the basename heuristic.
 func NewModel(opts ...ModelOption) Model {
 	m := DDD()
 	for _, o := range opts {
@@ -411,18 +420,11 @@ func NewModel(opts ...ModelOption) Model {
 	return m
 }
 
-// WithSublayers replaces the model's Sublayers list. Because NewModel inherits
-// PortLayers/ContractLayers from DDD defaults, WithSublayers also clears those
-// lists so custom sublayer callers do not leak DDD's port/contract names into
-// an unrelated architecture. After WithSublayers, port/contract classification
-// falls back to the built-in basename heuristic; callers can set explicit
-// lists via WithPortLayers / WithContractLayers *after* WithSublayers.
+// WithSublayers replaces the model's Sublayers list. PortLayers/ContractLayers
+// are NOT cleared: callers who need a clean slate should pass WithPortLayers(nil)
+// and/or WithContractLayers(nil) explicitly (see NewModel godoc).
 func WithSublayers(sublayers []string) ModelOption {
-	return func(m *Model) {
-		m.Sublayers = sublayers
-		m.PortLayers = nil
-		m.ContractLayers = nil
-	}
+	return func(m *Model) { m.Sublayers = sublayers }
 }
 
 func WithDirection(direction map[string][]string) ModelOption {

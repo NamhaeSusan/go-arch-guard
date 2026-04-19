@@ -9,8 +9,7 @@ import (
 // When m.PortLayers is non-empty it is authoritative (exact match only, no
 // basename leakage) so callers that set WithPortLayers get exactly what they
 // asked for. When it is empty, fall back to the hardcoded basename heuristic
-// ("repo", "gateway"). WithSublayers clears inherited PortLayers so custom
-// sublayer callers start from empty unless they explicitly set WithPortLayers.
+// ("repo", "gateway").
 func isPortSublayerFor(m Model, name string) bool {
 	if len(m.PortLayers) > 0 {
 		return slices.Contains(m.PortLayers, name)
@@ -23,12 +22,14 @@ func isPortSublayerFor(m Model, name string) bool {
 }
 
 // isContractSublayerFor reports whether name is a contract layer according to
-// the model. When m.ContractLayers is non-empty it is authoritative. Otherwise
-// we defer to isPortSublayerFor then fall back to the hardcoded "svc" basename
-// heuristic for backward compatibility.
+// the model. Contract ⊇ Port, so when either PortLayers or ContractLayers is
+// non-empty the helper unions the two lists (authoritative, no basename leak).
+// When both are empty, fall back to the hardcoded basename heuristic
+// (port names plus "svc").
 func isContractSublayerFor(m Model, name string) bool {
-	if len(m.ContractLayers) > 0 {
-		return slices.Contains(m.ContractLayers, name)
+	if len(m.ContractLayers) > 0 || len(m.PortLayers) > 0 {
+		return slices.Contains(m.ContractLayers, name) ||
+			slices.Contains(m.PortLayers, name)
 	}
 	if isPortSublayerFor(m, name) {
 		return true

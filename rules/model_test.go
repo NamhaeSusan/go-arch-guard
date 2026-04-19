@@ -617,11 +617,10 @@ func TestNewModel_FlatLayout_PreservesOrchestrationDir(t *testing.T) {
 	}
 }
 
-// Regression (review #2): NewModel inherits PortLayers/ContractLayers from DDD.
-// A custom model that renames core/repo to core/ports/repo (without explicitly
-// setting the new fields) must still get port/contract semantics via the
-// basename fallback.
-func TestNewModel_InheritedPortLayers_BasenameFallback(t *testing.T) {
+// Regression: a custom NewModel that renames core/repo to core/ports/repo
+// can opt into basename fallback by explicitly clearing inherited DDD
+// PortLayers/ContractLayers with WithPortLayers(nil)/WithContractLayers(nil).
+func TestNewModel_ExplicitClear_BasenameFallback(t *testing.T) {
 	m := NewModel(
 		WithSublayers([]string{"handler", "app", "core/ports/repo", "core/svcs/svc", "core/model"}),
 		WithDirection(map[string][]string{
@@ -631,6 +630,8 @@ func TestNewModel_InheritedPortLayers_BasenameFallback(t *testing.T) {
 			"core/svcs/svc":   {"core/model"},
 			"core/model":      {},
 		}),
+		WithPortLayers(nil),
+		WithContractLayers(nil),
 	)
 	if !isPortSublayerFor(m, "core/ports/repo") {
 		t.Error("basename fallback: 'core/ports/repo' must still be a port sublayer")
@@ -692,16 +693,46 @@ func TestWithContractLayers_ExactMatchIsAuthoritative(t *testing.T) {
 	}
 }
 
-// Regression (review #3): WithSublayers alone must clear inherited DDD
-// PortLayers/ContractLayers so basename fallback applies.
-func TestWithSublayers_ClearsInheritedPortContractLayers(t *testing.T) {
+// Regression (review #4): Option order must not silently wipe explicit
+// user config. WithPortLayers before WithSublayers must survive — WithSublayers
+// does not clear PortLayers/ContractLayers.
+func TestNewModel_WithPortLayersBeforeWithSublayers_Survives(t *testing.T) {
 	m := NewModel(
-		WithSublayers([]string{"worker", "store", "model"}),
+		WithPortLayers([]string{"store"}),
+		WithSublayers([]string{"usecase", "store", "model"}),
+		WithDirection(map[string][]string{
+			"usecase": {"store", "model"},
+			"store":   {"model"},
+			"model":   {},
+		}),
 	)
-	if len(m.PortLayers) != 0 {
-		t.Errorf("WithSublayers must clear inherited PortLayers, got %v", m.PortLayers)
+	if !slices.Contains(m.PortLayers, "store") {
+		t.Errorf("WithPortLayers before WithSublayers was wiped: PortLayers=%v", m.PortLayers)
 	}
-	if len(m.ContractLayers) != 0 {
-		t.Errorf("WithSublayers must clear inherited ContractLayers, got %v", m.ContractLayers)
+	if !isPortSublayerFor(m, "store") {
+		t.Error("explicit 'store' port layer lost after WithSublayers")
+	}
+}
+
+// Regression (review #4): ContractLayers ⊇ PortLayers invariant. A layer
+// listed in PortLayers but not ContractLayers must still be classified as
+// a contract layer (via the union in isContractSublayerFor).
+func TestIsContractSublayerFor_UnionsPortLayers(t *testing.T) {
+	m := Model{
+		Sublayers:      []string{"store", "svc", "model"},
+		PortLayers:     []string{"store"},
+		ContractLayers: []string{"svc"},
+	}
+	if !isPortSublayerFor(m, "store") {
+		t.Error("'store' must be a port sublayer")
+	}
+	if !isContractSublayerFor(m, "store") {
+		t.Error("contract union: 'store' (in PortLayers) must be a contract sublayer")
+	}
+	if !isContractSublayerFor(m, "svc") {
+		t.Error("'svc' (in ContractLayers) must be a contract sublayer")
+	}
+	if isContractSublayerFor(m, "model") {
+		t.Error("'model' (in neither list) must not be a contract sublayer")
 	}
 }
