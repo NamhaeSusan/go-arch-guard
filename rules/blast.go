@@ -113,12 +113,25 @@ func AnalyzeBlastRadius(pkgs []*packages.Package, projectModule string, projectR
 	q1 := percentile(tdValues, 25)
 	q3 := percentile(tdValues, 75)
 	iqr := q3 - q1
+
+	const iqrZeroFloor = 3 // minimum transitive dependents to flag when IQR=0
+
+	var threshold float64
 	if iqr == 0 {
-		return nil
-	}
-	threshold := q3 + 1.5*iqr
-	if threshold < 2 {
-		threshold = 2
+		// All packages have the same td value. The IQR method can't detect
+		// outliers, but a single package with a much higher count is still a
+		// hotspot. Fall back: emit for the max value only if it strictly exceeds
+		// q3 and meets the floor.
+		max := float64(tdValues[len(tdValues)-1])
+		if max <= q3 || max < iqrZeroFloor {
+			return nil
+		}
+		threshold = q3 // anything > q3 (i.e. == max) is the outlier
+	} else {
+		threshold = q3 + 1.5*iqr
+		if threshold < 2 {
+			threshold = 2
+		}
 	}
 
 	// 6. Emit violations

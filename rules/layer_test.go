@@ -223,6 +223,42 @@ func TestCheckLayerDirection_FlatLayout_Violation(t *testing.T) {
 	}
 }
 
+// TestCheckLayerDirection_NestedUnknownSublayer is a regression test for the bug where
+// identifySublayerWith collapsed "core/extra" into "core", masking the unknown sublayer.
+func TestCheckLayerDirection_NestedUnknownSublayer(t *testing.T) {
+	root := t.TempDir()
+	mod := "example.com/nested-unknown"
+
+	writeTestFile(t, filepath.Join(root, "go.mod"),
+		"module "+mod+"\n\ngo 1.21\n")
+
+	// internal/domain/x/core/extra — "core/extra" is not a known sublayer in DDD()
+	writeTestFile(t, filepath.Join(root, "internal", "domain", "x", "core", "extra", "e.go"),
+		"package extra\n\ntype Extra struct{}\n")
+	// A legitimate package so the domain has more than just the unknown package
+	writeTestFile(t, filepath.Join(root, "internal", "domain", "x", "core", "model", "m.go"),
+		"package model\n\ntype Item struct{}\n")
+	writeTestFile(t, filepath.Join(root, "internal", "domain", "x", "app", "s.go"),
+		"package app\n\nimport _ \""+mod+"/internal/domain/x/core/model\"\n")
+
+	pkgs := loadTestPackages(t, root)
+	violations := rules.CheckLayerDirection(pkgs, mod, root)
+
+	found := false
+	for _, v := range violations {
+		if v.Rule == "layer.unknown-sublayer" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected layer.unknown-sublayer violation for internal/domain/x/core/extra")
+		for _, v := range violations {
+			t.Log(v.String())
+		}
+	}
+}
+
 func TestCheckLayerDirection_FlatLayout_PkgImport(t *testing.T) {
 	root := t.TempDir()
 	mod := "example.com/flat-pkg"
