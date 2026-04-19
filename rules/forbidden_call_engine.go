@@ -31,13 +31,14 @@ type scanScope struct {
 	// determined are treated as non-allowed (layer "") and still checked.
 	// When false (default), they are skipped to avoid noise on ad-hoc helpers.
 	enforceUnclassified bool
-	// allowCmdRoot: when true, packages under <module>/cmd/... are skipped.
-	// When false (default), they are always checked and bypass the
-	// AllowedLayers list — a forbidden call in cmd/ always produces a
-	// violation. Modeled as a dedicated flag (not a synthetic layer name)
-	// so user-defined sublayers named "cmd" can't accidentally exempt the
-	// composition root.
-	allowCmdRoot bool
+	// enforceCmdRoot: when true, packages under <module>/cmd/... are scanned
+	// and bypass the AllowedLayers list — a forbidden call in cmd/ produces
+	// a violation. When false (default), cmd/ packages are skipped; this is
+	// the backward-compatible behavior for projects that legitimately start
+	// transactions from main. Modeled as a dedicated flag (not a synthetic
+	// layer name) so user-defined sublayers named "cmd" can't accidentally
+	// exempt the composition root.
+	enforceCmdRoot bool
 }
 
 // cmdRootLayerToken is the reserved layer token used in violation messages
@@ -46,10 +47,11 @@ type scanScope struct {
 const cmdRootLayerToken = "<cmd-root>"
 
 // checkForbiddenCallsByLayer walks all CallExprs in packages under
-// <module>/internal/ and <module>/cmd/ and emits a violation for each call
-// whose callee ID matches one of the rules and whose package layer is outside
-// that rule's AllowedLayers. Packages under cmd/ use the synthetic layer name
-// "cmd" so rules can allow or forbid them explicitly.
+// <module>/internal/ (and optionally <module>/cmd/ when scanScope.enforceCmdRoot
+// is true) and emits a violation for each call whose callee ID matches one of
+// the rules and whose package layer is outside that rule's AllowedLayers.
+// Composition-root packages bypass AllowedLayers and are emitted with the
+// reserved layer token cmdRootLayerToken for message clarity.
 func checkForbiddenCallsByLayer(
 	pkgs []*packages.Package,
 	projectModule, projectRoot string,
@@ -121,7 +123,7 @@ func checkForbiddenCallsByLayer(
 				relFile := relPathFromRoot(projectRoot, pos.Filename)
 				for _, cr := range crs {
 					// Composition-root packages bypass AllowedLayers: their
-					// exemption is controlled exclusively by AllowCmdRoot.
+					// policy is controlled exclusively by EnforceCmdRoot.
 					if !decision.isCmdRoot && cr.allowed[layer] {
 						continue
 					}
@@ -158,7 +160,8 @@ type scanDecision struct {
 // scanLayerFor classifies a package for the tx-boundary engines:
 //
 //   - Packages under <module>/cmd/... are scan targets with isCmdRoot=true
-//     (when allowCmdRoot is false) or skipped entirely (when true).
+//     only when enforceCmdRoot is true; otherwise skipped (backward-compat
+//     default).
 //   - Packages under <module>/internal/... are scanned with their known
 //     sublayer.
 //   - Internal packages that don't map to any known sublayer (layer == "")
@@ -167,7 +170,7 @@ type scanDecision struct {
 //   - Everything else is skipped.
 func scanLayerFor(m Model, pkgPath, internalPrefix, cmdPrefix string, scope scanScope) scanDecision {
 	if strings.HasPrefix(pkgPath, cmdPrefix) || pkgPath == strings.TrimSuffix(cmdPrefix, "/") {
-		if scope.allowCmdRoot {
+		if !scope.enforceCmdRoot {
 			return scanDecision{}
 		}
 		return scanDecision{scan: true, layer: cmdRootLayerToken, isCmdRoot: true}

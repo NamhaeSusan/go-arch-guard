@@ -63,7 +63,7 @@ type TxBoundaryConfig struct {
 	// Defaults to []string{"app"} when empty.
 	//
 	// Note: packages under <module>/cmd/... are NOT controlled by this list.
-	// Use AllowCmdRoot instead — see its docs for the rationale.
+	// Use EnforceCmdRoot instead — see its docs for the rationale.
 	AllowedLayers []string
 	// EnforceUnclassified controls how internal packages that do not map to any
 	// known sublayer (e.g. internal/testutil, internal/generic, codegen output)
@@ -75,20 +75,24 @@ type TxBoundaryConfig struct {
 	//                    and is willing to add explicit WithExclude for
 	//                    legitimate helper packages.
 	//
-	// Packages under <module>/cmd/... are always scanned regardless of this
-	// flag because cmd/ is a well-defined composition-root layer.
+	// Packages under <module>/cmd/... are controlled by EnforceCmdRoot, not
+	// this flag.
 	EnforceUnclassified bool
-	// AllowCmdRoot controls whether composition-root packages under
-	// <module>/cmd/... may start transactions or name tx types in their
+	// EnforceCmdRoot controls whether composition-root packages under
+	// <module>/cmd/... are checked for forbidden tx starts and tx-type
 	// signatures.
-	//   false (default): cmd/ packages are scanned and forbidden calls there
-	//                    produce a violation. This catches the common mistake
-	//                    of calling BeginTx directly from main.
-	//   true:            cmd/ packages are exempt from tx-boundary checks.
+	//   false (default): cmd/ packages are skipped — backward-compat, avoids
+	//                    flagging existing projects that call BeginTx from
+	//                    main or other cmd/ entry points.
+	//   true:            cmd/ packages are scanned and forbidden calls there
+	//                    produce a violation. Strict mode — recommended when
+	//                    the team wants to keep composition roots thin.
 	//
-	// This is a dedicated field rather than a magic layer name in AllowedLayers
-	// so it can't collide with a user-defined sublayer literally called "cmd".
-	AllowCmdRoot bool
+	// This is a dedicated field rather than a magic layer name in
+	// AllowedLayers so it can't collide with a user-defined sublayer
+	// literally called "cmd". Follows the same opt-in-to-strict semantics
+	// as EnforceUnclassified.
+	EnforceCmdRoot bool
 }
 
 func (c Config) model() Model {

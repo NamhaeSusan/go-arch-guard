@@ -667,25 +667,26 @@ violations := rules.CheckTxBoundary(pkgs, module, root,
         },
         Types:         []string{"database/sql.Tx"},
         AllowedLayers: []string{"app"}, // 비어 있으면 기본값
-        // AllowCmdRoot:        true, // <module>/cmd/... 면제 — 아래 참조
-        // EnforceUnclassified: true, // 엄격 모드 — 아래 참조
+        // EnforceCmdRoot:      true, // 옵트인: <module>/cmd/... 도 엄격 검사
+        // EnforceUnclassified: true, // 옵트인: 미분류 internal/ 도 엄격 검사
     }),
 )
 ```
 
 발생 가능한 규칙 ID: `tx.start-outside-allowed-layer`, `tx.type-in-signature`.
 
-**스캔 범위.** `internal/...` 과 `cmd/...` 를 모두 스캔합니다. internal
-패키지는 서브레이어 이름이 `AllowedLayers` 와 매칭되며, `cmd/...` 컴포지션
-루트는 별도 플래그로 제어합니다 — 아래 *컴포지션 루트* 참조.
+**스캔 범위.** `<module>/internal/...` 하위 패키지는 기본값으로 스캔됩니다.
+`<module>/cmd/...` 컴포지션 루트는 별도 플래그 `EnforceCmdRoot` 로 제어합니다
+— 아래 *컴포지션 루트* 참조.
 
-**컴포지션 루트 (`cmd/`).** `<module>/cmd/...` 하위 패키지는 **기본값으로
-스캔** 되며 `AllowedLayers` 와 무관하게 트랜잭션 시작이 항상 위반으로
-잡힙니다 (`main` 에서 `BeginTx` 를 직접 호출하는 실수를 막기 위함).
-면제하려면 `AllowCmdRoot: true` 를 설정하세요. `AllowCmdRoot` 를 별도
-필드로 두는 이유는, 사용자가 정의한 실제 서브레이어 이름이 우연히
-`"cmd"` 일 때 그 이름이 컴포지션 루트를 면제하는 마법으로 동작하지
-않도록 하기 위함입니다.
+**컴포지션 루트 (`cmd/`).** 기본값으로 `<module>/cmd/...` 에서의 트랜잭션
+시작은 위반으로 잡지 **않습니다** — `main` 등에서 정상적으로 트랜잭션을
+시작하는 기존 프로젝트의 업그레이드 경로를 깨지 않기 위함입니다. 엄격하게
+컴포지션 루트를 강제하려면 `EnforceCmdRoot: true` 를 설정하세요. 이 경우
+`cmd/` 하위에서의 tx 시작은 `AllowedLayers` 와 무관하게 위반으로 처리됩니다.
+`EnforceCmdRoot` 를 별도 필드로 두는 이유는, 사용자가 정의한 실제
+서브레이어 이름이 우연히 `"cmd"` 일 때 그 이름이 컴포지션 루트 동작을
+건드리지 않도록 하기 위함입니다.
 
 **제네릭 호출.** 명시적 타입 파라미터로 호출되는 경우 — 예:
 `BeginGeneric[string](...)`, `pkg.F[T1, T2](...)`, `x.M[T](...)` — 도

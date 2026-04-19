@@ -28,7 +28,7 @@ func CheckTxBoundary(
 	m := cfg.model()
 	scope := scanScope{
 		enforceUnclassified: tc.EnforceUnclassified,
-		allowCmdRoot:        tc.AllowCmdRoot,
+		enforceCmdRoot:      tc.EnforceCmdRoot,
 	}
 
 	var violations []Violation

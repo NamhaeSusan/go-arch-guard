@@ -54,6 +54,7 @@ func TestCheckTxBoundary_DetectsStartOutsideApp(t *testing.T) {
 
 func TestCheckTxBoundary_RespectsExclude(t *testing.T) {
 	pkgs := loadTxBoundary(t)
+	// cmd/ is skipped by default (EnforceCmdRoot=false), so no cmd exclude needed.
 	got := rules.CheckTxBoundary(pkgs,
 		"github.com/kimtaeyun/testproject-txboundary",
 		"../testdata/txboundary",
@@ -65,7 +66,6 @@ func TestCheckTxBoundary_RespectsExclude(t *testing.T) {
 		rules.WithExclude(
 			"internal/domain/order/core/repo/...",
 			"internal/domain/order/core/svc/...",
-			"cmd/...",
 		),
 	)
 	if len(got) != 0 {
@@ -97,8 +97,8 @@ func TestCheckTxBoundary_RespectsSeverity(t *testing.T) {
 
 func TestCheckTxBoundary_AllowedLayersIncludeOffenders(t *testing.T) {
 	pkgs := loadTxBoundary(t)
-	// cmd/... is a composition root covered by a separate test; exclude here
-	// so this test stays scoped to internal-only sublayers.
+	// cmd/ is skipped by default (EnforceCmdRoot=false), so internal-only
+	// AllowedLayers is enough to produce zero violations.
 	got := rules.CheckTxBoundary(pkgs,
 		"github.com/kimtaeyun/testproject-txboundary",
 		"../testdata/txboundary",
@@ -107,7 +107,6 @@ func TestCheckTxBoundary_AllowedLayersIncludeOffenders(t *testing.T) {
 			Types:         []string{"database/sql.Tx"},
 			AllowedLayers: []string{"app", "core/repo", "core/svc"},
 		}),
-		rules.WithExclude("cmd/..."),
 	)
 	if len(got) != 0 {
 		t.Fatalf("expected 0 violations when all layers allowed, got %d", len(got))
@@ -159,9 +158,8 @@ func TestCheckTxBoundary_StripsNonPointerWrappers(t *testing.T) {
 
 func TestCheckTxBoundary_OnlyStartSymbolsConfigured(t *testing.T) {
 	pkgs := loadTxBoundary(t)
-	// Default behavior (EnforceUnclassified=false) skips internal/testutil and
-	// internal/generic. cmd/ is always scanned, so exclude it to keep this
-	// test scoped to the core/repo case.
+	// Default behavior skips unclassified internal packages and cmd/, so
+	// this test is naturally scoped to the core/repo case.
 	got := rules.CheckTxBoundary(pkgs,
 		"github.com/kimtaeyun/testproject-txboundary",
 		"../testdata/txboundary",
@@ -169,7 +167,6 @@ func TestCheckTxBoundary_OnlyStartSymbolsConfigured(t *testing.T) {
 			StartSymbols:  []string{"database/sql.(*DB).BeginTx"},
 			AllowedLayers: []string{"app"},
 		}),
-		rules.WithExclude("cmd/..."),
 	)
 	for _, v := range got {
 		if v.Rule == "tx.type-in-signature" {
@@ -233,10 +230,10 @@ func TestCheckTxBoundary_UnclassifiedInternalFlaggedWhenEnforced(t *testing.T) {
 	}
 }
 
-// TestCheckTxBoundary_CmdPackageFlagged verifies that cmd/ packages (the
-// composition root) are scanned by default. Starting a transaction in cmd/
-// without setting AllowCmdRoot=true must produce a violation.
-func TestCheckTxBoundary_CmdPackageFlagged(t *testing.T) {
+// TestCheckTxBoundary_DefaultIgnoresCmdRoot verifies the backward-compat
+// default: composition-root packages under <module>/cmd/... are skipped
+// when EnforceCmdRoot is left at its zero value (false).
+func TestCheckTxBoundary_DefaultIgnoresCmdRoot(t *testing.T) {
 	pkgs := loadTxBoundary(t)
 	got := rules.CheckTxBoundary(pkgs,
 		"github.com/kimtaeyun/testproject-txboundary",
@@ -244,6 +241,27 @@ func TestCheckTxBoundary_CmdPackageFlagged(t *testing.T) {
 		rules.WithTxBoundary(rules.TxBoundaryConfig{
 			StartSymbols:  []string{"database/sql.(*DB).BeginTx"},
 			AllowedLayers: []string{"app"},
+			// EnforceCmdRoot left false — cmd/ must be skipped.
+		}),
+	)
+	for _, v := range got {
+		if strings.Contains(v.File, "cmd/") {
+			t.Errorf("unexpected violation in cmd/ when EnforceCmdRoot is false: %+v", v)
+		}
+	}
+}
+
+// TestCheckTxBoundary_EnforceCmdRoot_FlagsCmdCalls verifies that turning on
+// EnforceCmdRoot makes tx starts under <module>/cmd/... produce violations.
+func TestCheckTxBoundary_EnforceCmdRoot_FlagsCmdCalls(t *testing.T) {
+	pkgs := loadTxBoundary(t)
+	got := rules.CheckTxBoundary(pkgs,
+		"github.com/kimtaeyun/testproject-txboundary",
+		"../testdata/txboundary",
+		rules.WithTxBoundary(rules.TxBoundaryConfig{
+			StartSymbols:   []string{"database/sql.(*DB).BeginTx"},
+			AllowedLayers:  []string{"app"},
+			EnforceCmdRoot: true,
 		}),
 	)
 	var hit bool
@@ -253,28 +271,7 @@ func TestCheckTxBoundary_CmdPackageFlagged(t *testing.T) {
 		}
 	}
 	if !hit {
-		t.Error("expected tx.start-outside-allowed-layer violation from cmd/app/main.go")
-	}
-}
-
-// TestCheckTxBoundary_AllowCmdRootSuppresses verifies that AllowCmdRoot=true
-// exempts composition-root packages under <module>/cmd/... from tx-boundary
-// checks.
-func TestCheckTxBoundary_AllowCmdRootSuppresses(t *testing.T) {
-	pkgs := loadTxBoundary(t)
-	got := rules.CheckTxBoundary(pkgs,
-		"github.com/kimtaeyun/testproject-txboundary",
-		"../testdata/txboundary",
-		rules.WithTxBoundary(rules.TxBoundaryConfig{
-			StartSymbols: []string{"database/sql.(*DB).BeginTx"},
-			// Default AllowedLayers → ["app"], no mention of cmd here.
-			AllowCmdRoot: true,
-		}),
-	)
-	for _, v := range got {
-		if strings.Contains(v.File, "cmd/") {
-			t.Errorf("unexpected violation in cmd/ when AllowCmdRoot is true: %+v", v)
-		}
+		t.Error("expected tx.start-outside-allowed-layer from cmd/app/main.go when EnforceCmdRoot is true")
 	}
 }
 
@@ -282,12 +279,12 @@ func TestCheckTxBoundary_AllowCmdRootSuppresses(t *testing.T) {
 // regression test for the collision bug: a custom model with a legitimate
 // sublayer literally named "cmd" must not accidentally exempt the
 // composition-root packages under <module>/cmd/.... The composition-root
-// exemption is controlled exclusively by AllowCmdRoot.
+// policy is controlled exclusively by EnforceCmdRoot.
 func TestCheckTxBoundary_CmdRootIndependentOfUserSublayerNamedCmd(t *testing.T) {
 	pkgs := loadTxBoundary(t)
 	// Custom flat-layout model where "cmd" is a real internal sublayer.
-	// AllowedLayers lists "cmd" — in the old design this would have also
-	// exempted <module>/cmd/... by matching the synthetic layer token.
+	// AllowedLayers lists "cmd" — in the old design this could have
+	// accidentally exempted <module>/cmd/... by matching a synthetic token.
 	customModel := rules.NewModel(
 		rules.WithDomainDir(""),
 		rules.WithSublayers([]string{"app", "cmd", "core/repo", "core/svc"}),
@@ -297,9 +294,9 @@ func TestCheckTxBoundary_CmdRootIndependentOfUserSublayerNamedCmd(t *testing.T) 
 		"../testdata/txboundary",
 		rules.WithModel(customModel),
 		rules.WithTxBoundary(rules.TxBoundaryConfig{
-			StartSymbols:  []string{"database/sql.(*DB).BeginTx"},
-			AllowedLayers: []string{"app", "cmd"},
-			// AllowCmdRoot left false — composition-root must still be flagged.
+			StartSymbols:   []string{"database/sql.(*DB).BeginTx"},
+			AllowedLayers:  []string{"app", "cmd"},
+			EnforceCmdRoot: true, // strict mode — composition root must be flagged
 		}),
 	)
 	var hit bool

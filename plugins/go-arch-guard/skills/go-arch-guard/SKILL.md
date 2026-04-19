@@ -281,19 +281,20 @@ rules.WithTxBoundary(rules.TxBoundaryConfig{
     StartSymbols:        []string{"database/sql.(*DB).BeginTx"},
     Types:               []string{"database/sql.Tx"},
     AllowedLayers:       []string{"app"}, // 내부 서브레이어만 매칭
-    AllowCmdRoot:        false,           // 기본: cmd/ 에서 BeginTx 하면 위반
+    EnforceCmdRoot:      false,           // 기본: cmd/ 스킵 (backward-compat). true면 엄격
     EnforceUnclassified: false,           // 기본: 미분류 internal 패키지 스킵
 })
 ```
 
 위반 규칙 ID: `tx.start-outside-allowed-layer`, `tx.type-in-signature`.
 
-스캔 범위: `internal/...` + `cmd/...`. `cmd/` 는 별도 플래그 `AllowCmdRoot`
-로 제어되며 `AllowedLayers` 문자열과 충돌하지 않습니다 (사용자 정의
-서브레이어 이름이 `"cmd"` 여도 컴포지션 루트를 실수로 면제하지 않음).
-제네릭 호출 (`F[T](...)`, `pkg.F[T](...)`, `x.M[T](...)`) 도 풀어서
-식별합니다. `EnforceUnclassified: true` 를 켜면 미분류 internal 패키지도
-검사되며, 필요한 헬퍼는 `WithExclude` 로 제외합니다.
+스캔 범위: 기본값으로 `internal/...` 만 스캔. `cmd/...` 는 별도 플래그
+`EnforceCmdRoot` 로 제어되며 `AllowedLayers` 문자열과 충돌하지 않습니다
+(사용자 정의 서브레이어 이름이 `"cmd"` 여도 컴포지션 루트 동작에 영향
+없음). `EnforceCmdRoot: true` 를 켜면 `cmd/` 내의 tx 시작도 위반으로
+처리됩니다. 제네릭 호출 (`F[T](...)`, `pkg.F[T](...)`, `x.M[T](...)`) 도
+풀어서 식별합니다. `EnforceUnclassified: true` 를 켜면 미분류 internal
+패키지도 검사되며, 필요한 헬퍼는 `WithExclude` 로 제외합니다.
 
 ## Machine-readable Output
 

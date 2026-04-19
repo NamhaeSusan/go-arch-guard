@@ -8,11 +8,12 @@ import (
 )
 
 // checkTypeInSignature walks all FuncDecl params and results in packages
-// under <module>/internal/ and <module>/cmd/ and emits a violation when a
-// base type (after stripping pointer/slice/array/map/chan wrappers) matches
-// one of typeNames and the function's package layer is outside allowedLayers.
-// Composition-root packages under cmd/ bypass allowedLayers entirely — they
-// are controlled by scanScope.allowCmdRoot (see scanLayerFor).
+// under <module>/internal/ (and optionally <module>/cmd/ when
+// scanScope.enforceCmdRoot is true) and emits a violation when a base type
+// (after stripping pointer/slice/array/map/chan wrappers) matches one of
+// typeNames and the function's package layer is outside allowedLayers.
+// Composition-root packages bypass allowedLayers entirely — they are
+// controlled by scanScope.enforceCmdRoot (see scanLayerFor).
 //
 // message/fix are typed callbacks receiving (typeID, allowedLayers).
 func checkTypeInSignature(
@@ -52,8 +53,8 @@ func checkTypeInSignature(
 		if !decision.scan {
 			continue
 		}
-		// Composition-root packages bypass AllowedLayers: their exemption
-		// is controlled exclusively by AllowCmdRoot.
+		// Composition-root packages bypass AllowedLayers: their policy
+		// is controlled exclusively by EnforceCmdRoot.
 		if !decision.isCmdRoot && allowed[decision.layer] {
 			continue
 		}
