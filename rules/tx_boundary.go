@@ -26,12 +26,16 @@ func CheckTxBoundary(
 		allowed = []string{"app"}
 	}
 	m := cfg.model()
+	scope := scanScope{
+		enforceUnclassified: tc.EnforceUnclassified,
+		enforceCmdRoot:      tc.EnforceCmdRoot,
+	}
 
 	var violations []Violation
 
 	if len(tc.StartSymbols) > 0 {
 		violations = append(violations,
-			checkForbiddenCallsByLayer(pkgs, projectModule, projectRoot, m, cfg,
+			checkForbiddenCallsByLayer(pkgs, projectModule, projectRoot, m, cfg, scope,
 				[]forbiddenCallRule{{
 					Symbols:       tc.StartSymbols,
 					AllowedLayers: allowed,
@@ -48,7 +52,7 @@ func CheckTxBoundary(
 
 	if len(tc.Types) > 0 {
 		violations = append(violations,
-			checkTypeInSignature(pkgs, projectModule, projectRoot, m, cfg,
+			checkTypeInSignature(pkgs, projectModule, projectRoot, m, cfg, scope,
 				tc.Types, allowed,
 				"tx.type-in-signature",
 				func(typeID string, allowed []string) string {
