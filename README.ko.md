@@ -677,6 +677,31 @@ violations := rules.CheckTxBoundary(pkgs, module, root,
 
 발생 가능한 규칙 ID: `tx.start-outside-allowed-layer`, `tx.type-in-signature`.
 
+## 세터 패턴
+
+### `CheckNoSetters`
+
+포인터 리시버를 가진 내보내기 세터 메서드(`Set*`, 매개변수 1개 이상)를 검출하여
+명시적인 생성자 파라미터 사용을 유도합니다.
+
+**권장 수정**: 의존성을 생성자의 명시적 파라미터로 추가 (`NewService(..., dep)`).
+`With*` 옵션은 정말로 선택적이고 여러 조합이 필요한 경우에만 사용. 설정류
+옵션에도 setter는 대체로 맞지 않음.
+
+- 플루언트 빌더(리시버 타입을 반환하는 메서드)는 제외됩니다.
+- 테스트 파일과 `testdata/` 또는 `mocks/` 하위 패키지는 자동 제외됩니다.
+- 기본 severity: Warning. 엄격하게 적용하려면 `WithSeverity(rules.Error)`를 사용하세요.
+
+```go
+// 기본: Warning severity
+report.AssertNoViolations(t, rules.CheckNoSetters(pkgs))
+
+// 엄격: Error severity
+report.AssertNoViolations(t, rules.CheckNoSetters(pkgs, rules.WithSeverity(rules.Error)))
+```
+
+발생 가능한 규칙 ID: `setter.forbidden`.
+
 ## 옵션
 
 ```go
@@ -710,6 +735,7 @@ go run github.com/NamhaeSusan/go-arch-guard/cmd/tui .
 | `rules.AnalyzeBlastRadius(pkgs, module, root, opts...)` | 커플링 이상치 탐지 |
 | `rules.CheckInterfacePattern(pkgs, opts...)` | 인터페이스 패턴 모범 사례 |
 | `rules.CheckTxBoundary(pkgs, module, root, opts...)` | 트랜잭션 경계 강제 (옵트인) |
+| `rules.CheckNoSetters(pkgs, opts...)` | 내보내기 세터 검출 (기본 Warning) |
 | `rules.RunAll(pkgs, module, root, opts...)` | 권장 기본 rule 묶음 실행 |
 | `report.AssertNoViolations(t, violations)` | Error 위반 시 테스트 실패 |
 | `report.BuildJSONReport(violations)` | 기계가 읽기 쉬운 JSON 리포트 구성 |

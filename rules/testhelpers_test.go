@@ -61,6 +61,10 @@ var (
 	txboundaryOnce sync.Once
 	txboundaryPkgs []*packages.Package
 	txboundaryErr  error
+
+	settersOnce sync.Once
+	settersPkgs []*packages.Package
+	settersErr  error
 )
 
 func loadTxBoundary(t *testing.T) []*packages.Package {
@@ -72,6 +76,17 @@ func loadTxBoundary(t *testing.T) []*packages.Package {
 		t.Fatal(txboundaryErr)
 	}
 	return txboundaryPkgs
+}
+
+func loadSetters(t *testing.T) []*packages.Package {
+	t.Helper()
+	settersOnce.Do(func() {
+		settersPkgs, settersErr = analyzer.Load("../testdata/setters", "internal/...", "mocks/...")
+	})
+	if settersErr != nil {
+		t.Fatal(settersErr)
+	}
+	return settersPkgs
 }
 
 func writeTestFile(t *testing.T, path, content string) {

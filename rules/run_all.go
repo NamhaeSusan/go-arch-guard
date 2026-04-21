@@ -33,6 +33,7 @@ func RunAll(pkgs []*packages.Package, projectModule string, projectRoot string, 
 	violations = append(violations, CheckCrossDomainAnonymous(pkgs, opts...)...)
 	violations = append(violations, AnalyzeBlastRadius(pkgs, projectModule, projectRoot, opts...)...)
 	violations = append(violations, CheckTxBoundary(pkgs, projectModule, projectRoot, opts...)...)
+	violations = append(violations, CheckNoSetters(pkgs, opts...)...)
 	return deduplicateMetaViolations(violations)
 }
 

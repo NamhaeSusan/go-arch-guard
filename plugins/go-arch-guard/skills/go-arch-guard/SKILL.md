@@ -333,6 +333,7 @@ Repository 포트 interface(이름이 `Repository`/`Repo`로 끝나는 것)는 *
 | 룰 | 잡는 패턴 |
 |----|----------|
 | `interface.container-only` | 패키지에서 선언된 named interface가 struct field 타입으로만 쓰이고 함수 파라미터/반환에 한 번도 안 쓰임. wiring 레이어가 값을 들기 위해 만든 임시 컨테이너 interface 패턴을 잡는다. `WithSeverity(rules.Error)`로 hard rule 승격 가능. |
+| `setter.forbidden` | 포인터 리시버를 가진 내보내기 세터 메서드(`Set*`, 매개변수 1개 이상)를 검출. **권장 수정**: 의존성을 생성자의 명시적 파라미터로 추가 (`NewService(..., dep)`). `With*` 옵션은 정말로 선택적이고 여러 조합이 필요한 경우에만 사용 — 설정류 옵션에도 setter는 대체로 맞지 않음. 플루언트 빌더(리시버 타입 반환 메서드), 테스트 파일, `testdata/`·`mocks/` 하위 패키지는 자동 제외. `CheckNoSetters(pkgs, opts...)`. |
 
 ## Cross-Domain Anonymous Interface (Hard rule, Error)
 
