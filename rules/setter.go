@@ -60,8 +60,8 @@ func CheckNoSetters(pkgs []*packages.Package, opts ...Option) []Violation {
 					Rule:     "setter.forbidden",
 					File:     pos.Filename,
 					Line:     pos.Line,
-					Message:  fmt.Sprintf("exported setter %s on *%s — prefer constructor or With-pattern option", fd.Name.Name, recvType),
-					Fix:      fmt.Sprintf("construct via New%s(...) or expose an Option type (With%s) instead", recvType, strings.TrimPrefix(fd.Name.Name, "Set")),
+					Message:  fmt.Sprintf("exported setter %s on *%s — prefer explicit constructor parameter; use With-pattern only if truly optional", fd.Name.Name, recvType),
+					Fix:      fmt.Sprintf("add %s as an explicit parameter to New%s(...). Use With%s option only when %s is genuinely optional with multiple combinations.", strings.TrimPrefix(fd.Name.Name, "Set"), recvType, strings.TrimPrefix(fd.Name.Name, "Set"), strings.TrimPrefix(fd.Name.Name, "Set")),
 					Severity: sev,
 				})
 			}

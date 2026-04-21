@@ -703,7 +703,9 @@ Emitted rule IDs: `tx.start-outside-allowed-layer`, `tx.type-in-signature`.
 
 ### `CheckNoSetters`
 
-Flags exported setter methods (`Set*` on pointer receivers with at least one parameter) to steer custom types toward constructors and `With*` Option patterns.
+Flags exported setter methods (`Set*` on pointer receivers with at least one parameter) to steer custom types toward explicit constructor parameters.
+
+**Recommended fix**: add the dependency as an explicit parameter on the constructor (`NewService(..., dep)`). Reserve the `With`-pattern option for dependencies that are truly optional and combine with many others — setters are rarely the right answer for that either.
 
 - Fluent builders (methods returning the receiver type) are exempt.
 - Test files and packages under `testdata/` or `mocks/` are auto-excluded.
