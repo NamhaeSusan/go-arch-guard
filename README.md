@@ -699,6 +699,26 @@ violations := rules.CheckTxBoundary(pkgs, module, root,
 
 Emitted rule IDs: `tx.start-outside-allowed-layer`, `tx.type-in-signature`.
 
+## Setter Pattern
+
+### `CheckNoSetters`
+
+Flags exported setter methods (`Set*` on pointer receivers with at least one parameter) to steer custom types toward constructors and `With*` Option patterns.
+
+- Fluent builders (methods returning the receiver type) are exempt.
+- Test files and packages under `testdata/` or `mocks/` are auto-excluded.
+- Default severity: Warning. Use `WithSeverity(rules.Error)` for strict enforcement.
+
+```go
+// Default: Warning severity
+report.AssertNoViolations(t, rules.CheckNoSetters(pkgs))
+
+// Strict: Error severity
+report.AssertNoViolations(t, rules.CheckNoSetters(pkgs, rules.WithSeverity(rules.Error)))
+```
+
+Emitted rule ID: `setter.forbidden`.
+
 ## Options
 
 ### Severity
@@ -741,6 +761,7 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `rules.AnalyzeBlastRadius(pkgs, module, root, opts...)` | coupling outlier detection |
 | `rules.CheckInterfacePattern(pkgs, opts...)` | interface pattern best practices |
 | `rules.CheckTxBoundary(pkgs, module, root, opts...)` | transaction boundary enforcement (opt-in) |
+| `rules.CheckNoSetters(pkgs, opts...)` | exported setter detection (Warning by default) |
 | `rules.RunAll(pkgs, module, root, opts...)` | run the recommended built-in rule bundle |
 | `report.AssertNoViolations(t, violations)` | fail test on Error violations |
 | `report.BuildJSONReport(violations)` | build a machine-readable JSON-friendly report |
