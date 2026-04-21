@@ -155,6 +155,27 @@ func TestRunAll_TxBoundary_OptInEmitsViolations(t *testing.T) {
 	}
 }
 
+func TestRunAll_NoSetters_IncludedByDefault(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/runall-setter"
+
+	writeTestFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.23\n")
+	writeTestFile(t, filepath.Join(root, "internal", "svc", "service.go"),
+		"package svc\n\ntype Service struct{ name string }\n\nfunc (s *Service) SetName(name string) { s.name = name }\n")
+
+	pkgs := loadTestPackages(t, root)
+	violations := rules.RunAll(pkgs, module, root)
+	found := false
+	for _, v := range violations {
+		if v.Rule == "setter.forbidden" && v.Severity == rules.Warning {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("RunAll should include setter.forbidden (Warning) from CheckNoSetters")
+	}
+}
+
 func TestRunAll_TxBoundary_DefaultDisabled(t *testing.T) {
 	pkgs := loadTxBoundary(t)
 	got := rules.RunAll(pkgs,
