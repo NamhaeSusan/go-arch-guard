@@ -419,8 +419,17 @@ func isDTOAllowedSublayerWith(m Model, relPath string) bool {
 func isMisplacedLayerDirWith(m Model, rel, name string) bool {
 	switch name {
 	case "app", "infra":
+		if name == "app" && m.AppDir != "" && rel == filepath.ToSlash(filepath.Join("internal", m.AppDir)) {
+			return false
+		}
 		return !matchesDomainLayerWith(m, rel, name)
 	case "handler":
+		if m.ServerDir != "" {
+			serverBase := filepath.ToSlash(filepath.Join("internal", m.ServerDir))
+			if strings.HasPrefix(rel, serverBase+"/") || rel == serverBase {
+				return false
+			}
+		}
 		return !matchesDomainLayerWith(m, rel, name) && rel != filepath.ToSlash(filepath.Join("internal", m.OrchestrationDir, "handler"))
 	default:
 		return false

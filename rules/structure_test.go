@@ -540,4 +540,32 @@ type Order = model.Order
 			t.Error("expected internal-top-level violation for randomstuff/ in flat layout")
 		}
 	})
+
+	t.Run("DDD preset allows internal/app as composition root", func(t *testing.T) {
+		root := t.TempDir()
+		writeTestFile(t, filepath.Join(root, "internal", "app", "container.go"), "package app\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"), "package order\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"), "package model\n")
+
+		violations := rules.CheckStructure(root)
+		for _, v := range violations {
+			if v.Rule == "structure.misplaced-layer" && v.File == "internal/app/" {
+				t.Errorf("internal/app should not be a misplaced-layer violation in DDD preset, got: %s", v.String())
+			}
+		}
+	})
+
+	t.Run("DDD preset allows internal/server as transport root", func(t *testing.T) {
+		root := t.TempDir()
+		writeTestFile(t, filepath.Join(root, "internal", "server", "http", "server.go"), "package http\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"), "package order\n")
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"), "package model\n")
+
+		violations := rules.CheckStructure(root)
+		for _, v := range violations {
+			if v.Rule == "structure.misplaced-layer" && strings.HasPrefix(v.File, "internal/server/") {
+				t.Errorf("internal/server/ should not be a misplaced-layer violation in DDD preset, got: %s", v.String())
+			}
+		}
+	})
 }
