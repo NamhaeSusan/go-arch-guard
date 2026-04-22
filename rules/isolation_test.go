@@ -2,6 +2,7 @@ package rules_test
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/NamhaeSusan/go-arch-guard/analyzer"
@@ -331,5 +332,64 @@ func TestCheckDomainIsolation_TransportCannotImportOrchestration(t *testing.T) {
 			t.Logf("violation: %s", v.String())
 		}
 		t.Error("expected isolation.transport-imports-orchestration violation")
+	}
+}
+
+func TestCheckDomainIsolation_TransportCannotImportUnclassified(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/dddapp4"
+
+	writeTestFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+
+	writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"), "package order\n")
+	writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "model.go"), "package model\ntype Order struct{}\n")
+
+	// internal/bootstrap is unclassified (not domain/orchestration/shared/app/server).
+	writeTestFile(t, filepath.Join(root, "internal", "bootstrap", "xyz", "boot.go"), "package xyz\n")
+
+	// transport imports unclassified package — ILLEGAL under tightened policy.
+	writeTestFile(t, filepath.Join(root, "internal", "server", "http", "bad.go"),
+		"package http\n\nimport _ \""+module+"/internal/bootstrap/xyz\"\n")
+
+	pkgs := loadTestPackages(t, root)
+	violations := rules.CheckDomainIsolation(pkgs, module, root, rules.WithModel(rules.DDD()))
+
+	var transportUnclassified []rules.Violation
+	for _, v := range violations {
+		if v.Rule == "isolation.transport-imports-unclassified" {
+			transportUnclassified = append(transportUnclassified, v)
+		}
+	}
+	if len(transportUnclassified) != 1 {
+		for _, v := range violations {
+			t.Logf("violation: %s", v.String())
+		}
+		t.Fatalf("expected exactly 1 isolation.transport-imports-unclassified violation, got %d", len(transportUnclassified))
+	}
+}
+
+func TestCheckDomainIsolation_TransportCanImportSharedPkg(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/dddapp5"
+
+	writeTestFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+
+	writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"), "package order\n")
+	writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "model.go"), "package model\ntype Order struct{}\n")
+
+	// internal/pkg/logger — shared utility
+	writeTestFile(t, filepath.Join(root, "internal", "pkg", "logger", "logger.go"), "package logger\n")
+
+	// transport imports internal/pkg/... — LEGAL.
+	writeTestFile(t, filepath.Join(root, "internal", "server", "http", "server.go"),
+		"package http\n\nimport _ \""+module+"/internal/pkg/logger\"\n")
+
+	pkgs := loadTestPackages(t, root)
+	violations := rules.CheckDomainIsolation(pkgs, module, root, rules.WithModel(rules.DDD()))
+
+	for _, v := range violations {
+		if strings.HasPrefix(v.Rule, "isolation.transport-") {
+			t.Errorf("expected no transport-* violations, got: %s", v.String())
+		}
 	}
 }

@@ -44,7 +44,7 @@ DDD cross-layer isolation (composition root and transport):
 | source | allowed targets | forbidden targets |
 |--------|----------------|-------------------|
 | `internal/app/` (composition root) | anything | — |
-| `internal/server/<proto>/` (transport) | `internal/app/`, `internal/pkg/` | `internal/domain/` (direct), `internal/orchestration/` |
+| `internal/server/<proto>/` (transport) | `internal/app/`, `internal/pkg/`, sibling transport | `internal/domain/` (direct), `internal/orchestration/`, unclassified internal packages |
 
 ## Clean Architecture Layout
 

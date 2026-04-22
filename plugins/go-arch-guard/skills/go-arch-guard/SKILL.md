@@ -132,7 +132,7 @@ internal/
 - `core/*`, `event`는 `internal/pkg` import 금지
 - interface는 `core/repo/`에만 정의
 - `internal/app/` (컴포지션 루트): 무제한 import 가능
-- `internal/server/<proto>/` (트랜스포트): `internal/app/`과 `internal/pkg/`만 import 가능. 도메인 직접 import 금지 (`isolation.transport-imports-domain`)
+- `internal/server/<proto>/` (트랜스포트): `internal/app/`, `internal/pkg/`, 형제 트랜스포트만 import 가능. 위반 규칙: `isolation.transport-imports-domain`, `isolation.transport-imports-orchestration`, `isolation.transport-imports-unclassified`
 
 ### Clean Architecture
 

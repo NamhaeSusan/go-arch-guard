@@ -280,6 +280,11 @@ import _ "myapp/internal/domain/order"  // 위반: pkg가 도메인에 의존
 
 트랜스포트 패키지는 오케스트레이션을 직접 import할 수 없습니다.
 
+### `isolation.transport-imports-unclassified`
+
+트랜스포트 패키지는 분류되지 않은 내부 패키지(예: `internal/config`, `internal/bootstrap`)를 import할 수 없습니다.
+트랜스포트가 의존하는 모든 것은 `internal/app/` (컴포지션 루트) 또는 `internal/pkg/`를 거쳐야 합니다.
+
 **Import 매트릭스 (DDD + app/server):**
 
 | from | 도메인 루트 | 도메인 하위 | 오케스트레이션 | 공유 패키지 | app | 트랜스포트 |

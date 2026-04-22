@@ -88,9 +88,13 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 			}
 
 			// kindTransport: may only import app, pkg, or other transport.
-			// Must not import domain or orchestration directly.
+			// Everything else (domain, orchestration, unclassified) is forbidden.
 			if src.Kind == kindTransport {
-				if imp.Kind == kindDomain || imp.Kind == kindDomainRoot {
+				switch imp.Kind {
+				case kindApp, kindShared, kindTransport:
+					// allowed
+					continue
+				case kindDomain, kindDomainRoot:
 					file, line := findImportPosition(pkg, impPath, projectRoot)
 					violations = append(violations, Violation{
 						File:     file,
@@ -101,8 +105,7 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 						Severity: cfg.Sev,
 					})
 					continue
-				}
-				if imp.Kind == kindOrchestration {
+				case kindOrchestration:
 					file, line := findImportPosition(pkg, impPath, projectRoot)
 					violations = append(violations, Violation{
 						File:     file,
@@ -113,8 +116,21 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 						Severity: cfg.Sev,
 					})
 					continue
+				case kindUnclassified:
+					file, line := findImportPosition(pkg, impPath, projectRoot)
+					violations = append(violations, Violation{
+						File:     file,
+						Line:     line,
+						Rule:     "isolation.transport-imports-unclassified",
+						Message:  fmt.Sprintf("transport package %q must not import unclassified internal package %q", pkg.PkgPath, impPath),
+						Fix:      fmt.Sprintf("move the dependency into internal/%s (expose via Container), internal/%s, or another transport package", m.AppDir, m.SharedDir),
+						Severity: cfg.Sev,
+					})
+					continue
+				case kindCmd:
+					// cmd imports transport, not the other way; unreachable in practice.
+					continue
 				}
-				// app, pkg, transport → allowed
 				continue
 			}
 

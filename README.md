@@ -301,6 +301,16 @@ import _ "myapp/internal/app"                       // correct: go through compo
 
 Transport packages must not import orchestration directly.
 
+### `isolation.transport-imports-unclassified`
+
+Transport packages must not import unclassified internal packages (e.g. `internal/config`, `internal/bootstrap`).
+Anything transport depends on must be routed through `internal/app/` (the composition root) or `internal/pkg/`.
+
+```go
+// internal/server/http/server.go
+import _ "myapp/internal/config"  // violation: transport imports unclassified package
+```
+
 **Import matrix (DDD with app/server):**
 
 | from | domain root | domain sub-pkg | orchestration | shared pkg | app | transport |

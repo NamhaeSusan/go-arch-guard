@@ -147,9 +147,14 @@ rules.WithAppDir("")           // disable composition-root privilege
 
 **What:** the name of the top-level directory under `internal/` that groups transport layers. Any subdirectory under `ServerDir` is treated as a protocol-specific transport (e.g. `server/http`, `server/grpc`). No protocol whitelist — any subdirectory counts.
 
-**Why:** packages under `ServerDir/<proto>/` are classified as `kindTransport`. The isolation rule restricts them: they may only import `AppDir` (composition root) and `SharedDir` (shared utilities). Direct imports of domain packages or orchestration from transport layers trigger violations.
+**Why:** packages under `ServerDir/<proto>/` are classified as `kindTransport`. The isolation rule restricts them: they may only import `AppDir` (composition root), `SharedDir` (shared utilities), or other transport packages. Imports of domain packages, orchestration, or unclassified internal packages from transport layers trigger violations.
 
-Transport-to-domain restriction (`isolation.transport-imports-domain`) enforces the pattern where HTTP/gRPC handlers depend on the app container, not on domain internals directly.
+Rule IDs emitted for transport source violations:
+- `isolation.transport-imports-domain` — transport imports domain (root or sub-package) directly
+- `isolation.transport-imports-orchestration` — transport imports orchestration directly
+- `isolation.transport-imports-unclassified` — transport imports an unclassified internal package (e.g. `internal/config`, `internal/bootstrap`)
+
+All three enforce the pattern where HTTP/gRPC handlers depend on the app container (or shared pkg), not on arbitrary internal code.
 
 **Set to `""`** to disable. When non-empty, `NewModel` adds it to `InternalTopLevel` automatically.
 
