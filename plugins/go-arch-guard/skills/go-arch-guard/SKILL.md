@@ -110,21 +110,29 @@ go test -run TestArchitecture -v
 ### DDD (기본값)
 
 ```text
-internal/domain/{domain}/
-├── alias.go           # public surface (필수)
-├── handler/           # 인바운드 어댑터
-├── app/               # 애플리케이션 서비스
-├── core/model/        # 도메인 모델 (필수)
-├── core/repo/         # 레포지토리 인터페이스
-├── core/svc/          # 도메인 서비스 인터페이스
-├── event/             # 도메인 이벤트
-└── infra/             # 아웃바운드 어댑터
+internal/
+├── domain/{domain}/
+│   ├── alias.go           # public surface (필수)
+│   ├── handler/           # 인바운드 어댑터
+│   ├── app/               # 애플리케이션 서비스
+│   ├── core/model/        # 도메인 모델 (필수)
+│   ├── core/repo/         # 레포지토리 인터페이스
+│   ├── core/svc/          # 도메인 서비스 인터페이스
+│   ├── event/             # 도메인 이벤트
+│   └── infra/             # 아웃바운드 어댑터
+├── app/                   # 컴포지션 루트 (DI 와이어링)
+├── server/
+│   └── http/              # 트랜스포트 레이어 (http, grpc, …)
+├── orchestration/         # 크로스 도메인 조정
+└── pkg/                   # 공유 유틸리티
 ```
 
 - `alias.go` 필수, domain root에 다른 .go 금지
 - `core/model/`에 최소 1개 .go 필수
 - `core/*`, `event`는 `internal/pkg` import 금지
 - interface는 `core/repo/`에만 정의
+- `internal/app/` (컴포지션 루트): 무제한 import 가능
+- `internal/server/<proto>/` (트랜스포트): `internal/app/`과 `internal/pkg/`만 import 가능. 도메인 직접 import 금지 (`isolation.transport-imports-domain`)
 
 ### Clean Architecture
 
