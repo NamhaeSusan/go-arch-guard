@@ -3,13 +3,20 @@ package rules
 // Model defines the architecture model used by all rule checks.
 // Use DDD(), CleanArch(), Layered(), Hexagonal(), ModularMonolith(), ConsumerWorker(), Batch(), EventPipeline(), or NewModel() to create one.
 type Model struct {
-	Sublayers               []string
-	Direction               map[string][]string
-	PkgRestricted           map[string]bool
-	InternalTopLevel        map[string]bool
-	DomainDir               string
-	OrchestrationDir        string
-	SharedDir               string
+	Sublayers        []string
+	Direction        map[string][]string
+	PkgRestricted    map[string]bool
+	InternalTopLevel map[string]bool
+	DomainDir        string
+	OrchestrationDir string
+	SharedDir        string
+	// AppDir is the top-level composition-root directory under internal/.
+	// e.g. "app". Empty to disable kindApp classification.
+	AppDir string
+	// ServerDir is the top-level transport directory under internal/.
+	// Any subdirectory under ServerDir counts as a transport layer (e.g. server/http, server/grpc).
+	// e.g. "server". Empty to disable kindTransport classification.
+	ServerDir               string
 	RequireAlias            bool
 	AliasFileName           string
 	RequireModel            bool
@@ -74,10 +81,13 @@ func DDD() Model {
 		},
 		InternalTopLevel: map[string]bool{
 			"domain": true, "orchestration": true, "pkg": true,
+			"app": true, "server": true,
 		},
 		DomainDir:        "domain",
 		OrchestrationDir: "orchestration",
 		SharedDir:        "pkg",
+		AppDir:           "app",
+		ServerDir:        "server",
 		RequireAlias:     true,
 		AliasFileName:    "alias.go",
 		RequireModel:     true,
@@ -424,6 +434,12 @@ func NewModel(opts ...ModelOption) Model {
 	if m.SharedDir != "" {
 		tl[m.SharedDir] = true
 	}
+	if m.AppDir != "" {
+		tl[m.AppDir] = true
+	}
+	if m.ServerDir != "" {
+		tl[m.ServerDir] = true
+	}
 	m.InternalTopLevel = tl
 	return m
 }
@@ -497,4 +513,12 @@ func WithPortLayers(layers []string) ModelOption {
 
 func WithContractLayers(layers []string) ModelOption {
 	return func(m *Model) { m.ContractLayers = layers }
+}
+
+func WithAppDir(s string) ModelOption {
+	return func(m *Model) { m.AppDir = s }
+}
+
+func WithServerDir(s string) ModelOption {
+	return func(m *Model) { m.ServerDir = s }
 }

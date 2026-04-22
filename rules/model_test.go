@@ -5,6 +5,21 @@ import (
 	"testing"
 )
 
+func TestDDD_IncludesAppAndServer(t *testing.T) {
+	m := DDD()
+	for _, dir := range []string{"app", "server"} {
+		if !m.InternalTopLevel[dir] {
+			t.Errorf("DDD InternalTopLevel missing %q", dir)
+		}
+	}
+	if m.AppDir != "app" {
+		t.Errorf("AppDir = %q, want %q", m.AppDir, "app")
+	}
+	if m.ServerDir != "server" {
+		t.Errorf("ServerDir = %q, want %q", m.ServerDir, "server")
+	}
+}
+
 func TestDDD_ReturnsValidModel(t *testing.T) {
 	m := DDD()
 	if len(m.Sublayers) == 0 {
