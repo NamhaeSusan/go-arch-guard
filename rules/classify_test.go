@@ -122,6 +122,84 @@ func TestClassifyInternalPackage_FlatLayout(t *testing.T) {
 	}
 }
 
+func TestClassifyInternalPackage_AppAndTransport(t *testing.T) {
+	m := DDD()
+	internalPrefix := "example.com/myapp/internal/"
+
+	tests := []struct {
+		name     string
+		pkgPath  string
+		wantKind internalKind
+	}{
+		{
+			name:     "app composition root",
+			pkgPath:  "example.com/myapp/internal/app",
+			wantKind: kindApp,
+		},
+		{
+			name:     "app sub-package",
+			pkgPath:  "example.com/myapp/internal/app/container",
+			wantKind: kindApp,
+		},
+		{
+			name:     "transport http server",
+			pkgPath:  "example.com/myapp/internal/server/http",
+			wantKind: kindTransport,
+		},
+		{
+			name:     "transport grpc server",
+			pkgPath:  "example.com/myapp/internal/server/grpc",
+			wantKind: kindTransport,
+		},
+		{
+			name:     "transport sub-package",
+			pkgPath:  "example.com/myapp/internal/server/http/middleware",
+			wantKind: kindTransport,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := classifyInternalPackage(m, tc.pkgPath, internalPrefix)
+			if got.Kind != tc.wantKind {
+				t.Errorf("Kind = %v, want %v", got.Kind, tc.wantKind)
+			}
+		})
+	}
+}
+
+func TestClassifyInternalPackage_AppAndTransport_Disabled(t *testing.T) {
+	// When AppDir/ServerDir are empty, these should be kindUnclassified
+	m := CleanArch() // CleanArch doesn't have AppDir/ServerDir
+	internalPrefix := "example.com/myapp/internal/"
+
+	tests := []struct {
+		name     string
+		pkgPath  string
+		wantKind internalKind
+	}{
+		{
+			name:     "app is unclassified without AppDir",
+			pkgPath:  "example.com/myapp/internal/app",
+			wantKind: kindUnclassified,
+		},
+		{
+			name:     "server is unclassified without ServerDir",
+			pkgPath:  "example.com/myapp/internal/server/http",
+			wantKind: kindUnclassified,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := classifyInternalPackage(m, tc.pkgPath, internalPrefix)
+			if got.Kind != tc.wantKind {
+				t.Errorf("Kind = %v, want %v", got.Kind, tc.wantKind)
+			}
+		})
+	}
+}
+
 func TestClassifyInternalPackage_EventPipeline(t *testing.T) {
 	m := EventPipeline()
 	internalPrefix := "example.com/myapp/internal/"
