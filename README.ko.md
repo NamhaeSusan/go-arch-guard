@@ -180,6 +180,8 @@ m := rules.NewModel(
 | `WithDomainDir("domain")` | 도메인 최상위 디렉토리명 |
 | `WithOrchestrationDir("orchestration")` | 오케스트레이션 최상위 디렉토리명 |
 | `WithSharedDir("pkg")` | 공유 패키지 최상위 디렉토리명 |
+| `WithAppDir("app")` | 컴포지션 루트 최상위 디렉토리 (예: `internal/app/`). 이 패키지들은 무제한 import 가능. 비워두면 비활성화. |
+| `WithServerDir("server")` | 트랜스포트 레이어 최상위 디렉토리 (예: `internal/server/`). 하위 디렉토리는 모두 트랜스포트로 분류. app+pkg만 import 가능. 비워두면 비활성화. |
 | `WithRequireAlias(bool)` | 도메인 루트에 alias 파일 필수 여부 |
 | `WithAliasFileName("alias.go")` | alias 파일명 |
 | `WithRequireModel(bool)` | 도메인에 모델 디렉토리 필수 여부 |
@@ -267,17 +269,33 @@ import _ "myapp/internal/domain/order"  // 위반: pkg가 도메인에 의존
 
 ### `isolation.stray-imports-domain`
 
-도메인이 아닌 내부 패키지(orchestration/cmd/pkg 제외)는 도메인을 import할 수 없습니다.
+도메인이 아닌 내부 패키지(orchestration/cmd/pkg/app/transport 제외)는 도메인을 import할 수 없습니다.
 
-**Import 매트릭스:**
+### `isolation.transport-imports-domain`
 
-| from | 도메인 루트 | 도메인 하위 | 오케스트레이션 | 공유 패키지 |
-|------|:-:|:-:|:-:|:-:|
-| **같은 도메인** | O | O | X | O |
-| **다른 도메인** | X | X | X | O |
-| **오케스트레이션** | O | X | O | O |
-| **cmd** | O | X | O | O |
-| **공유 패키지** | X | X | X | O |
+트랜스포트 패키지(`internal/server/<proto>/`)는 도메인 하위 패키지를 직접 import할 수 없습니다.
+컴포지션 루트(`internal/app/`)를 통해야 합니다.
+
+### `isolation.transport-imports-orchestration`
+
+트랜스포트 패키지는 오케스트레이션을 직접 import할 수 없습니다.
+
+### `isolation.transport-imports-unclassified`
+
+트랜스포트 패키지는 분류되지 않은 내부 패키지(예: `internal/config`, `internal/bootstrap`)를 import할 수 없습니다.
+트랜스포트가 의존하는 모든 것은 `internal/app/` (컴포지션 루트) 또는 `internal/pkg/`를 거쳐야 합니다.
+
+**Import 매트릭스 (DDD + app/server):**
+
+| from | 도메인 루트 | 도메인 하위 | 오케스트레이션 | 공유 패키지 | app | 트랜스포트 |
+|------|:-:|:-:|:-:|:-:|:-:|:-:|
+| **같은 도메인** | O | O | X | O | X | X |
+| **다른 도메인** | X | X | X | O | X | X |
+| **오케스트레이션** | O | X | O | O | X | X |
+| **cmd** | O | X | O | O | X | X |
+| **공유 패키지** | X | X | X | O | X | X |
+| **app (컴포지션 루트)** | O | O | O | O | O | X |
+| **트랜스포트** | X | X | X | O | O | O |
 
 > **Flat 레이아웃 프리셋** (ConsumerWorker, Batch, EventPipeline): 격리할 도메인이 없으므로
 > 격리 규칙이 완전히 스킵됩니다.

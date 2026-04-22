@@ -19,11 +19,14 @@ internal/
 │       │   └── svc/              # domain service interface
 │       ├── event/                # domain events
 │       └── infra/persistence/    # outbound adapters
+├── app/                          # composition root (DI wiring)
+├── server/
+│   └── http/                     # transport layer (http, grpc, …)
 ├── orchestration/                # cross-domain coordination
 └── pkg/                          # shared utilities
 ```
 
-DDD layer direction:
+DDD layer direction (intra-domain sublayers):
 
 | from | allowed to import |
 |------|-------------------|
@@ -35,6 +38,13 @@ DDD layer direction:
 | `core/svc` | `core/model` |
 | `event` | `core/model` |
 | `infra` | `core/repo`, `core/model`, `event` |
+
+DDD cross-layer isolation (composition root and transport):
+
+| source | allowed targets | forbidden targets |
+|--------|----------------|-------------------|
+| `internal/app/` (composition root) | anything | — |
+| `internal/server/<proto>/` (transport) | `internal/app/`, `internal/pkg/`, sibling transport | `internal/domain/` (direct), `internal/orchestration/`, unclassified internal packages |
 
 ## Clean Architecture Layout
 

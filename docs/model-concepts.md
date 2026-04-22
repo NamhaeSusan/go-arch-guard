@@ -124,6 +124,51 @@ rules.WithSharedDir("pkg")  // internal/pkg/ (DDD default)
 
 ---
 
+### `AppDir`
+
+**What:** the name of the top-level directory under `internal/` that acts as the composition root (DI wiring, container setup).
+
+**Why:** packages under `AppDir` are classified as `kindApp`. The isolation rule grants them unrestricted import privileges — they are the composition root and must be able to wire together any combination of domain, orchestration, and shared packages.
+
+**Set to `""`** to disable. When non-empty, `NewModel` adds it to `InternalTopLevel` automatically.
+
+**Default in DDD:** `"app"` (`internal/app/`).
+
+**Example:**
+
+```go
+rules.WithAppDir("container")  // internal/container/
+rules.WithAppDir("")           // disable composition-root privilege
+```
+
+---
+
+### `ServerDir`
+
+**What:** the name of the top-level directory under `internal/` that groups transport layers. Any subdirectory under `ServerDir` is treated as a protocol-specific transport (e.g. `server/http`, `server/grpc`). No protocol whitelist — any subdirectory counts.
+
+**Why:** packages under `ServerDir/<proto>/` are classified as `kindTransport`. The isolation rule restricts them: they may only import `AppDir` (composition root), `SharedDir` (shared utilities), or other transport packages. Imports of domain packages, orchestration, or unclassified internal packages from transport layers trigger violations.
+
+Rule IDs emitted for transport source violations:
+- `isolation.transport-imports-domain` — transport imports domain (root or sub-package) directly
+- `isolation.transport-imports-orchestration` — transport imports orchestration directly
+- `isolation.transport-imports-unclassified` — transport imports an unclassified internal package (e.g. `internal/config`, `internal/bootstrap`)
+
+All three enforce the pattern where HTTP/gRPC handlers depend on the app container (or shared pkg), not on arbitrary internal code.
+
+**Set to `""`** to disable. When non-empty, `NewModel` adds it to `InternalTopLevel` automatically.
+
+**Default in DDD:** `"server"` (`internal/server/`).
+
+**Example:**
+
+```go
+rules.WithServerDir("transport")  // internal/transport/http/, internal/transport/grpc/
+rules.WithServerDir("")           // disable transport isolation
+```
+
+---
+
 ### `InternalTopLevel`
 
 **What:** the set of directory names allowed directly under `internal/`.

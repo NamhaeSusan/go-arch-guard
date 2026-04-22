@@ -195,6 +195,8 @@ All model options:
 | `WithDomainDir("domain")` | top-level directory name for domains |
 | `WithOrchestrationDir("orchestration")` | top-level directory name for orchestration |
 | `WithSharedDir("pkg")` | top-level directory name for shared packages |
+| `WithAppDir("app")` | top-level composition-root directory (e.g. `internal/app/`). Packages here may import anything. Empty to disable. |
+| `WithServerDir("server")` | top-level transport directory (e.g. `internal/server/`). Any subdirectory is a protocol transport. Restricted to app+pkg imports. Empty to disable. |
 | `WithRequireAlias(bool)` | whether domain roots must define alias.go |
 | `WithAliasFileName("alias.go")` | name of the alias file |
 | `WithRequireModel(bool)` | whether domains must have a model directory |
@@ -282,17 +284,44 @@ Only `cmd/` and orchestration itself may depend on orchestration.
 
 ### `isolation.stray-imports-domain`
 
-Non-domain internal packages (other than orchestration/cmd/pkg) must not import domains.
+Non-domain internal packages (other than orchestration/cmd/pkg/app/transport) must not import domains.
 
-**Import matrix:**
+### `isolation.transport-imports-domain`
 
-| from | domain root | domain sub-pkg | orchestration | shared pkg |
-|------|:-:|:-:|:-:|:-:|
-| **same domain** | Yes | Yes | No | Yes |
-| **other domain** | No | No | No | Yes |
-| **orchestration** | Yes | No | Yes | Yes |
-| **cmd** | Yes | No | Yes | Yes |
-| **shared pkg** | No | No | No | Yes |
+Transport packages (`internal/server/<proto>/`) must not import domain sub-packages directly.
+They should go through the composition root (`internal/app/`) instead.
+
+```go
+// internal/server/http/handler.go
+import _ "myapp/internal/domain/order/core/model"  // violation: transport imports domain directly
+import _ "myapp/internal/app"                       // correct: go through composition root
+```
+
+### `isolation.transport-imports-orchestration`
+
+Transport packages must not import orchestration directly.
+
+### `isolation.transport-imports-unclassified`
+
+Transport packages must not import unclassified internal packages (e.g. `internal/config`, `internal/bootstrap`).
+Anything transport depends on must be routed through `internal/app/` (the composition root) or `internal/pkg/`.
+
+```go
+// internal/server/http/server.go
+import _ "myapp/internal/config"  // violation: transport imports unclassified package
+```
+
+**Import matrix (DDD with app/server):**
+
+| from | domain root | domain sub-pkg | orchestration | shared pkg | app | transport |
+|------|:-:|:-:|:-:|:-:|:-:|:-:|
+| **same domain** | Yes | Yes | No | Yes | No | No |
+| **other domain** | No | No | No | Yes | No | No |
+| **orchestration** | Yes | No | Yes | Yes | No | No |
+| **cmd** | Yes | No | Yes | Yes | No | No |
+| **shared pkg** | No | No | No | Yes | No | No |
+| **app (composition root)** | Yes | Yes | Yes | Yes | Yes | No |
+| **transport** | No | No | No | Yes | Yes | Yes |
 
 > **Flat-layout presets** (ConsumerWorker, Batch, EventPipeline): isolation rules are
 > skipped entirely --- there are no domains to isolate.

@@ -69,6 +69,11 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 		// any known bucket (domain/, orchestration/, shared/). They may still
 		// import domains/orchestration and must be checked as "stray" sources.
 
+		// kindApp is a composition root — it may import anything. Skip all checks.
+		if src.Kind == kindApp {
+			continue
+		}
+
 		for impPath := range pkg.Imports {
 			if !strings.HasPrefix(impPath, internalPrefix) {
 				continue
@@ -79,6 +84,53 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 			// Rule 2: import pkg/ → always allowed for anyone except pkg/ itself
 			// (pkg/ → pkg/ is just intra-shared and still allowed).
 			if imp.Kind == kindShared && src.Kind != kindShared {
+				continue
+			}
+
+			// kindTransport: may only import app, pkg, or other transport.
+			// Everything else (domain, orchestration, unclassified) is forbidden.
+			if src.Kind == kindTransport {
+				switch imp.Kind {
+				case kindApp, kindShared, kindTransport:
+					// allowed
+					continue
+				case kindDomain, kindDomainRoot:
+					file, line := findImportPosition(pkg, impPath, projectRoot)
+					violations = append(violations, Violation{
+						File:     file,
+						Line:     line,
+						Rule:     "isolation.transport-imports-domain",
+						Message:  fmt.Sprintf("transport package %q must not import domain %q directly", pkg.PkgPath, imp.Domain),
+						Fix:      fmt.Sprintf("import %s/ (the app/composition root) instead of domain sub-packages directly", m.AppDir),
+						Severity: cfg.Sev,
+					})
+					continue
+				case kindOrchestration:
+					file, line := findImportPosition(pkg, impPath, projectRoot)
+					violations = append(violations, Violation{
+						File:     file,
+						Line:     line,
+						Rule:     "isolation.transport-imports-orchestration",
+						Message:  fmt.Sprintf("transport package %q must not import %s directly", pkg.PkgPath, m.OrchestrationDir),
+						Fix:      fmt.Sprintf("transport layers should only import %s/ (composition root) and %s/ (shared utilities)", m.AppDir, m.SharedDir),
+						Severity: cfg.Sev,
+					})
+					continue
+				case kindUnclassified:
+					file, line := findImportPosition(pkg, impPath, projectRoot)
+					violations = append(violations, Violation{
+						File:     file,
+						Line:     line,
+						Rule:     "isolation.transport-imports-unclassified",
+						Message:  fmt.Sprintf("transport package %q must not import unclassified internal package %q", pkg.PkgPath, impPath),
+						Fix:      fmt.Sprintf("move the dependency into internal/%s (expose via Container), internal/%s, or another transport package", m.AppDir, m.SharedDir),
+						Severity: cfg.Sev,
+					})
+					continue
+				case kindCmd:
+					// cmd imports transport, not the other way; unreachable in practice.
+					continue
+				}
 				continue
 			}
 

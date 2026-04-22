@@ -14,6 +14,8 @@ const (
 	kindDomainRoot
 	kindCmd
 	kindUnclassified
+	kindApp       // internal/<AppDir>/...
+	kindTransport // internal/<ServerDir>/<proto>/...
 )
 
 type classified struct {
@@ -34,6 +36,24 @@ func classifyInternalPackage(m Model, pkgPath, internalPrefix string) classified
 	// Shared/pkg check first
 	if m.SharedDir != "" && isUnderInternalDir(pkgPath, internalPrefix, m.SharedDir) {
 		return classified{Kind: kindShared}
+	}
+
+	// App (composition root) check
+	if m.AppDir != "" && isUnderInternalDir(pkgPath, internalPrefix, m.AppDir) {
+		return classified{Kind: kindApp}
+	}
+
+	// Transport (server/<proto>) check — must be under ServerDir/<any-proto>/
+	if m.ServerDir != "" {
+		rel := strings.TrimPrefix(pkgPath, internalPrefix)
+		serverPrefix := m.ServerDir + "/"
+		if strings.HasPrefix(rel, serverPrefix) {
+			// rel is now "server/<proto>[/...]" — must have at least one proto segment
+			after := strings.TrimPrefix(rel, serverPrefix)
+			if after != "" {
+				return classified{Kind: kindTransport}
+			}
+		}
 	}
 
 	// Orchestration check
