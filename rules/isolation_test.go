@@ -232,3 +232,104 @@ func TestCheckDomainIsolation(t *testing.T) {
 	})
 
 }
+
+func TestCheckDomainIsolation_TransportCannotImportDomain(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/dddapp"
+
+	writeTestFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+
+	// domain/order/core/model
+	writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"), "package order\n")
+	writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "model.go"), "package model\ntype Order struct{}\n")
+
+	// internal/app/container.go — legal: imports domain (kindApp can import anything)
+	writeTestFile(t, filepath.Join(root, "internal", "app", "container.go"),
+		"package app\n\nimport _ \""+module+"/internal/domain/order/core/model\"\n")
+
+	// internal/server/http/server.go — legal: imports internal/app only
+	writeTestFile(t, filepath.Join(root, "internal", "server", "http", "server.go"),
+		"package http\n\nimport _ \""+module+"/internal/app\"\n")
+
+	// internal/server/http/bad.go — ILLEGAL: transport imports domain directly
+	writeTestFile(t, filepath.Join(root, "internal", "server", "http", "bad.go"),
+		"package http\n\nimport _ \""+module+"/internal/domain/order/core/model\"\n")
+
+	pkgs := loadTestPackages(t, root)
+	violations := rules.CheckDomainIsolation(pkgs, module, root, rules.WithModel(rules.DDD()))
+
+	found := false
+	for _, v := range violations {
+		if v.Rule == "isolation.transport-imports-domain" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		for _, v := range violations {
+			t.Logf("violation: %s", v.String())
+		}
+		t.Error("expected isolation.transport-imports-domain violation")
+	}
+}
+
+func TestCheckDomainIsolation_AppCanImportAnything(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/dddapp2"
+
+	writeTestFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+
+	// domain/order/core/model
+	writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"), "package order\n")
+	writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "model.go"), "package model\ntype Order struct{}\n")
+
+	// domain/user/core/model
+	writeTestFile(t, filepath.Join(root, "internal", "domain", "user", "alias.go"), "package user\n")
+	writeTestFile(t, filepath.Join(root, "internal", "domain", "user", "core", "model", "model.go"), "package model\ntype User struct{}\n")
+
+	// internal/orchestration — cross-domain coordination
+	writeTestFile(t, filepath.Join(root, "internal", "orchestration", "orch.go"), "package orchestration\n")
+
+	// internal/app/container.go — imports multiple domains (legal)
+	writeTestFile(t, filepath.Join(root, "internal", "app", "container.go"),
+		"package app\n\nimport (\n\t_ \""+module+"/internal/domain/order/core/model\"\n\t_ \""+module+"/internal/domain/user/core/model\"\n\t_ \""+module+"/internal/orchestration\"\n)\n")
+
+	pkgs := loadTestPackages(t, root)
+	violations := rules.CheckDomainIsolation(pkgs, module, root, rules.WithModel(rules.DDD()))
+
+	for _, v := range violations {
+		t.Errorf("expected no violations for kindApp, got: %s", v.String())
+	}
+}
+
+func TestCheckDomainIsolation_TransportCannotImportOrchestration(t *testing.T) {
+	root := t.TempDir()
+	module := "example.com/dddapp3"
+
+	writeTestFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
+
+	writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"), "package order\n")
+	writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "model.go"), "package model\ntype Order struct{}\n")
+	writeTestFile(t, filepath.Join(root, "internal", "orchestration", "orch.go"), "package orchestration\n")
+
+	// transport imports orchestration — ILLEGAL
+	writeTestFile(t, filepath.Join(root, "internal", "server", "http", "bad.go"),
+		"package http\n\nimport _ \""+module+"/internal/orchestration\"\n")
+
+	pkgs := loadTestPackages(t, root)
+	violations := rules.CheckDomainIsolation(pkgs, module, root, rules.WithModel(rules.DDD()))
+
+	found := false
+	for _, v := range violations {
+		if v.Rule == "isolation.transport-imports-orchestration" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		for _, v := range violations {
+			t.Logf("violation: %s", v.String())
+		}
+		t.Error("expected isolation.transport-imports-orchestration violation")
+	}
+}

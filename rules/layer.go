@@ -33,8 +33,9 @@ func CheckLayerDirection(pkgs []*packages.Package, projectModule string, project
 
 		src := classifyInternalPackage(m, pkg.PkgPath, internalPrefix)
 		// The layer rule only reasons about domain-shaped sources. Domain
-		// root / orchestration / shared / unclassified are not subject to
-		// direction checks here; they are handled by isolation or skipped.
+		// root / orchestration / shared / unclassified / app / transport
+		// are not subject to direction checks here; they are handled by
+		// isolation or skipped.
 		if src.Kind != kindDomain {
 			continue
 		}
