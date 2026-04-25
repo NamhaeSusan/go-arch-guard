@@ -23,9 +23,27 @@ func Load(dir string, patterns ...string) ([]*packages.Package, error) {
 		return nil, fmt.Errorf("project root not found: %w", err)
 	}
 
+	// Prefix relative directory patterns with "./" so go/packages treats
+	// them as filesystem queries against absDir. Patterns that already start
+	// with "./" or that look like an absolute module query (e.g.
+	// "github.com/foo/bar/...") are passed through unchanged — double-
+	// prefixing would either yield "././..." or wedge a module path into a
+	// filesystem lookup that go/packages rejects.
+	//
+	// Module-path detection looks at the first path segment only: a dot in
+	// the first segment ("github.com/...") implies a module query, while
+	// "internal/..." has no dot in its first segment despite the trailing
+	// "..." wildcard.
 	prefixed := make([]string, len(patterns))
 	for i, p := range patterns {
-		prefixed[i] = "./" + p
+		switch {
+		case strings.HasPrefix(p, "./"):
+			prefixed[i] = p
+		case looksLikeModulePath(p):
+			prefixed[i] = p
+		default:
+			prefixed[i] = "./" + p
+		}
 	}
 
 	cfg := &packages.Config{
@@ -54,6 +72,12 @@ func Load(dir string, patterns ...string) ([]*packages.Package, error) {
 		// undefined identifier) because downstream rules can still inspect the
 		// AST/imports. Reject parse and list errors since those leave TypesInfo
 		// unreliable.
+		//
+		// Seed from pkg.IllTyped (which go/packages sets to true whenever any
+		// error exists, type or otherwise) and then narrow it: the loop below
+		// flips it to false the first time we hit a non-TypeError. The
+		// pkg.IllTyped seed is only meaningful AFTER firstFatalErrorInDeps has
+		// returned empty above, because otherwise this block never runs.
 		onlyTypeErrors := pkg.IllTyped
 		for _, e := range pkg.Errors {
 			if e.Kind != packages.TypeError {
@@ -71,9 +95,37 @@ func Load(dir string, patterns ...string) ([]*packages.Package, error) {
 		}
 	}
 	if len(loadErrs) > 0 {
-		return result, fmt.Errorf("packages with errors were skipped: %s", strings.Join(loadErrs, "; "))
+		return result, fmt.Errorf("packages with errors were skipped (%d): %s",
+			len(loadErrs), summarizeLoadErrs(loadErrs))
 	}
 	return result, nil
+}
+
+// looksLikeModulePath reports whether p has a dot in its first path segment,
+// the canonical signal of a Go module path (e.g. "github.com/x/y" or
+// "example.com/foo"). A pattern like "internal/..." has no dot in its first
+// segment ("internal") even though the trailing "..." wildcard contains
+// dots, so it is NOT a module path and still wants the "./" prefix.
+func looksLikeModulePath(p string) bool {
+	firstSegment, _, _ := strings.Cut(p, "/")
+	if firstSegment == "..." || firstSegment == "" {
+		return false
+	}
+	return strings.Contains(firstSegment, ".")
+}
+
+// summarizeLoadErrs joins errors with "; " and caps the output at the first
+// few entries so the final error message stays readable when many packages
+// fail at once. Callers that need every detail can re-run with verbose
+// tooling; the returned error here is for human-eyeballable CI logs.
+const maxLoadErrSamples = 5
+
+func summarizeLoadErrs(errs []string) string {
+	if len(errs) <= maxLoadErrSamples {
+		return strings.Join(errs, "; ")
+	}
+	head := strings.Join(errs[:maxLoadErrSamples], "; ")
+	return fmt.Sprintf("%s; ... and %d more", head, len(errs)-maxLoadErrSamples)
 }
 
 // firstFatalErrorInDeps traverses the transitive import graph of pkg
