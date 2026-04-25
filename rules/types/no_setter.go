@@ -3,6 +3,7 @@ package types
 import (
 	"fmt"
 	"go/ast"
+	"slices"
 	"strings"
 	"unicode"
 
@@ -148,10 +149,5 @@ func autoExcludedPackage(pkg *packages.Package) bool {
 
 func hasPathSegment(path, segment string) bool {
 	path = analysisutil.NormalizeMatchPath(path)
-	for _, part := range strings.Split(path, "/") {
-		if part == segment {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(strings.Split(path, "/"), segment)
 }
