@@ -1,5 +1,7 @@
 package core
 
+import "maps"
+
 // RuleSet is an immutable collection of rules plus a set of violation IDs
 // to filter out at the runner. With and Without return copies, so chaining
 // is safe and the original RuleSet is never mutated.
@@ -55,9 +57,7 @@ func (rs RuleSet) copy() RuleSet {
 	var skip map[string]bool
 	if len(rs.skipViolationIDs) > 0 {
 		skip = make(map[string]bool, len(rs.skipViolationIDs))
-		for k, v := range rs.skipViolationIDs {
-			skip[k] = v
-		}
+		maps.Copy(skip, rs.skipViolationIDs)
 	}
 	return RuleSet{rules: rules, skipViolationIDs: skip}
 }
