@@ -80,6 +80,10 @@ func ResolveRoot(pkgs []*packages.Package, explicit string) string {
 	return ""
 }
 
+// ResolveModuleFromContext returns the project module path for ctx,
+// preferring (in order) the explicit override, ctx.Module(), and the
+// loaded packages' module metadata. Custom-rule authors can use this to
+// resolve a module path without repeating the fallback chain.
 func ResolveModuleFromContext(ctx *core.Context, explicit string) string {
 	if ctx == nil {
 		return explicit
@@ -90,6 +94,9 @@ func ResolveModuleFromContext(ctx *core.Context, explicit string) string {
 	return ResolveModule(ctx.Pkgs(), "")
 }
 
+// ResolveRootFromContext returns the project root for ctx, preferring (in
+// order) the explicit override, ctx.Root(), and the loaded packages' module
+// directory metadata.
 func ResolveRootFromContext(ctx *core.Context, explicit string) string {
 	if ctx == nil {
 		return explicit
