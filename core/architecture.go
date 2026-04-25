@@ -10,10 +10,13 @@ type Architecture struct {
 	Structure StructurePolicy
 }
 
-// LayerModel owns layer vocabulary. Sublayers is authoritative; every
-// other field that names a layer (here or in StructurePolicy) MUST appear
-// in Sublayers — Architecture.Validate enforces this.
+// LayerModel owns layer vocabulary. Sublayers is the authoritative single
+// source of truth for layer names: every other field that names a layer
+// (here, in StructurePolicy, or in any rule) MUST appear in Sublayers, and
+// rules read layer names exclusively through ctx.Arch().Layers.Sublayers.
+// Architecture.Validate enforces both invariants.
 type LayerModel struct {
+	// Sublayers is the authoritative single source of truth for layer names.
 	Sublayers        []string
 	Direction        map[string][]string
 	PortLayers       []string        // pure interface layers (repo, gateway)
