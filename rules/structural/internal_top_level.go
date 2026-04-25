@@ -1,9 +1,9 @@
 package structural
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/NamhaeSusan/go-arch-guard/core"
@@ -19,9 +19,8 @@ type InternalTopLevel struct {
 }
 
 func NewInternalTopLevel(opts ...Option) *InternalTopLevel {
-	r := &InternalTopLevel{severity: core.Error}
-	applyOptions(r, opts)
-	return r
+	cfg := newConfig(opts, core.Error)
+	return &InternalTopLevel{severity: cfg.severity}
 }
 
 func (r *InternalTopLevel) Spec() core.RuleSpec {
@@ -39,6 +38,9 @@ func (r *InternalTopLevel) Check(ctx *core.Context) []core.Violation {
 	if ctx == nil {
 		return nil
 	}
+	if !hasInternalDir(ctx.Root()) {
+		return []core.Violation{metaLayoutNotSupported(ruleInternalTopLevel)}
+	}
 	internalDir := filepath.Join(ctx.Root(), "internal")
 	entries, err := os.ReadDir(internalDir)
 	if err != nil {
@@ -50,6 +52,8 @@ func (r *InternalTopLevel) Check(ctx *core.Context) []core.Violation {
 	for name := range arch.Layers.InternalTopLevel {
 		allowedNames = append(allowedNames, "internal/"+name+"/")
 	}
+	sort.Strings(allowedNames)
+	allowedHint := strings.Join(allowedNames, ", ")
 
 	var violations []core.Violation
 	for _, entry := range entries {
@@ -60,7 +64,7 @@ func (r *InternalTopLevel) Check(ctx *core.Context) []core.Violation {
 			}
 			violations = append(violations, violation(r.severity, internalTopLevel, relPath+"/",
 				`internal/ top-level package "`+entry.Name()+`" is not allowed`,
-				fmt.Sprintf("use only %v at the internal/ top level", allowedNames)))
+				"use only "+allowedHint+" at the internal/ top level"))
 			continue
 		}
 
@@ -72,7 +76,7 @@ func (r *InternalTopLevel) Check(ctx *core.Context) []core.Violation {
 		}
 		violations = append(violations, violation(r.severity, internalTopLevel, relPath,
 			`internal/ top-level Go file "`+entry.Name()+`" is not allowed`,
-			fmt.Sprintf("move code under %v", allowedNames)))
+			"move code under "+allowedHint))
 	}
 	return violations
 }

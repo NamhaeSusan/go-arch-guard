@@ -19,9 +19,8 @@ type BannedPackage struct {
 }
 
 func NewBannedPackage(opts ...Option) *BannedPackage {
-	r := &BannedPackage{severity: core.Warning}
-	applyOptions(r, opts)
-	return r
+	cfg := newConfig(opts, core.Warning)
+	return &BannedPackage{severity: cfg.severity}
 }
 
 func (r *BannedPackage) Spec() core.RuleSpec {
@@ -39,6 +38,9 @@ func (r *BannedPackage) Spec() core.RuleSpec {
 func (r *BannedPackage) Check(ctx *core.Context) []core.Violation {
 	if ctx == nil {
 		return nil
+	}
+	if !hasInternalDir(ctx.Root()) {
+		return []core.Violation{metaLayoutNotSupported(ruleBannedPackage)}
 	}
 	internalDir := filepath.Join(ctx.Root(), "internal")
 	var violations []core.Violation

@@ -1,7 +1,6 @@
 package structural
 
 import (
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -23,9 +22,8 @@ type Placement struct {
 }
 
 func NewPlacement(opts ...Option) *Placement {
-	r := &Placement{severity: core.Error}
-	applyOptions(r, opts)
-	return r
+	cfg := newConfig(opts, core.Error)
+	return &Placement{severity: cfg.severity}
 }
 
 func (r *Placement) Spec() core.RuleSpec {
@@ -45,10 +43,10 @@ func (r *Placement) Check(ctx *core.Context) []core.Violation {
 	if ctx == nil {
 		return nil
 	}
-	internalDir := filepath.Join(ctx.Root(), "internal")
-	if _, err := os.Stat(internalDir); err != nil {
-		return nil
+	if !hasInternalDir(ctx.Root()) {
+		return []core.Violation{metaLayoutNotSupported(rulePlacement)}
 	}
+	internalDir := filepath.Join(ctx.Root(), "internal")
 	arch := ctx.Arch()
 	violations := r.checkLayerPlacement(ctx, internalDir, arch)
 	violations = append(violations, r.checkMiddlewarePlacement(ctx, internalDir, arch)...)
@@ -84,7 +82,7 @@ func (r *Placement) checkLayerPlacement(ctx *core.Context, internalDir string, a
 		}
 		violations = append(violations, violation(r.severity, misplacedLayer, rel+"/",
 			`layer package "`+name+`" is misplaced`,
-			fmt.Sprintf("place layer packages only in configured domain slices or %s handler", arch.Layout.OrchestrationDir)))
+			"place layer packages only in configured domain slices or "+arch.Layout.OrchestrationDir+" handler"))
 		return nil
 	})
 	return violations
@@ -143,7 +141,7 @@ func (r *Placement) checkDTOPlacement(ctx *core.Context, internalDir string, arc
 		}
 		violations = append(violations, violation(r.severity, dtoPlacement, rel,
 			`"`+name+`" found in forbidden layer`,
-			fmt.Sprintf("DTOs belong in %v", arch.Structure.DTOAllowedLayers)))
+			"DTOs belong in "+strings.Join(arch.Structure.DTOAllowedLayers, ", ")))
 		return nil
 	})
 	return violations

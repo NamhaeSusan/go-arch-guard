@@ -17,9 +17,8 @@ type ModelRequired struct {
 }
 
 func NewModelRequired(opts ...Option) *ModelRequired {
-	r := &ModelRequired{severity: core.Error}
-	applyOptions(r, opts)
-	return r
+	cfg := newConfig(opts, core.Error)
+	return &ModelRequired{severity: cfg.severity}
 }
 
 func (r *ModelRequired) Spec() core.RuleSpec {
@@ -36,6 +35,9 @@ func (r *ModelRequired) Spec() core.RuleSpec {
 func (r *ModelRequired) Check(ctx *core.Context) []core.Violation {
 	if ctx == nil {
 		return nil
+	}
+	if !hasInternalDir(ctx.Root()) {
+		return []core.Violation{metaLayoutNotSupported(ruleModelRequired)}
 	}
 	arch := ctx.Arch()
 	if arch.Layout.DomainDir == "" || !arch.Structure.RequireModel {

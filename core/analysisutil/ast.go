@@ -2,9 +2,58 @@ package analysisutil
 
 import (
 	"go/ast"
+	"go/token"
 	"go/types"
 	"strings"
 )
+
+// TypeSpecInfo describes a single top-level type declaration in a Go file —
+// what InspectTypeSpecs extracts. Callers compute file-level metadata (e.g.
+// a relative path) once outside the loop; only per-decl fields live here.
+type TypeSpecInfo struct {
+	Name        string
+	Line        int
+	IsInterface bool
+	AliasFrom   string // import path of `type X = pkg.Y`; empty if not an alias
+}
+
+// InspectTypeSpecs walks the top-level type decls in file and returns one
+// entry per interface declaration or per type alias whose RHS is
+// `<ident>.<Name>`. Other type decls are skipped. Callers usually want to
+// detect interfaces or detect re-exports of types from other packages.
+func InspectTypeSpecs(file *ast.File, fset *token.FileSet) []TypeSpecInfo {
+	var result []TypeSpecInfo
+	for _, decl := range file.Decls {
+		gd, ok := decl.(*ast.GenDecl)
+		if !ok {
+			continue
+		}
+		for _, spec := range gd.Specs {
+			ts, ok := spec.(*ast.TypeSpec)
+			if !ok {
+				continue
+			}
+			info := TypeSpecInfo{
+				Name: ts.Name.Name,
+				Line: fset.Position(ts.Name.Pos()).Line,
+			}
+			if _, ok := ts.Type.(*ast.InterfaceType); ok {
+				info.IsInterface = true
+			}
+			if ts.Assign != 0 {
+				if sel, ok := ts.Type.(*ast.SelectorExpr); ok {
+					if ident, ok := sel.X.(*ast.Ident); ok {
+						info.AliasFrom = ResolveIdentImportPath(file, ident.Name)
+					}
+				}
+			}
+			if info.IsInterface || info.AliasFrom != "" {
+				result = append(result, info)
+			}
+		}
+	}
+	return result
+}
 
 // ReceiverTypeName extracts the unqualified receiver type name from an
 // *ast.FuncDecl receiver expression. It unwraps a leading pointer and
