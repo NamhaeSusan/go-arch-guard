@@ -11,51 +11,58 @@ import (
 
 func TestArchitectureTest(t *testing.T) {
 	tests := []struct {
-		name        string
-		preset      scaffold.Preset
-		contains    []string
-		notContains []string
+		name             string
+		preset           scaffold.Preset
+		architectureFunc string
+		rulesFunc        string
 	}{
 		{
-			name:        "ddd",
-			preset:      scaffold.PresetDDD,
-			contains:    []string{"package myapp_test", "func TestArchitecture", "rules.RunAll(pkgs, \"\", \"\")"},
-			notContains: []string{"rules.WithModel(m)"},
+			name:             "ddd",
+			preset:           scaffold.PresetDDD,
+			architectureFunc: "DDD",
+			rulesFunc:        "RecommendedDDD",
 		},
 		{
-			name:     "clean arch",
-			preset:   scaffold.PresetCleanArch,
-			contains: []string{"m := rules.CleanArch()", "opts := []rules.Option{rules.WithModel(m)}", "rules.RunAll(pkgs, \"\", \"\", opts...)"},
+			name:             "clean arch",
+			preset:           scaffold.PresetCleanArch,
+			architectureFunc: "CleanArch",
+			rulesFunc:        "RecommendedCleanArch",
 		},
 		{
-			name:     "layered",
-			preset:   scaffold.PresetLayered,
-			contains: []string{"m := rules.Layered()"},
+			name:             "layered",
+			preset:           scaffold.PresetLayered,
+			architectureFunc: "Layered",
+			rulesFunc:        "RecommendedLayered",
 		},
 		{
-			name:     "hexagonal",
-			preset:   scaffold.PresetHexagonal,
-			contains: []string{"m := rules.Hexagonal()"},
+			name:             "hexagonal",
+			preset:           scaffold.PresetHexagonal,
+			architectureFunc: "Hexagonal",
+			rulesFunc:        "RecommendedHexagonal",
 		},
 		{
-			name:     "modular monolith",
-			preset:   scaffold.PresetModularMonolith,
-			contains: []string{"m := rules.ModularMonolith()"},
+			name:             "modular monolith",
+			preset:           scaffold.PresetModularMonolith,
+			architectureFunc: "ModularMonolith",
+			rulesFunc:        "RecommendedModularMonolith",
 		},
 		{
-			name:     "consumer worker",
-			preset:   scaffold.PresetConsumerWorker,
-			contains: []string{"m := rules.ConsumerWorker()"},
+			name:             "consumer worker",
+			preset:           scaffold.PresetConsumerWorker,
+			architectureFunc: "ConsumerWorker",
+			rulesFunc:        "RecommendedConsumerWorker",
 		},
 		{
-			name:     "batch",
-			preset:   scaffold.PresetBatch,
-			contains: []string{"m := rules.Batch()"},
+			name:             "batch",
+			preset:           scaffold.PresetBatch,
+			architectureFunc: "Batch",
+			rulesFunc:        "RecommendedBatch",
 		},
 		{
-			name:     "event pipeline",
-			preset:   scaffold.PresetEventPipeline,
-			contains: []string{"m := rules.EventPipeline()"},
+			name:             "event pipeline",
+			preset:           scaffold.PresetEventPipeline,
+			architectureFunc: "EventPipeline",
+			rulesFunc:        "RecommendedEventPipeline",
 		},
 	}
 
@@ -65,12 +72,26 @@ func TestArchitectureTest(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ArchitectureTest() error = %v", err)
 			}
-			for _, fragment := range tt.contains {
+			contains := []string{
+				"package myapp_test",
+				"func TestArchitecture(t *testing.T)",
+				"\"github.com/NamhaeSusan/go-arch-guard/core\"",
+				"\"github.com/NamhaeSusan/go-arch-guard/presets\"",
+				"arch := presets." + tt.architectureFunc + "()",
+				"ctx := core.NewContext(pkgs, \"\", \"\", arch, nil)",
+				"rules := presets." + tt.rulesFunc + "()",
+				"report.AssertNoViolations(t, core.Run(ctx, rules))",
+			}
+			for _, fragment := range contains {
 				if !strings.Contains(src, fragment) {
 					t.Fatalf("expected generated source to contain %q\n%s", fragment, src)
 				}
 			}
-			for _, fragment := range tt.notContains {
+			for _, fragment := range []string{
+				"\"github.com/NamhaeSusan/go-arch-guard/rules\"",
+				"rules.RunAll",
+				"rules.WithModel",
+			} {
 				if strings.Contains(src, fragment) {
 					t.Fatalf("expected generated source not to contain %q\n%s", fragment, src)
 				}
@@ -87,8 +108,11 @@ func TestArchitectureTest_ConsumerWorker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(src, "rules.ConsumerWorker()") {
-		t.Error("generated source must call rules.ConsumerWorker()")
+	if !strings.Contains(src, "arch := presets.ConsumerWorker()") {
+		t.Error("generated source must call presets.ConsumerWorker()")
+	}
+	if !strings.Contains(src, "rules := presets.RecommendedConsumerWorker()") {
+		t.Error("generated source must call presets.RecommendedConsumerWorker()")
 	}
 	if !strings.Contains(src, "package myapp_test") {
 		t.Error("generated source must have correct package name")

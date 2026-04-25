@@ -16,9 +16,11 @@ func ExampleArchitectureTest() {
 		return
 	}
 
-	fmt.Println(strings.Contains(src, "m := rules.Hexagonal()"))
+	fmt.Println(strings.Contains(src, "arch := presets.Hexagonal()"))
+	fmt.Println(strings.Contains(src, "rules := presets.RecommendedHexagonal()"))
 	fmt.Println(strings.Contains(src, "func TestArchitecture"))
 	// Output:
+	// true
 	// true
 	// true
 }
