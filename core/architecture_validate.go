@@ -8,10 +8,17 @@ import (
 
 // Validate checks that every layer-referencing field names a layer present
 // in Layers.Sublayers, that Direction has a key for every sublayer (no
-// silent enforcement holes), and that PortLayers ⊆ ContractLayers.
+// silent enforcement holes), that PortLayers ⊆ ContractLayers, that
+// Sublayers entries are non-empty and unique, and that Direction is a DAG.
 //
 // Validate is called by Run before any rule executes; presets MAY call it
 // at construction time to fail fast.
+//
+// A zero-value Architecture (no Sublayers, no Direction) IS accepted as
+// valid — it represents "no layer policy." Pairing it with a non-empty
+// RuleSet is generally a configuration mistake (no rule that reads
+// Layers.Sublayers can fire) but Validate cannot detect this without
+// inspecting the RuleSet, so it is tolerated.
 //
 // Layout-level non-empty checks (e.g. "AppDir must be set when an
 // app-aware rule is enabled") are NOT performed here because Architecture
