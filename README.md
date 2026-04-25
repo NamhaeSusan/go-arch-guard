@@ -149,7 +149,7 @@ Sample output when violations exist:
 --- FAIL: TestArchitecture/domain_isolation
 ```
 
-Pass empty strings for `module` and `root` to auto-extract from loaded packages. If the module cannot be determined, a `meta.no-matching-packages` warning is emitted.
+Pass empty strings for `module` and `root` to auto-extract from loaded packages. If the module cannot be determined, a `meta.no-matching-packages` warning is emitted. If a rule panics, `core.Run` emits `meta.rule-panic` with Error severity and continues running the remaining rules.
 
 ## Presets
 
@@ -827,7 +827,7 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 |----------|-------------|
 | `analyzer.Load(dir, patterns...)` | load Go packages for analysis |
 | `core.NewContext(pkgs, module, root, arch, exclude)` | build the immutable analysis context |
-| `core.Run(ctx, ruleset, opts...)` | execute a ruleset and return `[]core.Violation` |
+| `core.Run(ctx, ruleset, opts...)` | execute a ruleset and return `[]core.Violation`; rule panics become `meta.rule-panic` Error violations |
 | `core.RuleSet` | immutable collection of rules plus violation filters |
 | `core.NewRuleSet(ruleValues...)` | create an immutable ruleset |
 | `(rs).With(ruleValues...)` / `(rs).Without(ids...)` | append rules or filter violation IDs |

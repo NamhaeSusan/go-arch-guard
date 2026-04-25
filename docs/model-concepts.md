@@ -152,6 +152,11 @@ invariants that rules rely on:
 invalid. Presets validate themselves when constructed so preset mistakes fail
 early.
 
+If an individual rule panics, `core.Run` converts it to a `meta.rule-panic`
+violation with Error severity and continues running the remaining rules. This
+keeps the report available while still marking the analysis as unreliable by
+default.
+
 ## Build Patterns
 
 Prefer a preset when your layout matches one of the built-ins:
