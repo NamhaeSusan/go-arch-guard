@@ -33,6 +33,30 @@ func TestSnakeCaseFilesFlagsNonSnakeCaseGoFile(t *testing.T) {
 	}
 }
 
+func TestSnakeCaseFilesFixHandlesUppercaseRuns(t *testing.T) {
+	cases := []struct {
+		in, want string
+	}{
+		{"createOrder.go", "create_order.go"},
+		{"XMLParser.go", "xml_parser.go"},
+		{"HTTP.go", "http.go"},
+		{"HTTPServer.go", "http_server.go"},
+		{"parseHTTPRequest.go", "parse_http_request.go"},
+	}
+	for _, tc := range cases {
+		ctx := tempContext(t, map[string]string{
+			"internal/domain/order/app/" + tc.in: "package app\n",
+		}, dddArch())
+		got := naming.NewSnakeCaseFiles().Check(ctx)
+		if len(got) != 1 {
+			t.Fatalf("%s: len = %d, want 1: %+v", tc.in, len(got), got)
+		}
+		if !strings.Contains(got[0].Fix, tc.want) {
+			t.Fatalf("%s: Fix = %q, want it to contain %q", tc.in, got[0].Fix, tc.want)
+		}
+	}
+}
+
 func TestSnakeCaseFilesSkipsExcludedPath(t *testing.T) {
 	ctx := core.NewContext(loadInvalid(t), "github.com/kimtaeyun/testproject-dc-invalid", "../../testdata/invalid", dddArch(), []string{"internal/domain/order/handler/..."})
 

@@ -51,6 +51,30 @@ func TestRepoFileInterfaceFlagsExtraInterfaces(t *testing.T) {
 	}
 }
 
+func TestRepoFileInterfaceExtraInterfaceFixUsesSnakeCase(t *testing.T) {
+	ctx := tempContext(t, map[string]string{
+		"internal/domain/order/core/repo/order.go": "package repo\n\ntype Order interface { Find() }\ntype UserRepository interface { Save() }\n",
+	}, dddArch())
+
+	got := naming.NewRepoFileInterface().Check(ctx)
+	var found bool
+	for _, v := range got {
+		if v.Rule != "structure.repo-file-extra-interface" {
+			continue
+		}
+		found = true
+		if !strings.Contains(v.Fix, "user_repository.go") {
+			t.Fatalf("Fix = %q, want it to suggest user_repository.go", v.Fix)
+		}
+		if strings.Contains(v.Fix, "userrepository.go") {
+			t.Fatalf("Fix = %q, must not suggest userrepository.go", v.Fix)
+		}
+	}
+	if !found {
+		t.Fatalf("expected extra-interface violation, got %+v", got)
+	}
+}
+
 func TestRepoFileInterfaceFlagsRepositoryPortOutsidePortLayer(t *testing.T) {
 	got := naming.NewRepoFileInterface().Check(invalidContext(t, nil))
 

@@ -88,7 +88,7 @@ func (r *RepoFileInterface) checkPortPackage(ctx *core.Context, pkg *packages.Pa
 			0,
 			"structure.repo-file-extra-interface",
 			`file "`+base+`" in repo/ must define only "`+expected+`", found extra: `+strings.Join(extra, ", "),
-			"move each extra interface to its own file (e.g. "+strings.ToLower(extra[0])+".go)",
+			"move each extra interface to its own file (e.g. "+pascalToSnake(extra[0])+".go)",
 		))
 	}
 	return violations
