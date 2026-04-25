@@ -13,11 +13,8 @@ import (
 type LayerDirection struct{ severity core.Severity }
 
 func NewLayerDirection(opts ...Option) *LayerDirection {
-	r := &LayerDirection{severity: core.Error}
-	for _, opt := range opts {
-		r.severity = opt.severity()
-	}
-	return r
+	cfg := newConfig(opts, core.Error)
+	return &LayerDirection{severity: cfg.severity}
 }
 
 func (r *LayerDirection) Spec() core.RuleSpec {
@@ -36,8 +33,12 @@ func (r *LayerDirection) Spec() core.RuleSpec {
 func (r *LayerDirection) Check(ctx *core.Context) []core.Violation {
 	projectModule := analysisutil.ResolveModuleFromContext(ctx, "")
 	projectRoot := analysisutil.ResolveRootFromContext(ctx, "")
-	if warns := validateModule(ctx.Pkgs(), projectModule); len(warns) > 0 {
+	pkgs := ctx.Pkgs()
+	if warns := validateModule(pkgs, projectModule); len(warns) > 0 {
 		return warns
+	}
+	if !hasInternalPackages(pkgs, projectModule) {
+		return []core.Violation{metaLayoutNotSupported("dependency.layer-direction", projectModule)}
 	}
 	internalPrefix := projectModule + "/internal/"
 

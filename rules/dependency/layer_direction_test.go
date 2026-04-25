@@ -61,6 +61,12 @@ func TestLayerDirectionInvalidProject(t *testing.T) {
 	}
 }
 
+func TestLayerDirectionFlatLayoutEmitsMetaWarning(t *testing.T) {
+	ctx := loadFlatLayoutContext(t)
+	violations := dependency.NewLayerDirection().Check(ctx)
+	assertExactlyOneMetaLayoutNotSupported(t, violations, "dependency.layer-direction")
+}
+
 func TestLayerDirectionExclude(t *testing.T) {
 	ctx := loadContextWithExclude(t,
 		"../../testdata/invalid",
