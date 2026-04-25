@@ -231,6 +231,38 @@ func TestRunDedupesMetaViolations(t *testing.T) {
 	}
 }
 
+func TestRunPreservesMetaViolationsWithDifferentMessages(t *testing.T) {
+	r1 := &fakeRule{
+		spec: RuleSpec{ID: "fake.a"},
+		violations: []Violation{
+			{File: ".", Rule: "meta.no-matching-packages", Message: "module not determined"},
+		},
+	}
+	r2 := &fakeRule{
+		spec: RuleSpec{ID: "fake.b"},
+		violations: []Violation{
+			{File: ".", Rule: "meta.no-matching-packages", Message: "module does not match any loaded package"},
+		},
+	}
+	ctx := NewContext(nil, "", "", validArchitecture(), nil)
+	got := Run(ctx, RuleSet{}.With(r1).With(r2))
+
+	var count int
+	messages := make(map[string]bool)
+	for _, v := range got {
+		if v.Rule == "meta.no-matching-packages" {
+			count++
+			messages[v.Message] = true
+		}
+	}
+	if count != 2 {
+		t.Fatalf("len = %d, want 2 (different messages must NOT be deduped): %+v", count, got)
+	}
+	if !messages["module not determined"] || !messages["module does not match any loaded package"] {
+		t.Fatalf("expected both messages preserved, got %v", messages)
+	}
+}
+
 func TestRunRejectsUnknownWithoutID(t *testing.T) {
 	r := &fakeRule{
 		spec: RuleSpec{

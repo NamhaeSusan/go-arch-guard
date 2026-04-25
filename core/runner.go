@@ -198,15 +198,25 @@ func defaultsByID(spec RuleSpec) map[string]Severity {
 	return out
 }
 
+// dedupeMetaViolations collapses duplicate meta.* violations. The dedup key
+// is the (Rule, Message) pair, not just Rule alone — two rules can emit the
+// same meta ID with different messages (e.g. "module not determined" vs
+// "module does not match any loaded package") and both signals should reach
+// the user. Exact duplicates are still collapsed.
 func dedupeMetaViolations(in []Violation) []Violation {
-	seen := make(map[string]bool)
+	type metaKey struct {
+		Rule    string
+		Message string
+	}
+	seen := make(map[metaKey]bool)
 	out := in[:0]
 	for _, v := range in {
 		if strings.HasPrefix(v.Rule, "meta.") {
-			if seen[v.Rule] {
+			key := metaKey{Rule: v.Rule, Message: v.Message}
+			if seen[key] {
 				continue
 			}
-			seen[v.Rule] = true
+			seen[key] = true
 		}
 		out = append(out, v)
 	}

@@ -176,12 +176,23 @@ func matchesDomainLayer(arch core.Architecture, rel, name string) bool {
 	return len(parts) == 4 && parts[0] == "internal" && parts[1] == arch.Layout.DomainDir && parts[2] != "" && parts[3] == name
 }
 
+// isDTOAllowedSublayer reports whether the file at rel sits in one of the
+// DTOAllowedLayers. The check tries every nested depth from the sublayer
+// start position so DTOAllowedLayers entries like "core/repo" match nested
+// directories — "core" is tested first, then "core/repo", and so on. The
+// last segment of parts is the filename, so it is excluded from candidates.
 func isDTOAllowedSublayer(arch core.Architecture, rel string) bool {
 	domainDepth := len(strings.Split(arch.Layout.DomainDir, "/"))
 	parts := strings.Split(rel, "/")
-	sublayerIdx := 1 + domainDepth + 1
-	if len(parts) <= sublayerIdx {
+	sublayerStart := 1 + domainDepth + 1
+	if len(parts) <= sublayerStart {
 		return false
 	}
-	return slices.Contains(arch.Structure.DTOAllowedLayers, parts[sublayerIdx])
+	for depth := 1; sublayerStart+depth < len(parts); depth++ {
+		candidate := strings.Join(parts[sublayerStart:sublayerStart+depth], "/")
+		if slices.Contains(arch.Structure.DTOAllowedLayers, candidate) {
+			return true
+		}
+	}
+	return false
 }

@@ -19,7 +19,11 @@ type Context struct {
 }
 
 // NewContext builds a Context. Excludes are normalized (leading "./"
-// stripped, OS path separators converted) at construction.
+// stripped, OS path separators converted) at construction. The Architecture
+// is deep-cloned so caller-side mutations to its maps and slices after this
+// call cannot leak into the Context's view; Arch() also returns a defensive
+// clone, but cloning here closes the construction-time window where a
+// caller could otherwise mutate shared state before the first Arch() read.
 func NewContext(pkgs []*packages.Package, module, root string, arch Architecture, exclude []string) *Context {
 	norm := make([]string, len(exclude))
 	for i, p := range exclude {
@@ -29,7 +33,7 @@ func NewContext(pkgs []*packages.Package, module, root string, arch Architecture
 		pkgs:    pkgs,
 		module:  module,
 		root:    root,
-		arch:    arch,
+		arch:    cloneArchitecture(arch),
 		exclude: norm,
 	}
 }
@@ -88,14 +92,27 @@ func matchExcludePattern(pattern, path string) bool {
 	return pattern == path
 }
 
+// normalizeMatchPath canonicalizes both exclude patterns and the file paths
+// rules emit so they match consistently. The supported equivalences are:
+//
+//   - Backslashes are converted to forward slashes (Windows-shell paste).
+//   - Leading "/" is trimmed (absolute-path fallback in analysisutil).
+//   - Leading "./" is trimmed (rule-emitted relative paths).
+//   - Trailing "/" is trimmed for non-recursive patterns; a recursive
+//     pattern keeps its "..." suffix intact since matchExcludePattern
+//     reads it.
+//
+// As a result "internal/foo", "/internal/foo", "./internal/foo",
+// "internal\\foo", and "internal/foo/" are all the same key.
 func normalizeMatchPath(path string) string {
-	// filepath.ToSlash is a no-op on Unix; mixed-style inputs (e.g. excludes
-	// copy-pasted from a Windows shell) need explicit backslash replacement
-	// to match downstream forward-slash paths emitted by rules.
 	path = strings.ReplaceAll(path, "\\", "/")
 	path = filepath.ToSlash(path)
+	path = strings.TrimPrefix(path, "/")
 	for strings.HasPrefix(path, "./") {
 		path = strings.TrimPrefix(path, "./")
+	}
+	if strings.HasSuffix(path, "/") && !strings.HasSuffix(path, "...") {
+		path = strings.TrimSuffix(path, "/")
 	}
 	return path
 }
