@@ -33,7 +33,7 @@ import (
 //     1. WithSeverityOverride(violationID, ...)
 //     2. RuleSpec.Violations[i].DefaultSeverity for matching ID
 //     3. Warning, when the violation ID starts with "meta." (environmental
-//        meta.* violations should never block builds by accident)
+//     meta.* violations should never block builds by accident)
 //     4. RuleSpec.DefaultSeverity
 //     5. Error
 //   - Violations are deduped by Rule field for any Rule starting with "meta.".
