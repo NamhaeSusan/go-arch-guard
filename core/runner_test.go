@@ -249,6 +249,22 @@ func TestRunRejectsUnknownSeverityOverrideID(t *testing.T) {
 	Run(ctx, RuleSet{}.With(r), WithSeverityOverride("fake.ghost", Warning))
 }
 
+func TestRunAllowsMetaIDInWithoutAndOverride(t *testing.T) {
+	// meta.* IDs are not in any rule's catalog, but callers may legitimately
+	// filter or downgrade them — Without/WithSeverityOverride must not panic.
+	r := &fakeRule{
+		spec: RuleSpec{
+			ID:         "fake.demo",
+			Violations: []ViolationSpec{{ID: "fake.demo", DefaultSeverity: Error}},
+		},
+	}
+	ctx := NewContext(nil, "", "", validArchitecture(), nil)
+
+	// Both should run without panic.
+	Run(ctx, RuleSet{}.With(r).Without("meta.no-matching-packages"))
+	Run(ctx, RuleSet{}.With(r), WithSeverityOverride("meta.no-matching-packages", Warning))
+}
+
 func TestRunPanicsOnInvalidArchitecture(t *testing.T) {
 	bad := validArchitecture()
 	delete(bad.Layers.Direction, "core/svc")

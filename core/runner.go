@@ -47,7 +47,10 @@ func Run(ctx *Context, rules RuleSet, opts ...RunOption) []Violation {
 	checkUnknown := func(label string, ids []string) {
 		var unknown []string
 		for _, id := range ids {
-			if !known[id] {
+			// meta.* IDs are not declared in any rule's catalog (they're
+			// emergency emits, see Check loop below). Callers may legitimately
+			// filter or override them, so allow them through unconditionally.
+			if !known[id] && !strings.HasPrefix(id, "meta.") {
 				unknown = append(unknown, id)
 			}
 		}
