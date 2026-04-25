@@ -251,18 +251,43 @@ func TestRunRejectsUnknownSeverityOverrideID(t *testing.T) {
 
 func TestRunAllowsMetaIDInWithoutAndOverride(t *testing.T) {
 	// meta.* IDs are not in any rule's catalog, but callers may legitimately
-	// filter or downgrade them — Without/WithSeverityOverride must not panic.
+	// filter or downgrade them — Without/WithSeverityOverride must (a) not
+	// panic and (b) actually apply.
 	r := &fakeRule{
 		spec: RuleSpec{
 			ID:         "fake.demo",
 			Violations: []ViolationSpec{{ID: "fake.demo", DefaultSeverity: Error}},
 		},
+		violations: []Violation{
+			{File: "a.go", Line: 1, Rule: "fake.demo", Message: "real"},
+			{File: ".", Rule: "meta.no-matching-packages", Message: "boom"},
+		},
 	}
 	ctx := NewContext(nil, "", "", validArchitecture(), nil)
 
-	// Both should run without panic.
-	Run(ctx, RuleSet{}.With(r).Without("meta.no-matching-packages"))
-	Run(ctx, RuleSet{}.With(r), WithSeverityOverride("meta.no-matching-packages", Warning))
+	// Without filters the meta.* ID out, leaves real violation in place.
+	got := Run(ctx, RuleSet{}.With(r).Without("meta.no-matching-packages"))
+	if len(got) != 1 {
+		t.Fatalf("Without: len = %d, want 1 (only fake.demo)", len(got))
+	}
+	if got[0].Rule != "fake.demo" {
+		t.Errorf("Without: Rule = %q, want fake.demo", got[0].Rule)
+	}
+
+	// SeverityOverride downgrades meta.* without filtering it.
+	got = Run(ctx, RuleSet{}.With(r), WithSeverityOverride("meta.no-matching-packages", Warning))
+	var meta *Violation
+	for i := range got {
+		if got[i].Rule == "meta.no-matching-packages" {
+			meta = &got[i]
+		}
+	}
+	if meta == nil {
+		t.Fatalf("override: meta.no-matching-packages should still be present, got %+v", got)
+	}
+	if meta.EffectiveSeverity != Warning {
+		t.Errorf("override: meta.EffectiveSeverity = %v, want Warning", meta.EffectiveSeverity)
+	}
 }
 
 func TestRunPanicsOnInvalidArchitecture(t *testing.T) {
