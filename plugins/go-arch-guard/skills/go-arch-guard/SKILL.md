@@ -8,6 +8,12 @@ user_invocable: true
 
 Go 프로젝트에 아키텍처 가드레일을 `go test`로 적용하고, AI 에이전트가 바로 스캐폴딩하고 유지하기 쉬운 형태로 안내한다.
 
+> **리팩토링 진행 중.** 라이브러리 내부에 새 `core/` 패키지 골격이 추가됐지만,
+> 아직 어떤 rule도 마이그레이션되지 않았고 사용자 통합 경로는 아니다. 본
+> 스킬은 계속해서 `rules.RunAll(...)`, `rules.NewModel(...)`, `Check*`
+> 함수, 그리고 `scaffold.ArchitectureTest(...)` 같은 v1 surface를 사용한다.
+> `core.RuleSet` / `core.Run` 예제는 rule 마이그레이션이 끝난 후에 도입한다.
+
 ## Decision Flow
 
 프로젝트 상태를 확인하고 분기한다.

@@ -16,6 +16,15 @@ AI-agent-friendly by default:
 - `rules.RunAll(...)` runs the recommended rule bundle in one call
 - `report.MarshalJSONReport(...)` emits machine-readable violations for bots and remediation loops
 
+> **Refactor in progress.** A new `core/` package has landed as a skeleton
+> (`Rule` interface, `RuleSpec` catalog, immutable `Context`, validated
+> `Architecture`, `RuleSet`, deterministic `Run`). No rules have been
+> migrated yet — the public API documented below (`rules.RunAll`,
+> `rules.Check*`, `rules.NewModel`, presets) is unchanged and remains the
+> supported integration path. The refactor is in-place (no `/v2` module
+> path); see `docs/superpowers/specs/2026-04-25-arch-guard-v2-design.md`
+> for the design.
+
 ## Why
 
 Architecture usually decays through a few broad mistakes, not through deep theoretical violations:

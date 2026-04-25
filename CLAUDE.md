@@ -11,11 +11,31 @@ AI 에이전트 친화적인 기본 surface:
 
 ---
 
+### Refactor Status (in-place rewrite in progress)
+
+A large in-place refactor is underway. The new `core/` package has landed as
+a skeleton: `Rule` interface, `RuleSpec` + `ViolationSpec` catalog,
+immutable `Context`, validated `Architecture` (LayerModel / LayoutModel /
+NamingPolicy / StructurePolicy), `RuleSet` struct, and `Run` with
+deterministic ordering, severity precedence, and unknown-ID rejection.
+**No rules have been migrated yet** — `rules/` and the v1 surface listed
+above are unchanged and remain the supported integration path. v1 will be
+replaced in-place over subsequent plans (no `/v2` module path; this is
+treated as a single-user library refactor, not a coexistence project).
+
+Design spec: `docs/superpowers/specs/2026-04-25-arch-guard-v2-design.md`.
+First plan executed: `docs/superpowers/plans/2026-04-25-core-skeleton.md`.
+
+---
+
 ### Post-Implementation Checklist (CRITICAL)
 
 After any code change, update related documentation (README.md, docs/).
 CLAUDE.md and README.md must be kept in sync.
 SKILL.md (`plugins/go-arch-guard/skills/go-arch-guard/SKILL.md`) must also be updated when rules or API surface changes.
+While the v2 refactor is in flight, also keep this file's "Refactor Status"
+section current — bump it as each plan lands (rule migrations, presets/,
+scaffold/TUI cutover, etc.).
 Skill changes on `main` also auto-bump `plugins/go-arch-guard/.claude-plugin/plugin.json` via GitHub Actions. Keep the versioning rule and workflow in sync with the script tests.
 
 ---

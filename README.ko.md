@@ -14,6 +14,14 @@ AI 에이전트 친화적인 기본 surface:
 - `rules.RunAll(...)` --- 권장 rule 묶음을 한 번에 실행
 - `report.MarshalJSONReport(...)` --- 봇과 자동 수정 루프가 읽기 쉬운 JSON 출력
 
+> **리팩토링 진행 중.** 새로운 `core/` 패키지 골격이 추가되었습니다 (`Rule`
+> 인터페이스, `RuleSpec` 카탈로그, 불변 `Context`, 검증되는 `Architecture`,
+> `RuleSet`, 결정적 정렬을 보장하는 `Run`). 아직 어떤 rule도 마이그레이션되지
+> 않았으며, 아래 문서가 설명하는 공개 API (`rules.RunAll`, `rules.Check*`,
+> `rules.NewModel`, 프리셋들)는 그대로이고 현재 지원되는 통합 경로입니다. 본
+> 리팩토링은 in-place 방식이며 (`/v2` module path 없음), 설계는
+> `docs/superpowers/specs/2026-04-25-arch-guard-v2-design.md`를 참고하세요.
+
 ## 왜 필요한가
 
 아키텍처는 보통 깊은 이론적 위반이 아니라 몇 가지 큰 실수를 통해 무너집니다:
