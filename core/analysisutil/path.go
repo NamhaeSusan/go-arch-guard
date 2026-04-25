@@ -84,14 +84,20 @@ func ResolveModuleFromContext(ctx *core.Context, explicit string) string {
 	if ctx == nil {
 		return explicit
 	}
-	return ResolveModule(ctx.Pkgs(), firstNonEmpty(explicit, ctx.Module()))
+	if m := firstNonEmpty(explicit, ctx.Module()); m != "" {
+		return m
+	}
+	return ResolveModule(ctx.Pkgs(), "")
 }
 
 func ResolveRootFromContext(ctx *core.Context, explicit string) string {
 	if ctx == nil {
 		return explicit
 	}
-	return ResolveRoot(ctx.Pkgs(), firstNonEmpty(explicit, ctx.Root()))
+	if r := firstNonEmpty(explicit, ctx.Root()); r != "" {
+		return r
+	}
+	return ResolveRoot(ctx.Pkgs(), "")
 }
 
 func ProjectRelativePackagePath(pkgPath, projectModule string) string {
