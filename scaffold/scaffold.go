@@ -119,6 +119,12 @@ func TestArchitecture(t *testing.T) {
 	}
 `)
 	fmt.Fprintf(&b, "\n\tarch := presets.%s()\n", funcs.architecture)
+	// Only emit the InternalRoot override for non-default values. The default
+	// "internal" is normalized inside cloneArchitecture, so emitting it would
+	// be redundant and would clutter the generated output for the common case.
+	if internalRoot != "internal" {
+		fmt.Fprintf(&b, "\tarch.Layout.InternalRoot = %q\n", internalRoot)
+	}
 	b.WriteString("\tctx := core.NewContext(pkgs, \"\", \"\", arch, nil)\n")
 	fmt.Fprintf(&b, "\trules := presets.%s()\n\n", funcs.rules)
 	b.WriteString("\treport.AssertNoViolations(t, core.Run(ctx, rules))\n")

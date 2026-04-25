@@ -128,6 +128,11 @@ func TestArchitectureTestDefaultsInternalRoot(t *testing.T) {
 	if !strings.Contains(src, want) {
 		t.Fatalf("default scaffold must emit %q\n%s", want, src)
 	}
+	// Default InternalRoot must NOT emit a redundant override line — the
+	// normalization inside cloneArchitecture already handles it.
+	if strings.Contains(src, "arch.Layout.InternalRoot") {
+		t.Fatalf("default scaffold must NOT emit arch.Layout.InternalRoot assignment\n%s", src)
+	}
 }
 
 func TestArchitectureTestCustomInternalRoot(t *testing.T) {
@@ -138,12 +143,30 @@ func TestArchitectureTestCustomInternalRoot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `analyzer.Load(".", "packages/...", "cmd/...")`
-	if !strings.Contains(src, want) {
-		t.Fatalf("custom InternalRoot must emit %q\n%s", want, src)
+	wantLoad := `analyzer.Load(".", "packages/...", "cmd/...")`
+	if !strings.Contains(src, wantLoad) {
+		t.Fatalf("custom InternalRoot must emit %q\n%s", wantLoad, src)
 	}
 	if strings.Contains(src, `"internal/..."`) {
 		t.Fatalf("custom InternalRoot must NOT emit \"internal/...\"\n%s", src)
+	}
+	// Critical: the rule classifier reads arch.Layout.InternalRoot, so the
+	// generated source must explicitly set it on the preset arch. Without this
+	// line, analyzer.Load would scan packages/ but rules would still classify
+	// against internal/, leaving every layout-dependent rule effectively a
+	// no-op.
+	wantArch := `arch.Layout.InternalRoot = "packages"`
+	if !strings.Contains(src, wantArch) {
+		t.Fatalf("custom InternalRoot must emit %q on arch\n%s", wantArch, src)
+	}
+	// Order: the assignment must come AFTER `arch := presets.DDD()` and
+	// BEFORE `core.NewContext(...)` so the override is in effect when the
+	// context clones and normalizes the architecture.
+	archIdx := strings.Index(src, "arch := presets.")
+	overrideIdx := strings.Index(src, wantArch)
+	ctxIdx := strings.Index(src, "core.NewContext")
+	if archIdx < 0 || archIdx >= overrideIdx || overrideIdx >= ctxIdx {
+		t.Fatalf("InternalRoot override must sit between presets.X() and core.NewContext(): archIdx=%d overrideIdx=%d ctxIdx=%d\n%s", archIdx, overrideIdx, ctxIdx, src)
 	}
 }
 
