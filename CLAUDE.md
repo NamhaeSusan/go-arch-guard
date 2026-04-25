@@ -23,8 +23,8 @@ above are unchanged and remain the supported integration path. v1 will be
 replaced in-place over subsequent plans (no `/v2` module path; this is
 treated as a single-user library refactor, not a coexistence project).
 
-Design spec: `docs/superpowers/specs/2026-04-25-arch-guard-v2-design.md`.
-First plan executed: `docs/superpowers/plans/2026-04-25-core-skeleton.md`.
+Design spec and plan documents live under `docs/superpowers/` (gitignored,
+local-only). Subsequent plans will migrate rule families one at a time.
 
 ---
 

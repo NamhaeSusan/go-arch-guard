@@ -19,8 +19,8 @@ AI 에이전트 친화적인 기본 surface:
 > `RuleSet`, 결정적 정렬을 보장하는 `Run`). 아직 어떤 rule도 마이그레이션되지
 > 않았으며, 아래 문서가 설명하는 공개 API (`rules.RunAll`, `rules.Check*`,
 > `rules.NewModel`, 프리셋들)는 그대로이고 현재 지원되는 통합 경로입니다. 본
-> 리팩토링은 in-place 방식이며 (`/v2` module path 없음), 설계는
-> `docs/superpowers/specs/2026-04-25-arch-guard-v2-design.md`를 참고하세요.
+> 리팩토링은 in-place 방식이며 (`/v2` module path 없음), 후속 rule
+> 마이그레이션이 v1 surface를 점진적으로 대체합니다.
 
 ## 왜 필요한가
 

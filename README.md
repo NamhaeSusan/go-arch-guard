@@ -22,8 +22,7 @@ AI-agent-friendly by default:
 > migrated yet — the public API documented below (`rules.RunAll`,
 > `rules.Check*`, `rules.NewModel`, presets) is unchanged and remains the
 > supported integration path. The refactor is in-place (no `/v2` module
-> path); see `docs/superpowers/specs/2026-04-25-arch-guard-v2-design.md`
-> for the design.
+> path); subsequent rule migrations will replace v1 surface incrementally.
 
 ## Why
 
