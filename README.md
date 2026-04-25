@@ -203,13 +203,14 @@ Architecture fields:
 
 | Field | Description |
 |-------|-------------|
-| `LayerModel.Sublayers` | authoritative layer vocabulary |
-| `LayerModel.Direction` | allowed import direction matrix |
-| `LayerModel.PortLayers` | pure interface layers such as repo or gateway |
-| `LayerModel.ContractLayers` | contract layers; must include every port layer |
+| `LayerModel.Sublayers` | authoritative layer-path vocabulary (`"core/repo"`); referenced by direction, port, and contract rules |
+| `LayerModel.Direction` | allowed import direction matrix (keys must be in `Sublayers`) |
+| `LayerModel.PortLayers` | pure interface layers such as repo or gateway (must be in `Sublayers`) |
+| `LayerModel.ContractLayers` | contract layers; must be a superset of `PortLayers` |
 | `LayerModel.PkgRestricted` | sublayers that must not import shared packages |
-| `LayerModel.InternalTopLevel` | allowed top-level directories under `internal/` |
-| `LayerModel.LayerDirNames` | directory names considered layer-like for placement checks |
+| `LayerModel.InternalTopLevel` | allowed top-level directories under the package root |
+| `LayerModel.LayerDirNames` | layer **basenames** (`"repo"`) recognized by file/directory placement rules; intentionally NOT required to appear in `Sublayers` |
+| `LayoutModel.InternalRoot` | project-relative package-root directory; defaults to `"internal"` when empty (set to `"packages"`, `"src"`, etc. for non-default layouts) |
 | `LayoutModel.DomainDir` | top-level directory name for domains; empty for flat layouts |
 | `LayoutModel.OrchestrationDir` | top-level directory name for orchestration |
 | `LayoutModel.SharedDir` | top-level directory name for shared packages |
@@ -241,6 +242,25 @@ arch.Layers.Direction = map[string][]string{
 arch.Structure.RequireAlias = false
 arch.Structure.RequireModel = false
 ```
+
+### Custom package root (non-`internal/` layouts)
+
+Projects that keep their packages under `packages/`, `src/`, or any other directory
+instead of the canonical `internal/` can set `Layout.InternalRoot`:
+
+```go
+arch := presets.DDD()
+arch.Layout.InternalRoot = "packages" // packages/domain/order/...
+```
+
+Empty `InternalRoot` is normalized to `"internal"` at construction, so existing
+configurations keep working unchanged. Layout-dependent rules emit
+`meta.layout-not-supported` (Warning) when no `<root>/<InternalRoot>/` directory
+is found, instead of silently producing zero violations.
+
+`scaffold.ArchitectureTest` honors the same field via
+`ArchitectureTestOptions.InternalRoot` so generated `architecture_test.go`
+matches the project's actual layout.
 
 ## Isolation Rules
 
@@ -803,7 +823,22 @@ ctx := core.NewContext(pkgs, "", "", presets.DDD(), []string{"internal/legacy/..
 violations := core.Run(ctx, presets.RecommendedDDD())
 ```
 
-Patterns are project-relative paths with forward slashes. `...` matches the root and all descendants.
+Patterns are project-relative paths with forward slashes. `...` matches the root and all descendants. Equivalent shapes (`/internal/foo`, `internal/foo`, `internal/foo/`, `./internal/foo`) all match the same paths after normalization.
+
+### Meta Violations
+
+The runner emits a small set of `meta.*` violations to surface environmental issues
+without blocking builds by default. They are deduped by `(Rule, Message)` pair so distinct
+diagnostics survive even when multiple rules emit the same ID.
+
+| ID | Severity | When |
+|---|---|---|
+| `meta.no-matching-packages` | Warning | the configured project module does not match any loaded package |
+| `meta.layout-not-supported` | Warning | a layout-dependent rule is run against a project without a recognized package root (`<root>/<InternalRoot>/`) |
+| `meta.rule-panic` | Error | a rule's `Check` panicked; the panic is captured and other rules continue to run |
+| `meta.unknown-violation-id` | per rule | a rule emits a violation ID it didn't declare in `Spec().Violations` |
+
+Promote any of them to a hard failure with `core.WithSeverityOverride(...)`, or filter them out with `RuleSet.Without(...)`.
 
 ## TUI Viewer
 
@@ -830,13 +865,13 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `core.Run(ctx, ruleset, opts...)` | execute a ruleset and return `[]core.Violation`; rule panics become `meta.rule-panic` Error violations |
 | `core.RuleSet` | immutable collection of rules plus violation filters |
 | `core.NewRuleSet(ruleValues...)` | create an immutable ruleset |
-| `(rs).With(ruleValues...)` / `(rs).Without(ids...)` | append rules or filter violation IDs |
+| `(rs).With(ruleValues...)` / `(rs).Without(ids...)` | append rules (nil entries are silently dropped) or filter violation IDs |
 | `core.WithSeverityOverride(violationID, sev)` | override effective severity for one violation ID |
 | `report.AssertNoViolations(t, violations)` | fail test on Error violations |
 | `report.BuildJSONReport(violations)` | build a machine-readable JSON-friendly report |
 | `report.MarshalJSONReport(violations)` | marshal a machine-readable JSON report |
 | `report.WriteJSONReport(w, violations)` | write a machine-readable JSON report |
-| `scaffold.ArchitectureTest(preset, opts)` | generate a preset-specific `architecture_test.go` template |
+| `scaffold.ArchitectureTest(preset, opts)` | generate a preset-specific `architecture_test.go` template (`opts.InternalRoot` overrides the canonical `internal/`) |
 | `presets.DDD()` / `presets.RecommendedDDD()` | DDD architecture and recommended ruleset |
 | `presets.CleanArch()` / `presets.RecommendedCleanArch()` | Clean Architecture architecture and ruleset |
 | `presets.Layered()` / `presets.RecommendedLayered()` | layered architecture and ruleset |

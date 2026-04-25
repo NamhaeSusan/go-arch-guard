@@ -68,6 +68,18 @@ if err != nil {
 }
 ```
 
+비표준 패키지 루트(`packages/`, `src/` 등)를 쓰는 프로젝트는 `InternalRoot`도 함께 지정한다 — 그래야 생성된 `analyzer.Load(".", "<root>/...", "cmd/...")`가 실제 레이아웃과 매칭된다:
+
+```go
+src, err := scaffold.ArchitectureTest(
+    scaffold.PresetDDD,
+    scaffold.ArchitectureTestOptions{
+        PackageName:  "myapp_test",
+        InternalRoot: "packages",
+    },
+)
+```
+
 생성된 결과를 `architecture_test.go`에 저장한다. 생성 템플릿은 내부에서
 `core.NewContext(...)`, `presets.{Preset}()`, `presets.Recommended{Preset}()`,
 `core.Run(...)`, `report.AssertNoViolations(...)`를 사용한다.
@@ -275,14 +287,16 @@ arch := core.Architecture{
 
 전체 필드: `LayerModel.Sublayers`, `LayerModel.Direction`, `LayerModel.PkgRestricted`,
 `LayerModel.InternalTopLevel`, `LayerModel.LayerDirNames`, `LayerModel.PortLayers`,
-`LayerModel.ContractLayers`, `LayoutModel.DomainDir`, `LayoutModel.OrchestrationDir`,
-`LayoutModel.SharedDir`, `LayoutModel.AppDir`, `LayoutModel.ServerDir`,
-`NamingPolicy.BannedPkgNames`, `NamingPolicy.LegacyPkgNames`, `NamingPolicy.AliasFileName`,
-`StructurePolicy.RequireAlias`, `StructurePolicy.RequireModel`, `StructurePolicy.ModelPath`,
+`LayerModel.ContractLayers`, `LayoutModel.InternalRoot` (default `"internal"`,
+`"packages"`/`"src"` 등 비표준 패키지 루트 지원), `LayoutModel.DomainDir`,
+`LayoutModel.OrchestrationDir`, `LayoutModel.SharedDir`, `LayoutModel.AppDir`,
+`LayoutModel.ServerDir`, `NamingPolicy.BannedPkgNames`, `NamingPolicy.LegacyPkgNames`,
+`NamingPolicy.AliasFileName`, `StructurePolicy.RequireAlias`,
+`StructurePolicy.RequireModel`, `StructurePolicy.ModelPath`,
 `StructurePolicy.DTOAllowedLayers`, `StructurePolicy.TypePatterns`,
 `StructurePolicy.InterfacePatternExclude`
 
-검증은 `arch.Validate()` 또는 `core.Validate(arch)`로 수행한다.
+검증은 `arch.Validate()` 또는 `core.Validate(arch)`로 수행한다. 빈 `InternalRoot`는 `cloneArchitecture` 시점에 `"internal"`로 정규화되므로 룰에서는 항상 비어있지 않은 값을 읽는다.
 
 ---
 
@@ -307,6 +321,19 @@ ctx := core.NewContext(pkgs, "", "", presets.DDD(), []string{"internal/legacy/..
 core.Run(ctx, presets.RecommendedDDD(),
     core.WithSeverityOverride("isolation.cross-domain", core.Warning))
 ```
+
+Exclude 패턴은 정규화 후 매칭됨: `/internal/foo`, `internal/foo`, `internal/foo/`, `./internal/foo` 모두 동일.
+
+### Meta Violations
+
+런타임이 환경 이슈를 알리는 `meta.*` violation. `(Rule, Message)` pair로 dedup.
+
+| ID | Severity | 의미 |
+|---|---|---|
+| `meta.no-matching-packages` | Warning | 모듈 path가 로드된 패키지와 매칭 안 됨 |
+| `meta.layout-not-supported` | Warning | 레이아웃 의존 룰이 `<root>/<InternalRoot>/`를 못 찾음 |
+| `meta.rule-panic` | Error | 룰 panic 발생; 다른 룰은 계속 실행 |
+| `meta.unknown-violation-id` | per rule | 룰이 미선언 violation ID emit |
 
 ### Tx Boundary (opt-in)
 

@@ -66,16 +66,17 @@ layers := core.LayerModel{
 
 ## LayoutModel
 
-`LayoutModel` describes the `internal/` directory topology. Empty fields
+`LayoutModel` describes the package-root directory topology. Empty fields
 disable the corresponding classification.
 
 | Field | Meaning |
 |-------|---------|
-| `DomainDir` | Directory that contains domain slices, for example `internal/domain/{name}/`. Empty means flat layout. |
-| `OrchestrationDir` | Directory for cross-domain coordination, for example `internal/orchestration/`. |
-| `SharedDir` | Shared internal package tree, usually `internal/pkg/`. |
-| `AppDir` | Composition root such as `internal/app/`. Rules can allow this layer to wire everything. |
-| `ServerDir` | Transport root such as `internal/server/http/` or `internal/server/grpc/`. |
+| `InternalRoot` | Project-relative directory that holds rule-managed packages. Defaults to `"internal"` when empty. Set to `"packages"`, `"src"`, etc. for projects that don't use the canonical Go `internal/` convention. The empty-to-`"internal"` normalization happens once in `cloneArchitecture`, so rules always read the resolved value. |
+| `DomainDir` | Directory that contains domain slices, for example `<InternalRoot>/domain/{name}/`. Empty means flat layout. |
+| `OrchestrationDir` | Directory for cross-domain coordination, for example `<InternalRoot>/orchestration/`. |
+| `SharedDir` | Shared internal package tree, usually `<InternalRoot>/pkg/`. |
+| `AppDir` | Composition root such as `<InternalRoot>/app/`. Rules can allow this layer to wire everything. |
+| `ServerDir` | Transport root such as `<InternalRoot>/server/http/` or `<InternalRoot>/server/grpc/`. |
 
 Domain layout example:
 

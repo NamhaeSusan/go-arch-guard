@@ -44,6 +44,8 @@ if err != nil {
 }
 ```
 
+비표준 패키지 루트(`packages/`, `src/`)를 쓰면 `ArchitectureTestOptions{..., InternalRoot: "packages"}`로 같이 지정한다.
+
 ### Step 3: 검증
 
 ```bash

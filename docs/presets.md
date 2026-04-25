@@ -4,6 +4,11 @@ Detailed layout diagrams and direction tables for each built-in preset.
 
 For custom architectures, see [Architecture Concepts](model-concepts.md).
 
+> **Note**: All preset layouts below use `internal/` as the canonical Go package root.
+> Projects that keep packages under a different directory (`packages/`, `src/`, etc.)
+> should set `arch.Layout.InternalRoot` accordingly — the same layout structure applies,
+> just under a different root.
+
 ## DDD Layout
 
 ```text
