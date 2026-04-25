@@ -34,7 +34,19 @@ func NewContext(pkgs []*packages.Package, module, root string, arch Architecture
 	}
 }
 
-func (c *Context) Pkgs() []*packages.Package { return c.pkgs }
+// Pkgs returns the loaded packages. The returned slice is a defensive copy
+// — callers may not affect the runner's view by reslicing or appending. The
+// pointed-to *packages.Package values are NOT cloned: mutating their fields
+// (Imports, Types, etc.) is undefined behavior across rules and breaks the
+// purity contract that lets the runner consider future parallelization.
+func (c *Context) Pkgs() []*packages.Package {
+	if c.pkgs == nil {
+		return nil
+	}
+	out := make([]*packages.Package, len(c.pkgs))
+	copy(out, c.pkgs)
+	return out
+}
 func (c *Context) Module() string            { return c.module }
 func (c *Context) Root() string              { return c.root }
 func (c *Context) Arch() Architecture        { return c.arch }
