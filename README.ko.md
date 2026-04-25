@@ -776,6 +776,12 @@ ctx := core.NewContext(pkgs, "", "", presets.CleanArch(), nil)
 go run github.com/NamhaeSusan/go-arch-guard/cmd/tui .
 ```
 
+DDD가 아닌 프리셋은 `--preset` 플래그로 지정 (`ddd`, `cleanarch`, `layered`, `hexagonal`, `modular-monolith`, `consumer-worker`, `batch`, `event-pipeline` 중 하나):
+
+```bash
+go run github.com/NamhaeSusan/go-arch-guard/cmd/tui --preset hexagonal .
+```
+
 건강 상태 트리 색상, 커플링 메트릭, 위반 상세, 검색/필터 (`/`), 키보드 탐색 지원.
 
 ## API 레퍼런스

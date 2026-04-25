@@ -813,6 +813,12 @@ Visualize your project's package structure and dependencies in an interactive te
 go run github.com/NamhaeSusan/go-arch-guard/cmd/tui .
 ```
 
+Pick a non-DDD preset with `--preset` (one of `ddd`, `cleanarch`, `layered`, `hexagonal`, `modular-monolith`, `consumer-worker`, `batch`, `event-pipeline`):
+
+```bash
+go run github.com/NamhaeSusan/go-arch-guard/cmd/tui --preset hexagonal .
+```
+
 Features: health-status tree coloring, imports/reverse dependencies/coupling metrics, violation details, search/filter (`/`), keyboard navigation.
 
 ## API Reference
