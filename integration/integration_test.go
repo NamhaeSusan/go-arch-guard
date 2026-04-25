@@ -1,4 +1,4 @@
-package goarchguard_test
+package integration_test
 
 import (
 	"os"
@@ -6,105 +6,66 @@ import (
 	"testing"
 
 	"github.com/NamhaeSusan/go-arch-guard/analyzer"
+	"github.com/NamhaeSusan/go-arch-guard/core"
+	"github.com/NamhaeSusan/go-arch-guard/presets"
 	"github.com/NamhaeSusan/go-arch-guard/report"
-	"github.com/NamhaeSusan/go-arch-guard/rules"
 	"golang.org/x/tools/go/packages"
 )
 
-func TestIntegration_Valid(t *testing.T) {
-	pkgs, err := analyzer.Load("testdata/valid", "internal/...", "cmd/...")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Run("domain isolation", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc", "testdata/valid"))
-	})
-	t.Run("layer direction", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, "github.com/kimtaeyun/testproject-dc", "testdata/valid"))
-	})
-	t.Run("naming", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckNaming(pkgs))
-	})
-	t.Run("structure", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckStructure("testdata/valid"))
-	})
-	t.Run("blast radius", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.AnalyzeBlastRadius(pkgs, "github.com/kimtaeyun/testproject-dc", "testdata/valid"))
-	})
+func fixturePath(path string) string {
+	return filepath.Join("..", filepath.FromSlash(path))
 }
 
-func TestIntegration_BlastRadius(t *testing.T) {
-	pkgs, err := analyzer.Load("testdata/blast", "internal/...")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	violations := rules.AnalyzeBlastRadius(pkgs, "github.com/kimtaeyun/testproject-blast", "testdata/blast")
-	if len(violations) == 0 {
-		t.Error("expected blast radius violations for hub package")
-	}
-	assertHasRule(t, violations, "blast.high-coupling")
+func runDDD(pkgs []*packages.Package, module, root string, opts ...core.RunOption) []core.Violation {
+	return runArchitecture(pkgs, module, root, presets.DDD(), presets.RecommendedDDD(), opts...)
 }
 
-func TestIntegration_Invalid(t *testing.T) {
-	pkgs, err := analyzer.Load("testdata/invalid", "internal/...", "cmd/...")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Run("domain isolation violations found", func(t *testing.T) {
-		violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "testdata/invalid")
-		assertHasRule(t, violations, "isolation.cross-domain")
-	})
-	t.Run("layer direction violations found", func(t *testing.T) {
-		violations := rules.CheckLayerDirection(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "testdata/invalid")
-		assertHasRule(t, violations, "layer.direction")
-	})
-	t.Run("naming violations found", func(t *testing.T) {
-		violations := rules.CheckNaming(pkgs)
-		assertHasRule(t, violations, "naming.no-layer-suffix")
-	})
-	t.Run("structure violations found", func(t *testing.T) {
-		violations := rules.CheckStructure("testdata/invalid")
-		assertHasRule(t, violations, "structure.banned-package")
-	})
-
-	t.Run("new rule ids are surfaced", func(t *testing.T) {
-		isolationViolations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "testdata/invalid")
-		layerViolations := rules.CheckLayerDirection(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "testdata/invalid")
-		structureViolations := rules.CheckStructure("testdata/invalid")
-
-		assertHasRule(t, isolationViolations, "isolation.domain-imports-orchestration")
-		assertHasRule(t, isolationViolations, "isolation.stray-imports-orchestration")
-		assertHasRule(t, isolationViolations, "isolation.pkg-imports-domain")
-		assertHasRule(t, layerViolations, "layer.unknown-sublayer")
-		assertHasRule(t, layerViolations, "layer.inner-imports-pkg")
-		assertHasRule(t, structureViolations, "structure.internal-top-level")
-		assertHasRule(t, structureViolations, "structure.domain-alias-exists")
-		assertHasRule(t, structureViolations, "structure.domain-model-required")
-		assertHasRule(t, structureViolations, "structure.dto-placement")
-		assertHasRule(t, structureViolations, "structure.misplaced-layer")
-	})
+func runArchitecture(pkgs []*packages.Package, module, root string, arch core.Architecture, rs core.RuleSet, opts ...core.RunOption) []core.Violation {
+	ctx := core.NewContext(pkgs, module, root, arch, nil)
+	return core.Run(ctx, rs, opts...)
 }
 
-func TestIntegration_WarningMode(t *testing.T) {
-	pkgs, err := analyzer.Load("testdata/invalid", "internal/...", "cmd/...")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	violations := rules.CheckDomainIsolation(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", "testdata/invalid",
-		rules.WithSeverity(rules.Warning))
-	if len(violations) == 0 {
-		t.Error("expected violations even in warning mode")
-	}
+func runArchitectureAsWarnings(pkgs []*packages.Package, module, root string, arch core.Architecture, rs core.RuleSet) []core.Violation {
+	violations := runArchitecture(pkgs, module, root, arch, rs)
+	opts := make([]core.RunOption, 0, len(violations))
+	seen := make(map[string]bool)
 	for _, v := range violations {
-		if v.EffectiveSeverity != rules.Warning {
-			t.Errorf("expected Warning severity, got %v", v.EffectiveSeverity)
+		if seen[v.Rule] {
+			continue
 		}
+		seen[v.Rule] = true
+		opts = append(opts, core.WithSeverityOverride(v.Rule, core.Warning))
 	}
-	report.AssertNoViolations(t, violations)
+	return runArchitecture(pkgs, module, root, arch, rs, opts...)
+}
+
+func customArchitecture() core.Architecture {
+	arch := core.Architecture{
+		Layers: core.LayerModel{
+			Sublayers: []string{"api", "logic", "data"},
+			Direction: map[string][]string{
+				"api":   {"logic"},
+				"logic": {"data"},
+				"data":  {},
+			},
+			PkgRestricted: map[string]bool{"data": true},
+			InternalTopLevel: map[string]bool{
+				"module": true,
+				"lib":    true,
+			},
+			LayerDirNames: map[string]bool{
+				"api": true, "logic": true, "data": true,
+			},
+		},
+		Layout: core.LayoutModel{
+			DomainDir: "module",
+			SharedDir: "lib",
+		},
+	}
+	if err := arch.Validate(); err != nil {
+		panic(err)
+	}
+	return arch
 }
 
 func TestIntegration_RejectsUnexpectedInternalTopLevelPackages(t *testing.T) {
@@ -129,22 +90,11 @@ func TestIntegration_RejectsUnexpectedInternalTopLevelPackages(t *testing.T) {
 	assertHasPackage(t, pkgs, module+"/internal/system")
 	assertHasPackage(t, pkgs, module+"/internal/foundation")
 
-	t.Run("domain isolation", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, module, root))
-	})
-	t.Run("layer direction", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, module, root))
-	})
-	t.Run("naming", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckNaming(pkgs))
-	})
-	t.Run("structure", func(t *testing.T) {
-		violations := rules.CheckStructure(root)
-		assertHasRule(t, violations, "structure.internal-top-level")
-	})
+	violations := runDDD(pkgs, module, root)
+	assertHasRule(t, violations, "structure.internal-top-level")
 }
 
-func assertHasRule(t *testing.T, violations []rules.Violation, rule string) {
+func assertHasRule(t *testing.T, violations []core.Violation, rule string) {
 	t.Helper()
 	for _, v := range violations {
 		if v.Rule == rule {
@@ -175,7 +125,8 @@ func assertHasPackage(t *testing.T, pkgs []*packages.Package, pkgPath string) {
 func TestIntegration_CleanArchModel(t *testing.T) {
 	root := t.TempDir()
 	module := "example.com/cleanapp"
-	m := rules.CleanArch()
+	arch := presets.CleanArch()
+	rs := presets.RecommendedCleanArch()
 
 	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.25.0\n")
 	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "handler", "handler.go"),
@@ -194,38 +145,25 @@ func TestIntegration_CleanArchModel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	opts := []rules.Option{rules.WithModel(m)}
-
 	t.Run("layer direction", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, module, root, opts...))
+		report.AssertNoViolations(t, runArchitecture(pkgs, module, root, arch, rs))
 	})
 	t.Run("domain isolation", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, module, root, opts...))
+		report.AssertNoViolations(t, runArchitecture(pkgs, module, root, arch, rs))
 	})
 	t.Run("structure", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckStructure(root, opts...))
+		report.AssertNoViolations(t, runArchitecture(pkgs, module, root, arch, rs))
 	})
 	t.Run("naming", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckNaming(pkgs, opts...))
+		report.AssertNoViolations(t, runArchitecture(pkgs, module, root, arch, rs))
 	})
 }
 
 func TestIntegration_CustomModel(t *testing.T) {
 	root := t.TempDir()
 	module := "example.com/custom"
-	m := rules.NewModel(
-		rules.WithDomainDir("module"),
-		rules.WithSharedDir("lib"),
-		rules.WithSublayers([]string{"api", "logic", "data"}),
-		rules.WithDirection(map[string][]string{
-			"api":   {"logic"},
-			"logic": {"data"},
-			"data":  {},
-		}),
-		rules.WithPkgRestricted(map[string]bool{"data": true}),
-		rules.WithRequireAlias(false),
-		rules.WithRequireModel(false),
-	)
+	arch := customArchitecture()
+	rs := presets.RecommendedDDD()
 
 	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.25.0\n")
 	writeIntegrationFile(t, filepath.Join(root, "internal", "module", "order", "api", "handler.go"),
@@ -242,26 +180,25 @@ func TestIntegration_CustomModel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	opts := []rules.Option{rules.WithModel(m)}
-
 	t.Run("layer direction", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, module, root, opts...))
+		report.AssertNoViolations(t, runArchitecture(pkgs, module, root, arch, rs))
 	})
 	t.Run("domain isolation", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, module, root, opts...))
+		report.AssertNoViolations(t, runArchitecture(pkgs, module, root, arch, rs))
 	})
 	t.Run("structure", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckStructure(root, opts...))
+		report.AssertNoViolations(t, runArchitecture(pkgs, module, root, arch, rs))
 	})
 	t.Run("naming", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckNaming(pkgs, opts...))
+		report.AssertNoViolations(t, runArchitecture(pkgs, module, root, arch, rs))
 	})
 }
 
 func TestIntegration_CleanArchModel_DirectionViolation(t *testing.T) {
 	root := t.TempDir()
 	module := "example.com/cleanviolation"
-	m := rules.CleanArch()
+	arch := presets.CleanArch()
+	rs := presets.RecommendedCleanArch()
 
 	// usecase imports handler — should violate direction (usecase can only import entity, gateway)
 	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.25.0\n")
@@ -275,25 +212,15 @@ func TestIntegration_CleanArchModel_DirectionViolation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	violations := rules.CheckLayerDirection(pkgs, module, root, rules.WithModel(m))
+	violations := runArchitecture(pkgs, module, root, arch, rs)
 	assertHasRule(t, violations, "layer.direction")
 }
 
 func TestIntegration_CustomModel_DirectionViolation(t *testing.T) {
 	root := t.TempDir()
 	module := "example.com/custom2"
-	m := rules.NewModel(
-		rules.WithDomainDir("module"),
-		rules.WithSharedDir("lib"),
-		rules.WithSublayers([]string{"api", "logic", "data"}),
-		rules.WithDirection(map[string][]string{
-			"api":   {"logic"},
-			"logic": {"data"},
-			"data":  {},
-		}),
-		rules.WithRequireAlias(false),
-		rules.WithRequireModel(false),
-	)
+	arch := customArchitecture()
+	rs := presets.RecommendedDDD()
 
 	// api imports data directly — should violate direction (api can only import logic)
 	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.25.0\n")
@@ -307,12 +234,13 @@ func TestIntegration_CustomModel_DirectionViolation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	violations := rules.CheckLayerDirection(pkgs, module, root, rules.WithModel(m))
+	violations := runArchitecture(pkgs, module, root, arch, rs)
 	assertHasRule(t, violations, "layer.direction")
 }
 
 // TestIntegration_RealWorldDDD simulates a realistic multi-domain DDD project
 // with orchestration, pkg, cmd, cross-domain isolation, and all layer directions.
+
 func TestIntegration_RealWorldDDD(t *testing.T) {
 	root := t.TempDir()
 	module := "example.com/shop"
@@ -343,6 +271,7 @@ import (
 type Service struct {
 	repo repo.Order
 }
+
 func NewService(r repo.Order) *Service { return &Service{repo: r} }
 func (s *Service) Get(id string) (model.Order, error) { return s.repo.Find(id) }
 `)
@@ -385,6 +314,7 @@ import (
 )
 
 type Service struct{ repo repo.User }
+
 func NewService(r repo.User) *Service { return &Service{repo: r} }
 func (s *Service) Get(id string) (model.User, error) { return s.repo.GetByID(id) }
 `)
@@ -414,6 +344,7 @@ type CreateOrder struct {
 	orderSvc *order.Service
 	userSvc  *user.Service
 }
+
 func New(o *order.Service, u *user.Service) *CreateOrder { return &CreateOrder{orderSvc: o, userSvc: u} }
 `)
 
@@ -444,28 +375,28 @@ func main() {}
 	}
 
 	t.Run("domain isolation", func(t *testing.T) {
-		violations := rules.CheckDomainIsolation(pkgs, module, root)
+		violations := runDDD(pkgs, module, root)
 		for _, v := range violations {
 			t.Log(v.String())
 		}
 		report.AssertNoViolations(t, violations)
 	})
 	t.Run("layer direction", func(t *testing.T) {
-		violations := rules.CheckLayerDirection(pkgs, module, root)
+		violations := runDDD(pkgs, module, root)
 		for _, v := range violations {
 			t.Log(v.String())
 		}
 		report.AssertNoViolations(t, violations)
 	})
 	t.Run("naming", func(t *testing.T) {
-		violations := rules.CheckNaming(pkgs)
+		violations := runDDD(pkgs, module, root)
 		for _, v := range violations {
 			t.Log(v.String())
 		}
 		report.AssertNoViolations(t, violations)
 	})
 	t.Run("structure", func(t *testing.T) {
-		violations := rules.CheckStructure(root)
+		violations := runDDD(pkgs, module, root)
 		for _, v := range violations {
 			t.Log(v.String())
 		}
@@ -475,10 +406,12 @@ func main() {}
 
 // TestIntegration_RealWorldCleanArch simulates a realistic Clean Architecture project
 // with multiple domains, cross-domain isolation via orchestration, and all layer directions.
+
 func TestIntegration_RealWorldCleanArch(t *testing.T) {
 	root := t.TempDir()
 	module := "example.com/cleanshop"
-	m := rules.CleanArch()
+	arch := presets.CleanArch()
+	rs := presets.RecommendedCleanArch()
 
 	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.25.0\n")
 
@@ -496,6 +429,7 @@ import (
 )
 
 type GetProduct struct{ gw gateway.Product }
+
 func NewGetProduct(gw gateway.Product) *GetProduct { return &GetProduct{gw: gw} }
 func (uc *GetProduct) Execute(id string) (entity.Product, error) { return uc.gw.FindByID(id) }
 `)
@@ -528,6 +462,7 @@ import (
 )
 
 type AddToCart struct{ gw gateway.Cart }
+
 func NewAddToCart(gw gateway.Cart) *AddToCart { return &AddToCart{gw: gw} }
 func (uc *AddToCart) Execute(c entity.Cart) error { return uc.gw.Save(c) }
 `)
@@ -556,31 +491,29 @@ var _ gateway.Cart = RedisCart{}
 		t.Fatal("no packages loaded")
 	}
 
-	opts := []rules.Option{rules.WithModel(m)}
-
 	t.Run("layer direction", func(t *testing.T) {
-		violations := rules.CheckLayerDirection(pkgs, module, root, opts...)
+		violations := runArchitecture(pkgs, module, root, arch, rs)
 		for _, v := range violations {
 			t.Log(v.String())
 		}
 		report.AssertNoViolations(t, violations)
 	})
 	t.Run("domain isolation", func(t *testing.T) {
-		violations := rules.CheckDomainIsolation(pkgs, module, root, opts...)
+		violations := runArchitecture(pkgs, module, root, arch, rs)
 		for _, v := range violations {
 			t.Log(v.String())
 		}
 		report.AssertNoViolations(t, violations)
 	})
 	t.Run("structure", func(t *testing.T) {
-		violations := rules.CheckStructure(root, opts...)
+		violations := runArchitecture(pkgs, module, root, arch, rs)
 		for _, v := range violations {
 			t.Log(v.String())
 		}
 		report.AssertNoViolations(t, violations)
 	})
 	t.Run("naming", func(t *testing.T) {
-		violations := rules.CheckNaming(pkgs, opts...)
+		violations := runArchitecture(pkgs, module, root, arch, rs)
 		for _, v := range violations {
 			t.Log(v.String())
 		}
@@ -590,10 +523,12 @@ var _ gateway.Cart = RedisCart{}
 
 // TestIntegration_RealWorldCleanArch_Violations tests that CleanArch model catches
 // various violations: cross-domain imports, wrong direction, unknown sublayers.
+
 func TestIntegration_RealWorldCleanArch_Violations(t *testing.T) {
 	root := t.TempDir()
 	module := "example.com/cleaninvalid"
-	m := rules.CleanArch()
+	arch := presets.CleanArch()
+	rs := presets.RecommendedCleanArch()
 
 	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.25.0\n")
 
@@ -625,9 +560,7 @@ func TestIntegration_RealWorldCleanArch_Violations(t *testing.T) {
 		t.Log("partial load:", err)
 	}
 
-	opts := []rules.Option{rules.WithModel(m)}
-
-	layerViolations := rules.CheckLayerDirection(pkgs, module, root, opts...)
+	layerViolations := runArchitecture(pkgs, module, root, arch, rs)
 	t.Run("detects direction violation", func(t *testing.T) {
 		assertHasRule(t, layerViolations, "layer.direction")
 	})
@@ -638,7 +571,7 @@ func TestIntegration_RealWorldCleanArch_Violations(t *testing.T) {
 		assertHasRule(t, layerViolations, "layer.unknown-sublayer")
 	})
 
-	isolationViolations := rules.CheckDomainIsolation(pkgs, module, root, opts...)
+	isolationViolations := runArchitecture(pkgs, module, root, arch, rs)
 	t.Run("detects cross-domain import", func(t *testing.T) {
 		assertHasRule(t, isolationViolations, "isolation.cross-domain")
 	})
@@ -647,7 +580,8 @@ func TestIntegration_RealWorldCleanArch_Violations(t *testing.T) {
 func TestIntegration_RealWorldLayered(t *testing.T) {
 	root := t.TempDir()
 	module := "example.com/layeredshop"
-	m := rules.Layered()
+	arch := presets.Layered()
+	rs := presets.RecommendedLayered()
 
 	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.25.0\n")
 
@@ -673,31 +607,29 @@ func TestIntegration_RealWorldLayered(t *testing.T) {
 		t.Fatal("no packages loaded")
 	}
 
-	opts := []rules.Option{rules.WithModel(m)}
-
 	t.Run("layer direction", func(t *testing.T) {
-		violations := rules.CheckLayerDirection(pkgs, module, root, opts...)
+		violations := runArchitecture(pkgs, module, root, arch, rs)
 		for _, v := range violations {
 			t.Log(v.String())
 		}
 		report.AssertNoViolations(t, violations)
 	})
 	t.Run("domain isolation", func(t *testing.T) {
-		violations := rules.CheckDomainIsolation(pkgs, module, root, opts...)
+		violations := runArchitecture(pkgs, module, root, arch, rs)
 		for _, v := range violations {
 			t.Log(v.String())
 		}
 		report.AssertNoViolations(t, violations)
 	})
 	t.Run("structure", func(t *testing.T) {
-		violations := rules.CheckStructure(root, opts...)
+		violations := runArchitecture(pkgs, module, root, arch, rs)
 		for _, v := range violations {
 			t.Log(v.String())
 		}
 		report.AssertNoViolations(t, violations)
 	})
 	t.Run("naming", func(t *testing.T) {
-		violations := rules.CheckNaming(pkgs, opts...)
+		violations := runArchitecture(pkgs, module, root, arch, rs)
 		for _, v := range violations {
 			t.Log(v.String())
 		}
@@ -708,7 +640,8 @@ func TestIntegration_RealWorldLayered(t *testing.T) {
 func TestIntegration_Layered_Violations(t *testing.T) {
 	root := t.TempDir()
 	module := "example.com/layeredinvalid"
-	m := rules.Layered()
+	arch := presets.Layered()
+	rs := presets.RecommendedLayered()
 
 	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.25.0\n")
 
@@ -733,9 +666,7 @@ func TestIntegration_Layered_Violations(t *testing.T) {
 		t.Log("partial load:", err)
 	}
 
-	opts := []rules.Option{rules.WithModel(m)}
-
-	layerViolations := rules.CheckLayerDirection(pkgs, module, root, opts...)
+	layerViolations := runArchitecture(pkgs, module, root, arch, rs)
 	t.Run("detects direction violation", func(t *testing.T) {
 		assertHasRule(t, layerViolations, "layer.direction")
 	})
@@ -747,7 +678,8 @@ func TestIntegration_Layered_Violations(t *testing.T) {
 func TestIntegration_RealWorldHexagonal(t *testing.T) {
 	root := t.TempDir()
 	module := "example.com/hexshop"
-	m := rules.Hexagonal()
+	arch := presets.Hexagonal()
+	rs := presets.RecommendedHexagonal()
 
 	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.25.0\n")
 
@@ -775,31 +707,29 @@ func TestIntegration_RealWorldHexagonal(t *testing.T) {
 		t.Fatal("no packages loaded")
 	}
 
-	opts := []rules.Option{rules.WithModel(m)}
-
 	t.Run("layer direction", func(t *testing.T) {
-		violations := rules.CheckLayerDirection(pkgs, module, root, opts...)
+		violations := runArchitecture(pkgs, module, root, arch, rs)
 		for _, v := range violations {
 			t.Log(v.String())
 		}
 		report.AssertNoViolations(t, violations)
 	})
 	t.Run("domain isolation", func(t *testing.T) {
-		violations := rules.CheckDomainIsolation(pkgs, module, root, opts...)
+		violations := runArchitecture(pkgs, module, root, arch, rs)
 		for _, v := range violations {
 			t.Log(v.String())
 		}
 		report.AssertNoViolations(t, violations)
 	})
 	t.Run("structure", func(t *testing.T) {
-		violations := rules.CheckStructure(root, opts...)
+		violations := runArchitecture(pkgs, module, root, arch, rs)
 		for _, v := range violations {
 			t.Log(v.String())
 		}
 		report.AssertNoViolations(t, violations)
 	})
 	t.Run("naming", func(t *testing.T) {
-		violations := rules.CheckNaming(pkgs, opts...)
+		violations := runArchitecture(pkgs, module, root, arch, rs)
 		for _, v := range violations {
 			t.Log(v.String())
 		}
@@ -810,7 +740,8 @@ func TestIntegration_RealWorldHexagonal(t *testing.T) {
 func TestIntegration_Hexagonal_Violations(t *testing.T) {
 	root := t.TempDir()
 	module := "example.com/hexinvalid"
-	m := rules.Hexagonal()
+	arch := presets.Hexagonal()
+	rs := presets.RecommendedHexagonal()
 
 	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.25.0\n")
 
@@ -835,9 +766,7 @@ func TestIntegration_Hexagonal_Violations(t *testing.T) {
 		t.Log("partial load:", err)
 	}
 
-	opts := []rules.Option{rules.WithModel(m)}
-
-	layerViolations := rules.CheckLayerDirection(pkgs, module, root, opts...)
+	layerViolations := runArchitecture(pkgs, module, root, arch, rs)
 	t.Run("detects direction violation", func(t *testing.T) {
 		assertHasRule(t, layerViolations, "layer.direction")
 	})
@@ -849,7 +778,8 @@ func TestIntegration_Hexagonal_Violations(t *testing.T) {
 func TestIntegration_RealWorldModularMonolith(t *testing.T) {
 	root := t.TempDir()
 	module := "example.com/modshop"
-	m := rules.ModularMonolith()
+	arch := presets.ModularMonolith()
+	rs := presets.RecommendedModularMonolith()
 
 	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.25.0\n")
 
@@ -875,31 +805,29 @@ func TestIntegration_RealWorldModularMonolith(t *testing.T) {
 		t.Fatal("no packages loaded")
 	}
 
-	opts := []rules.Option{rules.WithModel(m)}
-
 	t.Run("layer direction", func(t *testing.T) {
-		violations := rules.CheckLayerDirection(pkgs, module, root, opts...)
+		violations := runArchitecture(pkgs, module, root, arch, rs)
 		for _, v := range violations {
 			t.Log(v.String())
 		}
 		report.AssertNoViolations(t, violations)
 	})
 	t.Run("domain isolation", func(t *testing.T) {
-		violations := rules.CheckDomainIsolation(pkgs, module, root, opts...)
+		violations := runArchitecture(pkgs, module, root, arch, rs)
 		for _, v := range violations {
 			t.Log(v.String())
 		}
 		report.AssertNoViolations(t, violations)
 	})
 	t.Run("structure", func(t *testing.T) {
-		violations := rules.CheckStructure(root, opts...)
+		violations := runArchitecture(pkgs, module, root, arch, rs)
 		for _, v := range violations {
 			t.Log(v.String())
 		}
 		report.AssertNoViolations(t, violations)
 	})
 	t.Run("naming", func(t *testing.T) {
-		violations := rules.CheckNaming(pkgs, opts...)
+		violations := runArchitecture(pkgs, module, root, arch, rs)
 		for _, v := range violations {
 			t.Log(v.String())
 		}
@@ -910,7 +838,8 @@ func TestIntegration_RealWorldModularMonolith(t *testing.T) {
 func TestIntegration_ModularMonolith_Violations(t *testing.T) {
 	root := t.TempDir()
 	module := "example.com/modinvalid"
-	m := rules.ModularMonolith()
+	arch := presets.ModularMonolith()
+	rs := presets.RecommendedModularMonolith()
 
 	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.25.0\n")
 
@@ -935,14 +864,12 @@ func TestIntegration_ModularMonolith_Violations(t *testing.T) {
 		t.Log("partial load:", err)
 	}
 
-	opts := []rules.Option{rules.WithModel(m)}
-
-	layerViolations := rules.CheckLayerDirection(pkgs, module, root, opts...)
+	layerViolations := runArchitecture(pkgs, module, root, arch, rs)
 	t.Run("detects direction violation", func(t *testing.T) {
 		assertHasRule(t, layerViolations, "layer.direction")
 	})
 
-	isolationViolations := rules.CheckDomainIsolation(pkgs, module, root, opts...)
+	isolationViolations := runArchitecture(pkgs, module, root, arch, rs)
 	t.Run("detects cross-domain import", func(t *testing.T) {
 		assertHasRule(t, isolationViolations, "isolation.cross-domain")
 	})
@@ -951,7 +878,8 @@ func TestIntegration_ModularMonolith_Violations(t *testing.T) {
 func TestIntegration_ConsumerWorker_Valid(t *testing.T) {
 	root := t.TempDir()
 	module := "example.com/consumerworker"
-	m := rules.ConsumerWorker()
+	arch := presets.ConsumerWorker()
+	rs := presets.RecommendedConsumerWorker()
 
 	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
 	writeIntegrationFile(t, filepath.Join(root, "internal", "worker", "worker_order.go"),
@@ -975,32 +903,31 @@ func TestIntegration_ConsumerWorker_Valid(t *testing.T) {
 		t.Fatal("no packages loaded")
 	}
 
-	opts := []rules.Option{rules.WithModel(m)}
-
 	t.Run("layer direction", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, module, root, opts...))
+		report.AssertNoViolations(t, runArchitecture(pkgs, module, root, arch, rs))
 	})
 	t.Run("domain isolation skipped", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, module, root, opts...))
+		report.AssertNoViolations(t, runArchitecture(pkgs, module, root, arch, rs))
 	})
 	t.Run("structure", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckStructure(root, opts...))
+		report.AssertNoViolations(t, runArchitecture(pkgs, module, root, arch, rs))
 	})
 	t.Run("naming", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckNaming(pkgs, opts...))
+		report.AssertNoViolations(t, runArchitecture(pkgs, module, root, arch, rs))
 	})
 	t.Run("type patterns", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckTypePatterns(pkgs, opts...))
+		report.AssertNoViolations(t, runArchitecture(pkgs, module, root, arch, rs))
 	})
 	t.Run("run all", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.RunAll(pkgs, module, root, opts...))
+		report.AssertNoViolations(t, runArchitecture(pkgs, module, root, arch, rs))
 	})
 }
 
 func TestIntegration_ConsumerWorker_Violations(t *testing.T) {
 	root := t.TempDir()
 	module := "example.com/cw-violations"
-	m := rules.ConsumerWorker()
+	arch := presets.ConsumerWorker()
+	rs := presets.RecommendedConsumerWorker()
 
 	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
 	// store imports worker — layer direction violation
@@ -1026,7 +953,7 @@ func TestIntegration_ConsumerWorker_Violations(t *testing.T) {
 		t.Log("partial load:", err)
 	}
 
-	violations := rules.RunAll(pkgs, module, root, rules.WithModel(m))
+	violations := runArchitecture(pkgs, module, root, arch, rs)
 	if len(violations) == 0 {
 		t.Fatal("expected violations")
 	}
@@ -1040,7 +967,8 @@ func TestIntegration_ConsumerWorker_Violations(t *testing.T) {
 func TestIntegration_Batch_Valid(t *testing.T) {
 	root := t.TempDir()
 	module := "example.com/batchapp"
-	m := rules.Batch()
+	arch := presets.Batch()
+	rs := presets.RecommendedBatch()
 
 	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
 	writeIntegrationFile(t, filepath.Join(root, "internal", "job", "job_expire.go"),
@@ -1064,32 +992,31 @@ func TestIntegration_Batch_Valid(t *testing.T) {
 		t.Fatal("no packages loaded")
 	}
 
-	opts := []rules.Option{rules.WithModel(m)}
-
 	t.Run("layer direction", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, module, root, opts...))
+		report.AssertNoViolations(t, runArchitecture(pkgs, module, root, arch, rs))
 	})
 	t.Run("domain isolation skipped", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, module, root, opts...))
+		report.AssertNoViolations(t, runArchitecture(pkgs, module, root, arch, rs))
 	})
 	t.Run("structure", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckStructure(root, opts...))
+		report.AssertNoViolations(t, runArchitecture(pkgs, module, root, arch, rs))
 	})
 	t.Run("naming", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckNaming(pkgs, opts...))
+		report.AssertNoViolations(t, runArchitecture(pkgs, module, root, arch, rs))
 	})
 	t.Run("type patterns", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckTypePatterns(pkgs, opts...))
+		report.AssertNoViolations(t, runArchitecture(pkgs, module, root, arch, rs))
 	})
 	t.Run("run all", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.RunAll(pkgs, module, root, opts...))
+		report.AssertNoViolations(t, runArchitecture(pkgs, module, root, arch, rs))
 	})
 }
 
 func TestIntegration_Batch_Violations(t *testing.T) {
 	root := t.TempDir()
 	module := "example.com/batch-violations"
-	m := rules.Batch()
+	arch := presets.Batch()
+	rs := presets.RecommendedBatch()
 
 	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
 	// store imports job — layer direction violation
@@ -1115,7 +1042,7 @@ func TestIntegration_Batch_Violations(t *testing.T) {
 		t.Log("partial load:", err)
 	}
 
-	violations := rules.RunAll(pkgs, module, root, rules.WithModel(m))
+	violations := runArchitecture(pkgs, module, root, arch, rs)
 	if len(violations) == 0 {
 		t.Fatal("expected violations")
 	}
@@ -1129,7 +1056,8 @@ func TestIntegration_Batch_Violations(t *testing.T) {
 func TestIntegration_EventPipeline_Valid(t *testing.T) {
 	root := t.TempDir()
 	module := "example.com/eventapp"
-	m := rules.EventPipeline()
+	arch := presets.EventPipeline()
+	rs := presets.RecommendedEventPipeline()
 
 	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
 	writeIntegrationFile(t, filepath.Join(root, "internal", "command", "command_create_order.go"),
@@ -1157,32 +1085,31 @@ func TestIntegration_EventPipeline_Valid(t *testing.T) {
 		t.Fatal("no packages loaded")
 	}
 
-	opts := []rules.Option{rules.WithModel(m)}
-
 	t.Run("layer direction", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, module, root, opts...))
+		report.AssertNoViolations(t, runArchitecture(pkgs, module, root, arch, rs))
 	})
 	t.Run("domain isolation skipped", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, module, root, opts...))
+		report.AssertNoViolations(t, runArchitecture(pkgs, module, root, arch, rs))
 	})
 	t.Run("structure", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckStructure(root, opts...))
+		report.AssertNoViolations(t, runArchitecture(pkgs, module, root, arch, rs))
 	})
 	t.Run("naming", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckNaming(pkgs, opts...))
+		report.AssertNoViolations(t, runArchitecture(pkgs, module, root, arch, rs))
 	})
 	t.Run("type patterns", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckTypePatterns(pkgs, opts...))
+		report.AssertNoViolations(t, runArchitecture(pkgs, module, root, arch, rs))
 	})
 	t.Run("run all", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.RunAll(pkgs, module, root, opts...))
+		report.AssertNoViolations(t, runArchitecture(pkgs, module, root, arch, rs))
 	})
 }
 
 func TestIntegration_EventPipeline_Violations(t *testing.T) {
 	root := t.TempDir()
 	module := "example.com/ep-violations"
-	m := rules.EventPipeline()
+	arch := presets.EventPipeline()
+	rs := presets.RecommendedEventPipeline()
 
 	writeIntegrationFile(t, filepath.Join(root, "go.mod"), "module "+module+"\n\ngo 1.21\n")
 	// readstore imports command — layer direction violation
@@ -1209,7 +1136,7 @@ func TestIntegration_EventPipeline_Violations(t *testing.T) {
 		t.Log("partial load:", err)
 	}
 
-	violations := rules.RunAll(pkgs, module, root, rules.WithModel(m))
+	violations := runArchitecture(pkgs, module, root, arch, rs)
 	if len(violations) == 0 {
 		t.Fatal("expected violations")
 	}
