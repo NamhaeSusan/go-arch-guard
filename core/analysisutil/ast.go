@@ -6,6 +6,48 @@ import (
 	"strings"
 )
 
+// ReceiverTypeName extracts the unqualified receiver type name from an
+// *ast.FuncDecl receiver expression. It unwraps a leading pointer and
+// handles generic receivers — *ast.IndexExpr (T[U]) and *ast.IndexListExpr
+// (T[U, V]) — so callers do not silently miss methods on parameterized
+// types. Returns "" if the expression does not match a recognized shape.
+func ReceiverTypeName(expr ast.Expr) string {
+	if star, ok := expr.(*ast.StarExpr); ok {
+		expr = star.X
+	}
+	switch t := expr.(type) {
+	case *ast.Ident:
+		return t.Name
+	case *ast.IndexExpr:
+		if id, ok := t.X.(*ast.Ident); ok {
+			return id.Name
+		}
+	case *ast.IndexListExpr:
+		if id, ok := t.X.(*ast.Ident); ok {
+			return id.Name
+		}
+	}
+	return ""
+}
+
+// SnakeToPascal converts a snake_case identifier (e.g. "user_repository")
+// to PascalCase (e.g. "UserRepository"). Empty segments are skipped, so
+// leading/trailing/double underscores do not produce empty letters. Input
+// is assumed to be ASCII; non-ASCII first bytes in a segment are not
+// case-converted but are preserved.
+func SnakeToPascal(s string) string {
+	parts := strings.Split(s, "_")
+	var b strings.Builder
+	for _, part := range parts {
+		if part == "" {
+			continue
+		}
+		b.WriteString(strings.ToUpper(part[:1]))
+		b.WriteString(part[1:])
+	}
+	return b.String()
+}
+
 func ResolveIdentImportPath(file *ast.File, identName string) string {
 	for _, imp := range file.Imports {
 		impPath := strings.Trim(imp.Path.Value, `"`)

@@ -36,33 +36,9 @@ type TypePattern struct {
 	severity core.Severity
 }
 
-type Option interface {
-	applyNoSetter(*NoSetter)
-	applyTypePattern(*TypePattern)
-}
-
-type severityOption struct {
-	severity core.Severity
-}
-
-func WithSeverity(s core.Severity) Option {
-	return severityOption{severity: s}
-}
-
-func (o severityOption) applyNoSetter(r *NoSetter) {
-	r.severity = o.severity
-}
-
-func (o severityOption) applyTypePattern(r *TypePattern) {
-	r.severity = o.severity
-}
-
 func NewTypePattern(opts ...Option) *TypePattern {
-	r := &TypePattern{severity: core.Error}
-	for _, opt := range opts {
-		opt.applyTypePattern(r)
-	}
-	return r
+	cfg := newConfig(opts, core.Error)
+	return &TypePattern{severity: cfg.severity}
 }
 
 func (r *TypePattern) Spec() core.RuleSpec {
@@ -88,7 +64,7 @@ func (r *TypePattern) Check(ctx *core.Context) []core.Violation {
 }
 
 func (r *TypePattern) checkPackage(ctx *core.Context, pkg *packages.Package, pattern core.TypePattern) []core.Violation {
-	if pkg == nil || !strings.HasSuffix(pkg.PkgPath, "/internal/"+pattern.Dir) {
+	if pkg == nil || !strings.HasSuffix(pkg.PkgPath, "/"+pattern.Dir) {
 		return nil
 	}
 
@@ -110,7 +86,7 @@ func (r *TypePattern) checkPackage(ctx *core.Context, pkg *packages.Package, pat
 			continue
 		}
 
-		expectedType := snakeToPascal(suffix) + pattern.TypeSuffix
+		expectedType := analysisutil.SnakeToPascal(suffix) + pattern.TypeSuffix
 		if !hasExportedType(file, expectedType) {
 			violations = append(violations, core.Violation{
 				File:              relPath,
@@ -173,35 +149,11 @@ func collectMethods(pkg *packages.Package) map[string]bool {
 			if !ok || fd.Recv == nil || len(fd.Recv.List) == 0 {
 				continue
 			}
-			typeName := receiverTypeName(fd.Recv.List[0].Type)
+			typeName := analysisutil.ReceiverTypeName(fd.Recv.List[0].Type)
 			if typeName != "" {
 				result[typeName+"."+fd.Name.Name] = true
 			}
 		}
 	}
 	return result
-}
-
-func receiverTypeName(expr ast.Expr) string {
-	if star, ok := expr.(*ast.StarExpr); ok {
-		expr = star.X
-	}
-	ident, ok := expr.(*ast.Ident)
-	if !ok {
-		return ""
-	}
-	return ident.Name
-}
-
-func snakeToPascal(s string) string {
-	parts := strings.Split(s, "_")
-	var b strings.Builder
-	for _, part := range parts {
-		if part == "" {
-			continue
-		}
-		b.WriteString(strings.ToUpper(part[:1]))
-		b.WriteString(part[1:])
-	}
-	return b.String()
 }

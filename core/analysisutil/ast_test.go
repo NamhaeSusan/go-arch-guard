@@ -9,6 +9,61 @@ import (
 	"testing"
 )
 
+func TestReceiverTypeName(t *testing.T) {
+	src := `package sample
+type Foo struct{}
+func (f Foo) A() {}
+func (f *Foo) B() {}
+type Bar[T any] struct{}
+func (b Bar[T]) C() {}
+func (b *Bar[T]) D() {}
+type Baz[K comparable, V any] struct{}
+func (z *Baz[K, V]) E() {}
+`
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "sample.go", src, parser.AllErrors)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := []string{"Foo", "Foo", "Bar", "Bar", "Baz"}
+	var got []string
+	for _, decl := range file.Decls {
+		fd, ok := decl.(*ast.FuncDecl)
+		if !ok || fd.Recv == nil {
+			continue
+		}
+		got = append(got, ReceiverTypeName(fd.Recv.List[0].Type))
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %d names, want %d: %v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("got[%d] = %q, want %q", i, got[i], want[i])
+		}
+	}
+}
+
+func TestSnakeToPascal(t *testing.T) {
+	cases := []struct {
+		in, want string
+	}{
+		{"user_repository", "UserRepository"},
+		{"order", "Order"},
+		{"a_b_c", "ABC"},
+		{"", ""},
+		{"_leading", "Leading"},
+		{"trailing_", "Trailing"},
+		{"double__underscore", "DoubleUnderscore"},
+	}
+	for _, tc := range cases {
+		if got := SnakeToPascal(tc.in); got != tc.want {
+			t.Fatalf("SnakeToPascal(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
 func TestResolveIdentImportPath(t *testing.T) {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, "sample.go", `package sample

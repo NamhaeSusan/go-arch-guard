@@ -62,7 +62,7 @@ func (r *RepoFileInterface) checkPortPackage(ctx *core.Context, pkg *packages.Pa
 		if ctx.IsExcluded(relPath) {
 			continue
 		}
-		expected := snakeToPascal(strings.TrimSuffix(base, ".go"))
+		expected := analysisutil.SnakeToPascal(strings.TrimSuffix(base, ".go"))
 		ifaces := collectInterfacesFromFile(file)
 		if _, ok := ifaces[expected]; !ok {
 			violations = append(violations, r.violation(
@@ -140,19 +140,6 @@ func (r *RepoFileInterface) violation(file string, line int, rule, message, fix 
 		DefaultSeverity:   r.severity,
 		EffectiveSeverity: r.severity,
 	}
-}
-
-func snakeToPascal(s string) string {
-	parts := strings.Split(s, "_")
-	var b strings.Builder
-	for _, part := range parts {
-		if part == "" {
-			continue
-		}
-		b.WriteString(strings.ToUpper(part[:1]))
-		b.WriteString(part[1:])
-	}
-	return b.String()
 }
 
 func collectInterfacesFromFile(file *ast.File) map[string]*ast.InterfaceType {
