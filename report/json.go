@@ -9,7 +9,10 @@ import (
 	"github.com/NamhaeSusan/go-arch-guard/core"
 )
 
-const jsonReportSchema = "go-arch-guard.report.v1"
+// jsonReportSchema versions the JSON report shape. v2 renamed `severity` to
+// `effectiveSeverity` and added `defaultSeverity`; consumers should branch on
+// this string before parsing severity fields.
+const jsonReportSchema = "go-arch-guard.report.v2"
 
 // JSONSummary captures aggregate counts for a machine-readable report.
 type JSONSummary struct {

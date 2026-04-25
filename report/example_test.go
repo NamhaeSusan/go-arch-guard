@@ -22,7 +22,7 @@ func ExampleMarshalJSONReport() {
 	fmt.Println(string(data))
 	// Output:
 	// {
-	//   "schema": "go-arch-guard.report.v1",
+	//   "schema": "go-arch-guard.report.v2",
 	//   "summary": {
 	//     "total": 1,
 	//     "errors": 1,
