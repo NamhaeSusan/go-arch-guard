@@ -116,6 +116,29 @@ func TestRunFallsBackToRuleSpecDefaultSeverity(t *testing.T) {
 	}
 }
 
+func TestRunAllowsUndeclaredMetaIDs(t *testing.T) {
+	// Rules may emit meta.* violations (e.g. meta.no-matching-packages)
+	// without declaring them in Spec().Violations. The runner must let
+	// these through unchanged, not rewrite them as meta.unknown-violation-id.
+	r := &fakeRule{
+		spec: RuleSpec{
+			ID:         "fake.demo",
+			Violations: []ViolationSpec{{ID: "fake.demo.declared", DefaultSeverity: Error}},
+		},
+		violations: []Violation{
+			{File: ".", Rule: "meta.no-matching-packages", Message: "no packages"},
+		},
+	}
+	ctx := NewContext(nil, "", "", validArchitecture(), nil)
+	got := Run(ctx, RuleSet{}.With(r))
+	if len(got) != 1 {
+		t.Fatalf("len = %d, want 1", len(got))
+	}
+	if got[0].Rule != "meta.no-matching-packages" {
+		t.Errorf("Rule = %q, want meta.no-matching-packages (must NOT be rewritten)", got[0].Rule)
+	}
+}
+
 func TestRunReplacesUnknownEmittedIDWithMeta(t *testing.T) {
 	// Rule emits a violation whose ID isn't in its own Spec().Violations
 	// or RuleSpec.ID. This is a rule-author bug; runner replaces with

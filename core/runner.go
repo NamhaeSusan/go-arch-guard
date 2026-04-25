@@ -22,7 +22,11 @@ import (
 //   - For each Violation a rule emits, Run validates Violation.Rule
 //     against THAT rule's own ID set. Unknown IDs (rule-author bugs) are
 //     replaced with "meta.unknown-violation-id" rather than panicked —
-//     a buggy rule should not crash the entire run.
+//     a buggy rule should not crash the entire run. Emitted IDs starting
+//     with "meta." are exempt from this check: any rule may emit
+//     meta.* violations to surface environmental issues (e.g.
+//     "meta.no-matching-packages" when the project module cannot be
+//     resolved) without declaring them in its catalog.
 //   - Rules execute serially in registration order. Rule.Check must be
 //     pure; future runners may parallelize.
 //   - Effective severity precedence (highest wins):
@@ -63,7 +67,10 @@ func Run(ctx *Context, rules RuleSet, opts ...RunOption) []Violation {
 		ruleKnown := ruleKnownIDs(spec)
 
 		for _, v := range r.Check(ctx) {
-			if !ruleKnown[v.Rule] {
+			// meta.* IDs are emergency emit by any rule (e.g. "meta.no-matching-packages"
+			// when the project module cannot be resolved) and are not part of any
+			// rule's catalog. Allow them through unconditionally.
+			if !ruleKnown[v.Rule] && !strings.HasPrefix(v.Rule, "meta.") {
 				v = Violation{
 					File:    v.File,
 					Line:    v.Line,
