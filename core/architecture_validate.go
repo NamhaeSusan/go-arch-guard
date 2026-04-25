@@ -20,11 +20,20 @@ import (
 // Layout is missing required directories.
 func (a Architecture) Validate() error {
 	known := make(map[string]bool, len(a.Layers.Sublayers))
+	var errs []string
+
+	// Sublayers must be non-empty distinct names (silently allowing
+	// "" or duplicates lets typos pass and corrupts the Direction graph).
 	for _, l := range a.Layers.Sublayers {
+		if l == "" {
+			errs = append(errs, "Sublayers contains empty-string entry")
+			continue
+		}
+		if known[l] {
+			errs = append(errs, fmt.Sprintf("Sublayers contains duplicate entry %q", l))
+		}
 		known[l] = true
 	}
-
-	var errs []string
 
 	// Direction: every Sublayer must be a key.
 	for _, l := range a.Layers.Sublayers {

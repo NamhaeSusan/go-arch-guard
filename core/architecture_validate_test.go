@@ -115,6 +115,30 @@ func TestValidateRejectsContractLayersUnknown(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsEmptyStringSublayer(t *testing.T) {
+	a := Architecture{
+		Layers: LayerModel{
+			Sublayers: []string{"", "svc"},
+			Direction: map[string][]string{"": {}, "svc": {}},
+		},
+	}
+	if err := a.Validate(); err == nil || !strings.Contains(err.Error(), "empty-string") {
+		t.Fatalf("empty-string sublayer must be rejected, got %v", err)
+	}
+}
+
+func TestValidateRejectsDuplicateSublayers(t *testing.T) {
+	a := Architecture{
+		Layers: LayerModel{
+			Sublayers: []string{"svc", "svc"},
+			Direction: map[string][]string{"svc": {}},
+		},
+	}
+	if err := a.Validate(); err == nil || !strings.Contains(err.Error(), "duplicate") {
+		t.Fatalf("duplicate sublayer name must be rejected, got %v", err)
+	}
+}
+
 func TestValidateRejectsDirectionCycle(t *testing.T) {
 	a := Architecture{
 		Layers: LayerModel{
