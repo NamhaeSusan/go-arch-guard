@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/NamhaeSusan/go-arch-guard/core/analysisutil"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -22,6 +23,8 @@ type forbiddenCallRule struct {
 	Message func(layer string, allowed []string) string
 	Fix     func(layer string, allowed []string) string
 }
+
+var _ = funcQualifiedName
 
 // checkForbiddenCallsByLayer walks all CallExprs in internal packages and
 // emits a violation for each call whose callee ID matches one of the rules
@@ -138,48 +141,9 @@ func layerOfPackage(m Model, pkgPath, internalPrefix string) string {
 //
 // Returns "" when the callee cannot be resolved.
 func resolveCalleeID(info *types.Info, call *ast.CallExpr) string {
-	switch fun := call.Fun.(type) {
-	case *ast.SelectorExpr:
-		if sel, ok := info.Selections[fun]; ok && sel != nil {
-			if fn, ok := sel.Obj().(*types.Func); ok {
-				return funcQualifiedName(fn)
-			}
-		}
-		if obj := info.Uses[fun.Sel]; obj != nil {
-			if fn, ok := obj.(*types.Func); ok {
-				return funcQualifiedName(fn)
-			}
-		}
-	case *ast.Ident:
-		if obj := info.Uses[fun]; obj != nil {
-			if fn, ok := obj.(*types.Func); ok {
-				return funcQualifiedName(fn)
-			}
-		}
-	}
-	return ""
+	return analysisutil.ResolveCalleeID(info, call)
 }
 
 func funcQualifiedName(fn *types.Func) string {
-	sig, ok := fn.Type().(*types.Signature)
-	if !ok {
-		return ""
-	}
-	pkg := fn.Pkg()
-	if pkg == nil {
-		return ""
-	}
-	if sig.Recv() == nil {
-		return pkg.Path() + "." + fn.Name()
-	}
-	recv := sig.Recv().Type()
-	if ptr, ok := recv.(*types.Pointer); ok {
-		if named, ok := ptr.Elem().(*types.Named); ok {
-			return pkg.Path() + ".(*" + named.Obj().Name() + ")." + fn.Name()
-		}
-	}
-	if named, ok := recv.(*types.Named); ok {
-		return pkg.Path() + "." + named.Obj().Name() + "." + fn.Name()
-	}
-	return ""
+	return analysisutil.FuncQualifiedName(fn)
 }

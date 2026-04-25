@@ -1,8 +1,8 @@
 package rules
 
 import (
-	"slices"
-	"strings"
+	"github.com/NamhaeSusan/go-arch-guard/core"
+	"github.com/NamhaeSusan/go-arch-guard/core/analysisutil"
 )
 
 // isPortSublayerFor reports whether name is a port layer according to the model.
@@ -11,14 +11,7 @@ import (
 // asked for. When it is empty, fall back to the hardcoded basename heuristic
 // ("repo", "gateway").
 func isPortSublayerFor(m Model, name string) bool {
-	if len(m.PortLayers) > 0 {
-		return slices.Contains(m.PortLayers, name)
-	}
-	base := name
-	if i := strings.LastIndex(name, "/"); i >= 0 {
-		base = name[i+1:]
-	}
-	return base == "repo" || base == "gateway"
+	return analysisutil.IsPortSublayer(layerModelFromModel(m), name)
 }
 
 // isContractSublayerFor reports whether name is a contract layer according to
@@ -27,59 +20,33 @@ func isPortSublayerFor(m Model, name string) bool {
 // When both are empty, fall back to the hardcoded basename heuristic
 // (port names plus "svc").
 func isContractSublayerFor(m Model, name string) bool {
-	if len(m.ContractLayers) > 0 || len(m.PortLayers) > 0 {
-		return slices.Contains(m.ContractLayers, name) ||
-			slices.Contains(m.PortLayers, name)
-	}
-	if isPortSublayerFor(m, name) {
-		return true
-	}
-	base := name
-	if i := strings.LastIndex(name, "/"); i >= 0 {
-		base = name[i+1:]
-	}
-	return base == "svc"
+	return analysisutil.IsContractSublayer(layerModelFromModel(m), name)
 }
 
 // hasPortSublayer reports whether the model has any port sublayer.
 func hasPortSublayer(m Model) bool {
-	return slices.ContainsFunc(m.Sublayers, func(sl string) bool {
-		return isPortSublayerFor(m, sl)
-	})
+	return analysisutil.HasPortSublayer(layerModelFromModel(m))
 }
 
 // matchPortSublayer returns the port sublayer name if pkgPath references one, "" otherwise.
 func matchPortSublayer(m Model, pkgPath string) string {
-	for _, sl := range m.Sublayers {
-		if !isPortSublayerFor(m, sl) {
-			continue
-		}
-		if strings.HasSuffix(pkgPath, "/"+sl) || strings.Contains(pkgPath, "/"+sl+"/") {
-			return sl
-		}
-	}
-	return ""
+	return analysisutil.MatchPortSublayer(layerModelFromModel(m), pkgPath)
 }
 
 // matchContractSublayer returns the contract sublayer name if pkgPath references one, "" otherwise.
 func matchContractSublayer(m Model, pkgPath string) string {
-	for _, sl := range m.Sublayers {
-		if !isContractSublayerFor(m, sl) {
-			continue
-		}
-		if strings.HasSuffix(pkgPath, "/"+sl) || strings.Contains(pkgPath, "/"+sl+"/") {
-			return sl
-		}
-	}
-	return ""
+	return analysisutil.MatchContractSublayer(layerModelFromModel(m), pkgPath)
 }
 
 // portSublayerName returns the first port sublayer name from the model, or "core/repo" as fallback.
 func portSublayerName(m Model) string {
-	for _, sl := range m.Sublayers {
-		if isPortSublayerFor(m, sl) {
-			return sl
-		}
+	return analysisutil.PortSublayerName(layerModelFromModel(m))
+}
+
+func layerModelFromModel(m Model) core.LayerModel {
+	return core.LayerModel{
+		Sublayers:      m.Sublayers,
+		PortLayers:     m.PortLayers,
+		ContractLayers: m.ContractLayers,
 	}
-	return "core/repo"
 }

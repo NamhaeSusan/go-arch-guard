@@ -1,10 +1,10 @@
 package rules
 
 import (
-	"path/filepath"
 	"strings"
 
 	"github.com/NamhaeSusan/go-arch-guard/core"
+	"github.com/NamhaeSusan/go-arch-guard/core/analysisutil"
 )
 
 type Severity = core.Severity
@@ -111,9 +111,5 @@ func matchPattern(pattern, path string) bool {
 }
 
 func normalizeMatchPath(path string) string {
-	path = filepath.ToSlash(path)
-	for strings.HasPrefix(path, "./") {
-		path = strings.TrimPrefix(path, "./")
-	}
-	return path
+	return analysisutil.NormalizeMatchPath(path)
 }

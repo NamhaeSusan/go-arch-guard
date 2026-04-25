@@ -3,75 +3,32 @@ package rules
 import (
 	"fmt"
 	"go/ast"
-	"path/filepath"
 	"strings"
 
+	"github.com/NamhaeSusan/go-arch-guard/core/analysisutil"
 	"golang.org/x/tools/go/packages"
 )
 
 // relPathFromRoot turns an absolute file path into a forward-slash path
 // relative to projectRoot. Falls back to the original path on error.
 func relPathFromRoot(projectRoot, filename string) string {
-	absRoot, err := filepath.Abs(projectRoot)
-	if err != nil {
-		return filename
-	}
-	rel, err := filepath.Rel(absRoot, filename)
-	if err != nil {
-		return filename
-	}
-	return filepath.ToSlash(rel)
+	return analysisutil.RelPathFromRoot(projectRoot, filename)
 }
 
 func findImportPosition(pkg *packages.Package, importPath, projectRoot string) (string, int) {
-	fset := pkg.Fset
-	for _, file := range pkg.Syntax {
-		for _, imp := range file.Imports {
-			path := strings.Trim(imp.Path.Value, `"`)
-			if path == importPath {
-				pos := fset.Position(imp.Pos())
-				return relPathFromRoot(projectRoot, pos.Filename), pos.Line
-			}
-		}
-	}
-	if len(pkg.GoFiles) > 0 {
-		return relPathFromRoot(projectRoot, pkg.GoFiles[0]), 0
-	}
-	return pkg.PkgPath, 0
+	return analysisutil.FindImportPosition(pkg, importPath, projectRoot)
 }
 
 func relativePathForPackage(pkg *packages.Package, path string) string {
-	if pkg != nil && pkg.Module != nil && pkg.Module.Dir != "" {
-		rel, err := filepath.Rel(pkg.Module.Dir, path)
-		if err == nil {
-			return filepath.ToSlash(rel)
-		}
-	}
-	return filepath.ToSlash(path)
+	return analysisutil.RelativePathForPackage(pkg, path)
 }
 
 func resolveModule(pkgs []*packages.Package, explicit string) string {
-	if explicit != "" {
-		return explicit
-	}
-	for _, pkg := range pkgs {
-		if pkg.Module != nil && pkg.Module.Path != "" {
-			return pkg.Module.Path
-		}
-	}
-	return ""
+	return analysisutil.ResolveModule(pkgs, explicit)
 }
 
 func resolveRoot(pkgs []*packages.Package, explicit string) string {
-	if explicit != "" {
-		return explicit
-	}
-	for _, pkg := range pkgs {
-		if pkg.Module != nil && pkg.Module.Dir != "" {
-			return pkg.Module.Dir
-		}
-	}
-	return ""
+	return analysisutil.ResolveRoot(pkgs, explicit)
 }
 
 func validateModule(pkgs []*packages.Package, projectModule string) []Violation {
@@ -102,20 +59,7 @@ func validateModule(pkgs []*packages.Package, projectModule string) []Violation 
 // resolveIdentImportPath returns the import path that identName refers to
 // by scanning the file's import declarations. Returns "" if not found.
 func resolveIdentImportPath(file *ast.File, identName string) string {
-	for _, imp := range file.Imports {
-		impPath := strings.Trim(imp.Path.Value, `"`)
-		alias := ""
-		if imp.Name != nil {
-			alias = imp.Name.Name
-		} else {
-			parts := strings.Split(impPath, "/")
-			alias = parts[len(parts)-1]
-		}
-		if alias == identName {
-			return impPath
-		}
-	}
-	return ""
+	return analysisutil.ResolveIdentImportPath(file, identName)
 }
 
 func isExcludedPackage(cfg Config, pkgPath, projectModule string) bool {
@@ -123,14 +67,5 @@ func isExcludedPackage(cfg Config, pkgPath, projectModule string) bool {
 }
 
 func projectRelativePackagePath(pkgPath, projectModule string) string {
-	if pkgPath == "" || projectModule == "" {
-		return ""
-	}
-	if pkgPath == projectModule {
-		return "."
-	}
-	if rel, ok := strings.CutPrefix(pkgPath, projectModule+"/"); ok {
-		return rel
-	}
-	return ""
+	return analysisutil.ProjectRelativePackagePath(pkgPath, projectModule)
 }

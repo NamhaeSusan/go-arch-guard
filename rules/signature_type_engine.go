@@ -5,6 +5,7 @@ import (
 	"go/types"
 	"strings"
 
+	"github.com/NamhaeSusan/go-arch-guard/core/analysisutil"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -107,32 +108,9 @@ func checkFieldList(
 }
 
 func stripWrappers(t types.Type) types.Type {
-	for {
-		switch x := t.(type) {
-		case *types.Pointer:
-			t = x.Elem()
-		case *types.Slice:
-			t = x.Elem()
-		case *types.Array:
-			t = x.Elem()
-		case *types.Map:
-			t = x.Elem()
-		case *types.Chan:
-			t = x.Elem()
-		default:
-			return t
-		}
-	}
+	return analysisutil.StripWrappers(t)
 }
 
 func namedQualifiedName(t types.Type) string {
-	named, ok := t.(*types.Named)
-	if !ok {
-		return ""
-	}
-	obj := named.Obj()
-	if obj == nil || obj.Pkg() == nil {
-		return ""
-	}
-	return obj.Pkg().Path() + "." + obj.Name()
+	return analysisutil.NamedQualifiedName(t)
 }
