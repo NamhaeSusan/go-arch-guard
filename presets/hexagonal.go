@@ -68,7 +68,7 @@ func RecommendedHexagonal() core.RuleSet {
 		structural.NewPlacement(),
 		structural.NewBannedPackage(),
 		structural.NewInternalTopLevel(),
-		interfaces.NewPattern(),
+		interfaces.NewPattern(interfaces.WithMaxMethods(10)),
 		interfaces.NewContainer(),
 		interfaces.NewCrossDomainAnonymous(),
 		types.NewTypePattern(),
