@@ -53,9 +53,18 @@ func (c *Context) Pkgs() []*packages.Package {
 	copy(out, c.pkgs)
 	return out
 }
-func (c *Context) Module() string            { return c.module }
-func (c *Context) Root() string              { return c.root }
-func (c *Context) Arch() Architecture        { return c.arch }
+func (c *Context) Module() string { return c.module }
+func (c *Context) Root() string   { return c.root }
+
+// Arch returns a defensive deep copy of the architecture so a rule that
+// mutates returned slices/maps cannot corrupt later rules' view of the
+// policy. The cost is small (Architecture is bounded in size) and it
+// preserves the "single source of truth" guarantee on Layers.Sublayers
+// when several rules read from the context concurrently in some future
+// runner.
+func (c *Context) Arch() Architecture {
+	return cloneArchitecture(c.arch)
+}
 
 // IsExcluded reports whether path matches any configured exclude pattern.
 // Patterns ending in "..." match the base directory and any descendant;
@@ -80,6 +89,10 @@ func matchExcludePattern(pattern, path string) bool {
 }
 
 func normalizeMatchPath(path string) string {
+	// filepath.ToSlash is a no-op on Unix; mixed-style inputs (e.g. excludes
+	// copy-pasted from a Windows shell) need explicit backslash replacement
+	// to match downstream forward-slash paths emitted by rules.
+	path = strings.ReplaceAll(path, "\\", "/")
 	path = filepath.ToSlash(path)
 	for strings.HasPrefix(path, "./") {
 		path = strings.TrimPrefix(path, "./")

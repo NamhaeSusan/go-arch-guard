@@ -49,3 +49,12 @@ func TestContextIsExcludedNormalizesLeadingDotSlash(t *testing.T) {
 		t.Errorf("IsExcluded should normalize leading ./")
 	}
 }
+
+func TestContextIsExcludedNormalizesBackslashes(t *testing.T) {
+	// A pattern entered with backslashes (e.g. copied from a Windows shell)
+	// must match forward-slash paths emitted by rules on every platform.
+	c := NewContext(nil, "", "", Architecture{}, []string{`internal\handler\...`})
+	if !c.IsExcluded("internal/handler/foo.go") {
+		t.Errorf("backslash exclude pattern must match forward-slash path")
+	}
+}
