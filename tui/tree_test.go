@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/NamhaeSusan/go-arch-guard/analyzer"
+	"github.com/NamhaeSusan/go-arch-guard/presets"
 	"github.com/NamhaeSusan/go-arch-guard/tui"
 )
 
@@ -83,7 +84,7 @@ func TestBuildViolationIndex(t *testing.T) {
 		}
 	}
 
-	violations := tui.BuildViolationIndex(pkgs, module, root)
+	violations := tui.BuildViolationIndex(pkgs, module, root, presets.DDD(), presets.RecommendedDDD())
 	if len(violations) == 0 {
 		t.Error("expected violations from invalid testdata")
 	}

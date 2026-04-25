@@ -10,9 +10,11 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-// Run launches the TUI application for the given packages.
-func Run(pkgs []*packages.Package, module, root string) error {
-	violations := BuildViolationIndex(pkgs, module, root)
+// Run launches the TUI application for the given packages and preset
+// configuration. Callers (typically cmd/tui) pass the architecture and
+// recommended ruleset matching their project shape.
+func Run(pkgs []*packages.Package, module, root string, arch core.Architecture, ruleSet core.RuleSet) error {
+	violations := BuildViolationIndex(pkgs, module, root, arch, ruleSet)
 	importedBy := BuildImportedByMap(pkgs)
 	metrics := BuildMetricsIndex(pkgs, module)
 	tree := BuildTree(pkgs, module, violations)

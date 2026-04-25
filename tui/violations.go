@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/NamhaeSusan/go-arch-guard/core"
-	"github.com/NamhaeSusan/go-arch-guard/presets"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -20,11 +19,11 @@ const (
 // ViolationIndex maps relative package paths to their violations.
 type ViolationIndex map[string][]core.Violation
 
-// BuildViolationIndex runs all rules and indexes violations by package path.
-func BuildViolationIndex(pkgs []*packages.Package, module, root string) ViolationIndex {
-	arch := presets.DDD()
+// BuildViolationIndex runs the given ruleset against pkgs and indexes
+// violations by package path. The architecture and ruleset are caller-
+// supplied so the TUI works with any preset (or custom configuration).
+func BuildViolationIndex(pkgs []*packages.Package, module, root string, arch core.Architecture, ruleSet core.RuleSet) ViolationIndex {
 	ctx := core.NewContext(pkgs, module, root, arch, nil)
-	ruleSet := presets.RecommendedDDD()
 	all := core.Run(ctx, ruleSet)
 
 	idx := make(ViolationIndex)
