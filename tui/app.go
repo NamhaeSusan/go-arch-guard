@@ -4,15 +4,17 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/NamhaeSusan/go-arch-guard/rules"
+	"github.com/NamhaeSusan/go-arch-guard/core"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 	"golang.org/x/tools/go/packages"
 )
 
-// Run launches the TUI application for the given packages.
-func Run(pkgs []*packages.Package, module, root string) error {
-	violations := BuildViolationIndex(pkgs, module, root)
+// Run launches the TUI application for the given packages and preset
+// configuration. Callers (typically cmd/tui) pass the architecture and
+// recommended ruleset matching their project shape.
+func Run(pkgs []*packages.Package, module, root string, arch core.Architecture, ruleSet core.RuleSet) error {
+	violations := BuildViolationIndex(pkgs, module, root, arch, ruleSet)
 	importedBy := BuildImportedByMap(pkgs)
 	metrics := BuildMetricsIndex(pkgs, module)
 	tree := BuildTree(pkgs, module, violations)
@@ -44,7 +46,7 @@ func Run(pkgs []*packages.Package, module, root string) error {
 	errCount, warnCount := 0, 0
 	for _, viols := range violations {
 		for _, v := range viols {
-			if v.Severity == rules.Error {
+			if v.EffectiveSeverity == core.Error {
 				errCount++
 			} else {
 				warnCount++

@@ -3,15 +3,16 @@ package report_test
 import (
 	"fmt"
 
+	"github.com/NamhaeSusan/go-arch-guard/core"
 	"github.com/NamhaeSusan/go-arch-guard/report"
-	"github.com/NamhaeSusan/go-arch-guard/rules"
 )
 
 func ExampleMarshalJSONReport() {
-	data, err := report.MarshalJSONReport([]rules.Violation{{
-		Rule:     "test.rule",
-		Message:  "bad import",
-		Severity: rules.Error,
+	data, err := report.MarshalJSONReport([]core.Violation{{
+		Rule:              "test.rule",
+		Message:           "bad import",
+		DefaultSeverity:   core.Error,
+		EffectiveSeverity: core.Error,
 	}})
 	if err != nil {
 		fmt.Println(err)
@@ -21,7 +22,7 @@ func ExampleMarshalJSONReport() {
 	fmt.Println(string(data))
 	// Output:
 	// {
-	//   "schema": "go-arch-guard.report.v1",
+	//   "schema": "go-arch-guard.report.v2",
 	//   "summary": {
 	//     "total": 1,
 	//     "errors": 1,
@@ -35,7 +36,8 @@ func ExampleMarshalJSONReport() {
 	//     {
 	//       "rule": "test.rule",
 	//       "message": "bad import",
-	//       "severity": "error"
+	//       "effectiveSeverity": "error",
+	//       "defaultSeverity": "error"
 	//     }
 	//   ]
 	// }

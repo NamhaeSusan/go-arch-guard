@@ -5,9 +5,9 @@
 Go 프로젝트의 아키텍처 규칙(의존성, 네이밍, 구조)을 정적 분석으로 검증하는 라이브러리. 팀이 커밋한 컨벤션을 vibe coding 중에 깨지지 않게 지켜주는 **중립 인프라**이며, AI 코딩 에이전트가 쉽게 스캐폴딩하고 유지할 수 있는 표면을 제공한다.
 
 AI 에이전트 친화적인 기본 surface:
-- `scaffold.ArchitectureTest(...)` — 프리셋별 `architecture_test.go` 생성
-- `report.BuildJSONReport(...)` / `report.MarshalJSONReport(...)` — machine-readable violation 출력
-- `rules.RunAll(...)` — 권장 기본 rule 묶음 실행
+- `scaffold.ArchitectureTest(...)` — 프리셋별 `core` + `presets` 기반 `architecture_test.go` 생성
+- `report.BuildJSONReport(...)` / `report.MarshalJSONReport(...)` — `core.Violation` 기반 machine-readable violation 출력
+- `core.Run(ctx, presets.RecommendedDDD())` — 권장 rule 묶음 실행
 
 ---
 
@@ -67,8 +67,8 @@ should be able to express it.
   be pure" or "alias.go is the only exposed surface" are legitimate team
   choices; the library provides rules for those if they are mechanically
   detectable.
-- Severity per rule — `Error` (blocks builds) or `Warning` (advisory). Override
-  via `WithSeverity`.
+- Severity per violation — `Error` (blocks builds) or `Warning` (advisory).
+  Override via `core.WithSeverityOverride`.
 - False-positive tolerance. A rule that's noisy in one project may be a clean
   win in another.
 
@@ -79,7 +79,7 @@ should be able to express it.
   than no rule. This is the firmest gate; "micro" scope is fine, "noisy" is
   not.
 - **Static analysis only** — no runtime dependencies.
-- **Independent** — no hidden ordering or state sharing between rules.
+- **Independent** — no hidden ordering or state sharing between rule implementations.
 
 #### When to add a rule to the recommended bundle
 

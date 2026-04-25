@@ -4,7 +4,8 @@ import (
 	"fmt"
 
 	"github.com/NamhaeSusan/go-arch-guard/analyzer"
-	"github.com/NamhaeSusan/go-arch-guard/rules"
+	"github.com/NamhaeSusan/go-arch-guard/core"
+	"github.com/NamhaeSusan/go-arch-guard/presets"
 )
 
 func Example() {
@@ -14,7 +15,10 @@ func Example() {
 		return
 	}
 
-	violations := rules.RunAll(pkgs, "github.com/kimtaeyun/testproject-dc", "testdata/valid")
+	arch := presets.DDD()
+	ctx := core.NewContext(pkgs, "github.com/kimtaeyun/testproject-dc", "testdata/valid", arch, nil)
+	rs := presets.RecommendedDDD()
+	violations := core.Run(ctx, rs)
 
 	fmt.Printf("violations: %d\n", len(violations))
 	// Output: violations: 0

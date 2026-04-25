@@ -164,8 +164,9 @@ Command → Aggregate → Event
 ## Options
 
 ```go
-rules.WithExclude("internal/legacy/...")  // 마이그레이션 중 경로 제외
-rules.WithSeverity(rules.Warning)         // 실패 없이 로그만
+ctx := core.NewContext(pkgs, "", "", presets.EventPipeline(), []string{"internal/legacy/..."})
+core.Run(ctx, presets.RecommendedEventPipeline(),
+    core.WithSeverityOverride("layer.direction", core.Warning))
 ```
 
 ---

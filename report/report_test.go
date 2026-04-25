@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/NamhaeSusan/go-arch-guard/core"
 	"github.com/NamhaeSusan/go-arch-guard/report"
-	"github.com/NamhaeSusan/go-arch-guard/rules"
 )
 
 type fakeTB struct {
@@ -34,8 +34,8 @@ func TestAssertNoViolations(t *testing.T) {
 
 	t.Run("error violations fails test", func(t *testing.T) {
 		tb := &fakeTB{}
-		report.AssertNoViolations(tb, []rules.Violation{
-			{Rule: "test.rule", Message: "bad", Severity: rules.Error},
+		report.AssertNoViolations(tb, []core.Violation{
+			{Rule: "test.rule", Message: "bad", EffectiveSeverity: core.Error},
 		})
 		if !tb.failed {
 			t.Error("expected test to fail with error violations")
@@ -44,8 +44,8 @@ func TestAssertNoViolations(t *testing.T) {
 
 	t.Run("warning-only violations passes test", func(t *testing.T) {
 		tb := &fakeTB{}
-		report.AssertNoViolations(tb, []rules.Violation{
-			{Rule: "test.rule", Message: "warn", Severity: rules.Warning},
+		report.AssertNoViolations(tb, []core.Violation{
+			{Rule: "test.rule", Message: "warn", EffectiveSeverity: core.Warning},
 		})
 		if tb.failed {
 			t.Error("expected test to pass with warning-only violations")

@@ -11,8 +11,10 @@ import (
 	"testing"
 
 	"github.com/NamhaeSusan/go-arch-guard/analyzer"
+	"github.com/NamhaeSusan/go-arch-guard/core"
+	"github.com/NamhaeSusan/go-arch-guard/presets"
 	"github.com/NamhaeSusan/go-arch-guard/report"
-	"github.com/NamhaeSusan/go-arch-guard/rules"
+	"golang.org/x/tools/go/packages"
 )
 
 // TestSkill_NewProjectSetup simulates the "new project from scratch" scenario
@@ -111,16 +113,16 @@ import _ "` + mod + `/internal/domain/order"
 	}
 
 	t.Run("domain isolation", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, "", ""))
+		report.AssertNoViolations(t, runSkill(pkgs, mod, root, presets.DDD(), presets.RecommendedDDD(), nil))
 	})
 	t.Run("layer direction", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, "", ""))
+		report.AssertNoViolations(t, runSkill(pkgs, mod, root, presets.DDD(), presets.RecommendedDDD(), nil))
 	})
 	t.Run("naming", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckNaming(pkgs))
+		report.AssertNoViolations(t, runSkill(pkgs, mod, root, presets.DDD(), presets.RecommendedDDD(), nil))
 	})
 	t.Run("structure", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckStructure(root))
+		report.AssertNoViolations(t, runSkill(pkgs, mod, root, presets.DDD(), presets.RecommendedDDD(), nil))
 	})
 }
 
@@ -150,10 +152,10 @@ func TestSkill_AutoExtractModuleRoot(t *testing.T) {
 	}
 
 	// "" triggers auto-extraction — same as skill template
-	violations := rules.CheckDomainIsolation(pkgs, "", "")
+	violations := runSkill(pkgs, mod, root, presets.DDD(), presets.RecommendedDDD(), nil)
 	report.AssertNoViolations(t, violations)
 
-	violations = rules.CheckLayerDirection(pkgs, "", "")
+	violations = runSkill(pkgs, mod, root, presets.DDD(), presets.RecommendedDDD(), nil)
 	report.AssertNoViolations(t, violations)
 }
 
@@ -178,8 +180,13 @@ func TestSkill_ExcludeOption(t *testing.T) {
 
 	writeProjectFiles(t, root, files)
 
+	pkgs, err := analyzer.Load(root, "internal/...")
+	if err != nil {
+		t.Log(err)
+	}
+
 	// Without exclude: should have violation
-	violations := rules.CheckStructure(root)
+	violations := runSkill(pkgs, mod, root, presets.DDD(), presets.RecommendedDDD(), nil)
 	hasTopLevel := false
 	for _, v := range violations {
 		if v.Rule == "structure.internal-top-level" {
@@ -192,21 +199,14 @@ func TestSkill_ExcludeOption(t *testing.T) {
 	}
 
 	// With exclude: structure check on legacy path excluded
-	structExcluded := rules.CheckStructure(root, rules.WithExclude("internal/legacy/..."))
+	structExcluded := runSkill(pkgs, mod, root, presets.DDD(), presets.RecommendedDDD(), []string{"internal/legacy/..."})
 	for _, v := range structExcluded {
 		if v.Rule == "structure.internal-top-level" && strings.Contains(v.File, "legacy") {
 			t.Error("expected legacy to be excluded from structure check")
 		}
 	}
 
-	pkgs, err := analyzer.Load(root, "internal/...")
-	if err != nil {
-		t.Log(err)
-	}
-
-	isolationViolations := rules.CheckDomainIsolation(pkgs, "", "",
-		rules.WithExclude("internal/legacy/..."),
-	)
+	isolationViolations := runSkill(pkgs, mod, root, presets.DDD(), presets.RecommendedDDD(), []string{"internal/legacy/..."})
 	report.AssertNoViolations(t, isolationViolations)
 }
 
@@ -241,21 +241,19 @@ import _ "` + mod + `/internal/domain/user/app"
 	}
 
 	// Error mode: should have violations
-	errViolations := rules.CheckDomainIsolation(pkgs, "", "")
+	errViolations := runSkill(pkgs, mod, root, presets.DDD(), presets.RecommendedDDD(), nil)
 	if len(errViolations) == 0 {
 		t.Fatal("expected isolation violations in error mode")
 	}
 
 	// Warning mode: same violations but AssertNoViolations passes
-	warnViolations := rules.CheckDomainIsolation(pkgs, "", "",
-		rules.WithSeverity(rules.Warning),
-	)
+	warnViolations := runSkillAsWarnings(pkgs, mod, root, presets.DDD(), presets.RecommendedDDD())
 	if len(warnViolations) == 0 {
 		t.Fatal("expected violations in warning mode too")
 	}
 	for _, v := range warnViolations {
-		if v.Severity != rules.Warning {
-			t.Errorf("expected Warning severity, got %v", v.Severity)
+		if v.EffectiveSeverity != core.Warning {
+			t.Errorf("expected Warning severity, got %v", v.EffectiveSeverity)
 		}
 	}
 	report.AssertNoViolations(t, warnViolations) // must pass
@@ -278,7 +276,12 @@ func TestSkill_BannedPatterns(t *testing.T) {
 
 	writeProjectFiles(t, root, files)
 
-	violations := rules.CheckStructure(root)
+	pkgs, err := analyzer.Load(root, "internal/...")
+	if err != nil {
+		t.Log(err)
+	}
+
+	violations := runSkill(pkgs, mod, root, presets.DDD(), presets.RecommendedDDD(), nil)
 	hasBanned := false
 	for _, v := range violations {
 		if v.Rule == "structure.banned-package" {
@@ -320,7 +323,7 @@ import _ "` + mod + `/internal/domain/user"
 		t.Fatalf("no packages loaded: %v", err)
 	}
 
-	violations := rules.CheckDomainIsolation(pkgs, "", "")
+	violations := runSkill(pkgs, mod, root, presets.DDD(), presets.RecommendedDDD(), nil)
 	hasCross := false
 	for _, v := range violations {
 		if v.Rule == "isolation.cross-domain" {
@@ -359,7 +362,7 @@ import _ "` + mod + `/internal/domain/order/app"
 		t.Log(err)
 	}
 
-	violations := rules.CheckLayerDirection(pkgs, "", "")
+	violations := runSkill(pkgs, mod, root, presets.DDD(), presets.RecommendedDDD(), nil)
 	hasDirection := false
 	for _, v := range violations {
 		if v.Rule == "layer.direction" {
@@ -378,7 +381,8 @@ import _ "` + mod + `/internal/domain/order/app"
 func TestSkill_ConsumerWorkerSetup(t *testing.T) {
 	root := t.TempDir()
 	mod := "example.com/myworker"
-	m := rules.ConsumerWorker()
+	arch := presets.ConsumerWorker()
+	rs := presets.RecommendedConsumerWorker()
 
 	files := map[string]string{
 		"go.mod": "module " + mod + "\n\ngo 1.26.1\n",
@@ -426,25 +430,23 @@ func FindOrder() {}
 		t.Fatalf("no packages loaded: %v", err)
 	}
 
-	opts := []rules.Option{rules.WithModel(m)}
-
 	t.Run("layer direction", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, "", "", opts...))
+		report.AssertNoViolations(t, runSkill(pkgs, mod, root, arch, rs, nil))
 	})
 	t.Run("domain isolation skipped", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, "", "", opts...))
+		report.AssertNoViolations(t, runSkill(pkgs, mod, root, arch, rs, nil))
 	})
 	t.Run("naming", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckNaming(pkgs, opts...))
+		report.AssertNoViolations(t, runSkill(pkgs, mod, root, arch, rs, nil))
 	})
 	t.Run("structure", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckStructure(root, opts...))
+		report.AssertNoViolations(t, runSkill(pkgs, mod, root, arch, rs, nil))
 	})
 	t.Run("type patterns", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckTypePatterns(pkgs, opts...))
+		report.AssertNoViolations(t, runSkill(pkgs, mod, root, arch, rs, nil))
 	})
 	t.Run("RunAll", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.RunAll(pkgs, "", "", opts...))
+		report.AssertNoViolations(t, runSkill(pkgs, mod, root, arch, rs, nil))
 	})
 }
 
@@ -453,7 +455,8 @@ func FindOrder() {}
 func TestSkill_BatchSetup(t *testing.T) {
 	root := t.TempDir()
 	mod := "example.com/mybatch"
-	m := rules.Batch()
+	arch := presets.Batch()
+	rs := presets.RecommendedBatch()
 
 	files := map[string]string{
 		"go.mod": "module " + mod + "\n\ngo 1.26.1\n",
@@ -501,25 +504,23 @@ func FindFile() {}
 		t.Fatalf("no packages loaded: %v", err)
 	}
 
-	opts := []rules.Option{rules.WithModel(m)}
-
 	t.Run("layer direction", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, "", "", opts...))
+		report.AssertNoViolations(t, runSkill(pkgs, mod, root, arch, rs, nil))
 	})
 	t.Run("domain isolation skipped", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, "", "", opts...))
+		report.AssertNoViolations(t, runSkill(pkgs, mod, root, arch, rs, nil))
 	})
 	t.Run("naming", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckNaming(pkgs, opts...))
+		report.AssertNoViolations(t, runSkill(pkgs, mod, root, arch, rs, nil))
 	})
 	t.Run("structure", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckStructure(root, opts...))
+		report.AssertNoViolations(t, runSkill(pkgs, mod, root, arch, rs, nil))
 	})
 	t.Run("type patterns", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckTypePatterns(pkgs, opts...))
+		report.AssertNoViolations(t, runSkill(pkgs, mod, root, arch, rs, nil))
 	})
 	t.Run("RunAll", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.RunAll(pkgs, "", "", opts...))
+		report.AssertNoViolations(t, runSkill(pkgs, mod, root, arch, rs, nil))
 	})
 }
 
@@ -529,7 +530,8 @@ func FindFile() {}
 func TestSkill_EventPipelineSetup(t *testing.T) {
 	root := t.TempDir()
 	mod := "example.com/myevent"
-	m := rules.EventPipeline()
+	arch := presets.EventPipeline()
+	rs := presets.RecommendedEventPipeline()
 
 	files := map[string]string{
 		"go.mod":               "module " + mod + "\n\ngo 1.26.1\n",
@@ -595,26 +597,43 @@ func SaveView() {}
 		t.Fatalf("no packages loaded: %v", err)
 	}
 
-	opts := []rules.Option{rules.WithModel(m)}
-
 	t.Run("layer direction", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, "", "", opts...))
+		report.AssertNoViolations(t, runSkill(pkgs, mod, root, arch, rs, nil))
 	})
 	t.Run("domain isolation skipped", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, "", "", opts...))
+		report.AssertNoViolations(t, runSkill(pkgs, mod, root, arch, rs, nil))
 	})
 	t.Run("naming", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckNaming(pkgs, opts...))
+		report.AssertNoViolations(t, runSkill(pkgs, mod, root, arch, rs, nil))
 	})
 	t.Run("structure", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckStructure(root, opts...))
+		report.AssertNoViolations(t, runSkill(pkgs, mod, root, arch, rs, nil))
 	})
 	t.Run("type patterns", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.CheckTypePatterns(pkgs, opts...))
+		report.AssertNoViolations(t, runSkill(pkgs, mod, root, arch, rs, nil))
 	})
 	t.Run("RunAll", func(t *testing.T) {
-		report.AssertNoViolations(t, rules.RunAll(pkgs, "", "", opts...))
+		report.AssertNoViolations(t, runSkill(pkgs, mod, root, arch, rs, nil))
 	})
+}
+
+func runSkill(pkgs []*packages.Package, module, root string, arch core.Architecture, rs core.RuleSet, exclude []string, opts ...core.RunOption) []core.Violation {
+	ctx := core.NewContext(pkgs, module, root, arch, exclude)
+	return core.Run(ctx, rs, opts...)
+}
+
+func runSkillAsWarnings(pkgs []*packages.Package, module, root string, arch core.Architecture, rs core.RuleSet) []core.Violation {
+	violations := runSkill(pkgs, module, root, arch, rs, nil)
+	opts := make([]core.RunOption, 0, len(violations))
+	seen := make(map[string]bool)
+	for _, v := range violations {
+		if seen[v.Rule] {
+			continue
+		}
+		seen[v.Rule] = true
+		opts = append(opts, core.WithSeverityOverride(v.Rule, core.Warning))
+	}
+	return runSkill(pkgs, module, root, arch, rs, nil, opts...)
 }
 
 func writeProjectFiles(t *testing.T, root string, files map[string]string) {

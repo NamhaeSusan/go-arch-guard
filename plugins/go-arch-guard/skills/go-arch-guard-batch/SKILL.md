@@ -198,8 +198,9 @@ func main() {
 ## Options
 
 ```go
-rules.WithExclude("internal/legacy/...")  // 마이그레이션 중 경로 제외
-rules.WithSeverity(rules.Warning)         // 실패 없이 로그만
+ctx := core.NewContext(pkgs, "", "", presets.Batch(), []string{"internal/legacy/..."})
+core.Run(ctx, presets.RecommendedBatch(),
+    core.WithSeverityOverride("layer.direction", core.Warning))
 ```
 
 ---

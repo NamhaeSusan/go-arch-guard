@@ -5,20 +5,22 @@ import (
 	"go/format"
 	"go/token"
 	"strings"
+
+	"github.com/NamhaeSusan/go-arch-guard/presets"
 )
 
 // Preset identifies a built-in architecture model template.
-type Preset string
+type Preset = presets.Preset
 
 const (
-	PresetDDD             Preset = "ddd"
-	PresetCleanArch       Preset = "clean-arch"
-	PresetLayered         Preset = "layered"
-	PresetHexagonal       Preset = "hexagonal"
-	PresetModularMonolith Preset = "modular-monolith"
-	PresetConsumerWorker  Preset = "consumer-worker"
-	PresetBatch           Preset = "batch"
-	PresetEventPipeline   Preset = "event-pipeline"
+	PresetDDD             = presets.PresetDDD
+	PresetCleanArch       = presets.PresetCleanArch
+	PresetLayered         = presets.PresetLayered
+	PresetHexagonal       = presets.PresetHexagonal
+	PresetModularMonolith = presets.PresetModularMonolith
+	PresetConsumerWorker  = presets.PresetConsumerWorker
+	PresetBatch           = presets.PresetBatch
+	PresetEventPipeline   = presets.PresetEventPipeline
 )
 
 // ArchitectureTestOptions controls generated architecture_test.go output.
@@ -38,12 +40,12 @@ func ArchitectureTest(preset Preset, opts ArchitectureTestOptions) (string, erro
 		return "", fmt.Errorf("package name must be a valid Go identifier: %q", packageName)
 	}
 
-	modelFunc, err := presetModelFunc(preset)
+	funcs, err := presetFunctions(preset)
 	if err != nil {
 		return "", err
 	}
 
-	src := renderArchitectureTest(packageName, modelFunc)
+	src := renderArchitectureTest(packageName, funcs)
 	formatted, err := format.Source([]byte(src))
 	if err != nil {
 		return "", fmt.Errorf("format generated template: %w", err)
@@ -51,38 +53,44 @@ func ArchitectureTest(preset Preset, opts ArchitectureTestOptions) (string, erro
 	return string(formatted), nil
 }
 
-func presetModelFunc(preset Preset) (string, error) {
+type presetFuncs struct {
+	architecture string
+	rules        string
+}
+
+func presetFunctions(preset Preset) (presetFuncs, error) {
 	switch preset {
 	case PresetDDD:
-		return "", nil
+		return presetFuncs{architecture: "DDD", rules: "RecommendedDDD"}, nil
 	case PresetCleanArch:
-		return "CleanArch", nil
+		return presetFuncs{architecture: "CleanArch", rules: "RecommendedCleanArch"}, nil
 	case PresetLayered:
-		return "Layered", nil
+		return presetFuncs{architecture: "Layered", rules: "RecommendedLayered"}, nil
 	case PresetHexagonal:
-		return "Hexagonal", nil
+		return presetFuncs{architecture: "Hexagonal", rules: "RecommendedHexagonal"}, nil
 	case PresetModularMonolith:
-		return "ModularMonolith", nil
+		return presetFuncs{architecture: "ModularMonolith", rules: "RecommendedModularMonolith"}, nil
 	case PresetConsumerWorker:
-		return "ConsumerWorker", nil
+		return presetFuncs{architecture: "ConsumerWorker", rules: "RecommendedConsumerWorker"}, nil
 	case PresetBatch:
-		return "Batch", nil
+		return presetFuncs{architecture: "Batch", rules: "RecommendedBatch"}, nil
 	case PresetEventPipeline:
-		return "EventPipeline", nil
+		return presetFuncs{architecture: "EventPipeline", rules: "RecommendedEventPipeline"}, nil
 	default:
-		return "", fmt.Errorf("unknown preset %q", preset)
+		return presetFuncs{}, fmt.Errorf("unknown preset %q", preset)
 	}
 }
 
-func renderArchitectureTest(packageName, modelFunc string) string {
+func renderArchitectureTest(packageName string, funcs presetFuncs) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "package %s\n\n", packageName)
 	b.WriteString(`import (
 	"testing"
 
 	"github.com/NamhaeSusan/go-arch-guard/analyzer"
+	"github.com/NamhaeSusan/go-arch-guard/core"
+	"github.com/NamhaeSusan/go-arch-guard/presets"
 	"github.com/NamhaeSusan/go-arch-guard/report"
-	"github.com/NamhaeSusan/go-arch-guard/rules"
 )
 
 func TestArchitecture(t *testing.T) {
@@ -94,15 +102,10 @@ func TestArchitecture(t *testing.T) {
 		t.Fatalf("no packages loaded: %v", err)
 	}
 `)
-	if modelFunc != "" {
-		fmt.Fprintf(&b, "\n\tm := rules.%s()\n\topts := []rules.Option{rules.WithModel(m)}\n", modelFunc)
-	}
-	b.WriteString("\n")
-	if modelFunc == "" {
-		b.WriteString("\treport.AssertNoViolations(t, rules.RunAll(pkgs, \"\", \"\"))\n")
-	} else {
-		b.WriteString("\treport.AssertNoViolations(t, rules.RunAll(pkgs, \"\", \"\", opts...))\n")
-	}
+	fmt.Fprintf(&b, "\n\tarch := presets.%s()\n", funcs.architecture)
+	b.WriteString("\tctx := core.NewContext(pkgs, \"\", \"\", arch, nil)\n")
+	fmt.Fprintf(&b, "\trules := presets.%s()\n\n", funcs.rules)
+	b.WriteString("\treport.AssertNoViolations(t, core.Run(ctx, rules))\n")
 	b.WriteString("}\n")
 	return b.String()
 }
