@@ -96,13 +96,17 @@ func Run(ctx *Context, rules RuleSet, opts ...RunOption) []Violation {
 			}
 			declared, ok := violationDefaults[v.Rule]
 			if !ok {
-				// meta.* IDs are environmental warnings (e.g.
-				// meta.no-matching-packages). Default them to Warning so a
-				// dependency rule that defaults to Error doesn't accidentally
-				// promote a configuration mismatch into a hard failure.
-				if strings.HasPrefix(v.Rule, "meta.") {
+				// meta.rule-panic means a rule failed internally, so the
+				// analysis result is incomplete and should block by default.
+				// Other meta.* IDs are environmental warnings (e.g.
+				// meta.no-matching-packages) and should not accidentally
+				// inherit an Error default from the emitting rule.
+				switch {
+				case v.Rule == "meta.rule-panic":
+					declared = Error
+				case strings.HasPrefix(v.Rule, "meta."):
 					declared = Warning
-				} else {
+				default:
 					declared = ruleDefault
 				}
 			}
@@ -205,10 +209,10 @@ func defaultsByID(spec RuleSpec) map[string]Severity {
 // safeCheck invokes rule.Check inside a deferred recover. A panic from a
 // rule is converted into a single meta.rule-panic violation so a buggy
 // rule does not crash the entire run; other rules continue to execute.
-// The returned violation goes through the runner's normal meta.* path:
-// default severity is Warning (so a buggy rule does not block the build),
-// dedup collapses repeated panics from the same rule, and callers can
-// promote it to Error with WithSeverityOverride("meta.rule-panic", Error).
+// The returned violation goes through the runner's normal severity / dedup
+// pipeline: default severity is Error because the analysis result is
+// incomplete, repeated panics from the same rule collapse via meta dedup,
+// and callers can still override the severity if needed.
 func safeCheck(rule Rule, ctx *Context) (violations []Violation, panicked bool) {
 	defer func() {
 		if rec := recover(); rec != nil {

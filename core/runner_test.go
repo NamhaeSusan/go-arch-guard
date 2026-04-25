@@ -247,7 +247,7 @@ func (p *panickingRule) Check(_ *Context) []Violation {
 	panic("intentional rule bug for testing")
 }
 
-func TestRunRecoversRulePanicAsMetaWarning(t *testing.T) {
+func TestRunRecoversRulePanicAsMetaError(t *testing.T) {
 	r := &panickingRule{id: "fake.bombs"}
 	ctx := NewContext(nil, "", "", validArchitecture(), nil)
 	got := Run(ctx, RuleSet{}.With(r))
@@ -259,8 +259,8 @@ func TestRunRecoversRulePanicAsMetaWarning(t *testing.T) {
 	if v.Rule != "meta.rule-panic" {
 		t.Errorf("Rule = %q, want meta.rule-panic", v.Rule)
 	}
-	if v.EffectiveSeverity != Warning {
-		t.Errorf("EffectiveSeverity = %v, want Warning (panic must NOT block builds by default)", v.EffectiveSeverity)
+	if v.EffectiveSeverity != Error {
+		t.Errorf("EffectiveSeverity = %v, want Error (panic means the analysis did not complete reliably)", v.EffectiveSeverity)
 	}
 	if !strings.Contains(v.Message, "fake.bombs") {
 		t.Errorf("Message = %q, want it to mention rule ID", v.Message)
@@ -298,16 +298,16 @@ func TestRunRulePanicDoesNotBlockOtherRules(t *testing.T) {
 func TestRunRulePanicSeverityOverrideWorks(t *testing.T) {
 	r := &panickingRule{id: "fake.bombs"}
 	ctx := NewContext(nil, "", "", validArchitecture(), nil)
-	got := Run(ctx, RuleSet{}.With(r), WithSeverityOverride("meta.rule-panic", Error))
+	got := Run(ctx, RuleSet{}.With(r), WithSeverityOverride("meta.rule-panic", Warning))
 
 	if len(got) != 1 {
 		t.Fatalf("len = %d, want 1", len(got))
 	}
-	if got[0].EffectiveSeverity != Error {
-		t.Errorf("EffectiveSeverity = %v, want Error (override must apply)", got[0].EffectiveSeverity)
+	if got[0].EffectiveSeverity != Warning {
+		t.Errorf("EffectiveSeverity = %v, want Warning (override must apply)", got[0].EffectiveSeverity)
 	}
-	if got[0].DefaultSeverity != Warning {
-		t.Errorf("DefaultSeverity = %v, want Warning (default unchanged by override)", got[0].DefaultSeverity)
+	if got[0].DefaultSeverity != Error {
+		t.Errorf("DefaultSeverity = %v, want Error (default unchanged by override)", got[0].DefaultSeverity)
 	}
 }
 

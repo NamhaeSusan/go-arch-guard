@@ -75,6 +75,8 @@ if err != nil {
 수동 작성 시에도 같은 흐름을 따른다: `analyzer.Load`로 패키지를 로드하고,
 프리셋 아키텍처로 `core.NewContext`를 만든 뒤, 권장 ruleset을 `core.Run`에 넘긴다.
 세부 rule을 개별로 다뤄야 할 때만 `core.NewRuleSet(...)`으로 직접 조합한다.
+rule이 panic을 내면 `core.Run`은 `meta.rule-panic` Error violation으로 변환하고
+나머지 rule 실행을 계속한다.
 
 프리셋 매핑:
 
