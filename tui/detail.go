@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/NamhaeSusan/go-arch-guard/rules"
+	"github.com/NamhaeSusan/go-arch-guard/core"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
@@ -109,8 +109,8 @@ func (d *DetailPanel) renderGroup(node *PkgNode) {
 	fmt.Fprintf(&b, "[white::b]%s\n\n", node.RelPath)
 
 	// Collect all violations under this path.
-	var allViols []rules.Violation
-	d.violations.walkPath(node.RelPath, func(viols []rules.Violation) {
+	var allViols []core.Violation
+	d.violations.walkPath(node.RelPath, func(viols []core.Violation) {
 		allViols = append(allViols, viols...)
 	})
 
@@ -123,7 +123,7 @@ func (d *DetailPanel) renderGroup(node *PkgNode) {
 	// Count by severity.
 	errors, warnings := 0, 0
 	for _, vp := range allViols {
-		if vp.EffectiveSeverity == rules.Error {
+		if vp.EffectiveSeverity == core.Error {
 			errors++
 		} else {
 			warnings++
@@ -154,7 +154,7 @@ func (d *DetailPanel) renderGroup(node *PkgNode) {
 	if errors > 0 {
 		b.WriteString("[red::b]── Errors ──\n")
 		for _, vp := range allViols {
-			if vp.EffectiveSeverity != rules.Error {
+			if vp.EffectiveSeverity != core.Error {
 				break
 			}
 			fmt.Fprintf(&b, "[red]  ✗ [%s] %s\n", vp.Rule, vp.File)
@@ -170,7 +170,7 @@ func (d *DetailPanel) renderGroup(node *PkgNode) {
 	if warnings > 0 {
 		b.WriteString("[yellow::b]── Warnings ──\n")
 		for _, vp := range allViols {
-			if vp.EffectiveSeverity != rules.Warning {
+			if vp.EffectiveSeverity != core.Warning {
 				continue
 			}
 			fmt.Fprintf(&b, "[yellow]  ⚠ [%s] %s\n", vp.Rule, vp.File)
@@ -200,7 +200,7 @@ func (d *DetailPanel) writeViolations(b *strings.Builder, relPath string) {
 	for _, v := range viols {
 		color := "red"
 		sev := "ERR"
-		if v.EffectiveSeverity == rules.Warning {
+		if v.EffectiveSeverity == core.Warning {
 			color = "yellow"
 			sev = "WARN"
 		}

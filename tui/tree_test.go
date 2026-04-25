@@ -1,6 +1,10 @@
 package tui_test
 
 import (
+	"go/parser"
+	"go/token"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/NamhaeSusan/go-arch-guard/analyzer"
@@ -82,6 +86,34 @@ func TestBuildViolationIndex(t *testing.T) {
 	violations := tui.BuildViolationIndex(pkgs, module, root)
 	if len(violations) == 0 {
 		t.Error("expected violations from invalid testdata")
+	}
+}
+
+func TestTUIDoesNotImportV1Rules(t *testing.T) {
+	v1RulesImport := "github.com/NamhaeSusan/go-arch-guard/" + "rules"
+	files := []string{
+		"app.go",
+		"detail.go",
+		"violations.go",
+		"../cmd/tui/main.go",
+	}
+
+	for _, file := range files {
+		t.Run(file, func(t *testing.T) {
+			src, err := os.ReadFile(file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			parsed, err := parser.ParseFile(token.NewFileSet(), file, src, parser.ImportsOnly)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, imp := range parsed.Imports {
+				if strings.Trim(imp.Path.Value, `"`) == v1RulesImport {
+					t.Fatal("tui must use core API instead of v1 rules package")
+				}
+			}
+		})
 	}
 }
 

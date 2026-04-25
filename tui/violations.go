@@ -3,7 +3,8 @@ package tui
 import (
 	"strings"
 
-	"github.com/NamhaeSusan/go-arch-guard/rules"
+	"github.com/NamhaeSusan/go-arch-guard/core"
+	"github.com/NamhaeSusan/go-arch-guard/presets"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -17,11 +18,14 @@ const (
 )
 
 // ViolationIndex maps relative package paths to their violations.
-type ViolationIndex map[string][]rules.Violation
+type ViolationIndex map[string][]core.Violation
 
 // BuildViolationIndex runs all rules and indexes violations by package path.
 func BuildViolationIndex(pkgs []*packages.Package, module, root string) ViolationIndex {
-	all := rules.RunAll(pkgs, module, root)
+	arch := presets.DDD()
+	ctx := core.NewContext(pkgs, module, root, arch, nil)
+	ruleSet := presets.RecommendedDDD()
+	all := core.Run(ctx, ruleSet)
 
 	idx := make(ViolationIndex)
 	for _, v := range all {
@@ -34,13 +38,13 @@ func BuildViolationIndex(pkgs []*packages.Package, module, root string) Violatio
 // Severity returns the worst severity for a path and all sub-paths.
 func (vi ViolationIndex) Severity(relPath string) severity {
 	worst := sevNone
-	vi.walkPath(relPath, func(viols []rules.Violation) {
+	vi.walkPath(relPath, func(viols []core.Violation) {
 		for _, v := range viols {
-			if v.EffectiveSeverity == rules.Error {
+			if v.EffectiveSeverity == core.Error {
 				worst = sevError
 				return
 			}
-			if v.EffectiveSeverity == rules.Warning && worst < sevWarning {
+			if v.EffectiveSeverity == core.Warning && worst < sevWarning {
 				worst = sevWarning
 			}
 		}
@@ -48,7 +52,7 @@ func (vi ViolationIndex) Severity(relPath string) severity {
 	return worst
 }
 
-func (vi ViolationIndex) walkPath(relPath string, fn func([]rules.Violation)) {
+func (vi ViolationIndex) walkPath(relPath string, fn func([]core.Violation)) {
 	if viols, ok := vi[relPath]; ok {
 		fn(viols)
 	}

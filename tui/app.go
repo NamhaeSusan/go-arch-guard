@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/NamhaeSusan/go-arch-guard/rules"
+	"github.com/NamhaeSusan/go-arch-guard/core"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 	"golang.org/x/tools/go/packages"
@@ -44,7 +44,7 @@ func Run(pkgs []*packages.Package, module, root string) error {
 	errCount, warnCount := 0, 0
 	for _, viols := range violations {
 		for _, v := range viols {
-			if v.EffectiveSeverity == rules.Error {
+			if v.EffectiveSeverity == core.Error {
 				errCount++
 			} else {
 				warnCount++
