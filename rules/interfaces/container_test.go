@@ -62,6 +62,27 @@ func New() Reader { return &reader{} }
 	assertLacksRule(t, violations, "interface.container-only")
 }
 
+func TestContainerHandlesGenericTypeArguments(t *testing.T) {
+	root := writeFixture(t, "example.com/container-generics", map[string]string{
+		"internal/wire/wire.go": `package wire
+
+type Reader interface {
+	Read() string
+}
+
+type Cache[T any] struct {
+	v T
+}
+
+func New() *Cache[Reader] { return &Cache[Reader]{} }
+`,
+	})
+
+	violations := interfaces.NewContainer().Check(loadContext(t, root, flatArchitecture(), "example.com/container-generics"))
+
+	assertLacksRule(t, violations, "interface.container-only")
+}
+
 func TestContainerWithSeverity(t *testing.T) {
 	rule := interfaces.NewContainer(interfaces.WithSeverity(core.Error))
 

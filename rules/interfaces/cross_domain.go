@@ -12,15 +12,11 @@ import (
 )
 
 type CrossDomainAnonymous struct {
-	cfg config
+	cfg ruleConfig
 }
 
 func NewCrossDomainAnonymous(opts ...Option) *CrossDomainAnonymous {
-	cfg := config{severity: core.Error}
-	for _, opt := range opts {
-		opt(&cfg)
-	}
-	return &CrossDomainAnonymous{cfg: cfg}
+	return &CrossDomainAnonymous{cfg: newConfig(opts, core.Error)}
 }
 
 func (r *CrossDomainAnonymous) Spec() core.RuleSpec {
@@ -35,12 +31,20 @@ func (r *CrossDomainAnonymous) Spec() core.RuleSpec {
 }
 
 func (r *CrossDomainAnonymous) Check(ctx *core.Context) []core.Violation {
-	if ctx == nil || ctx.Arch().Layout.DomainDir == "" {
+	if ctx == nil {
+		return nil
+	}
+	pkgs := ctx.Pkgs()
+	projectModule := analysisutil.ResolveModuleFromContext(ctx, "")
+	if !hasInternalPackages(pkgs, projectModule) {
+		return []core.Violation{metaLayoutNotSupported("interfaces.cross-domain-anonymous", projectModule)}
+	}
+	if ctx.Arch().Layout.DomainDir == "" {
 		return nil
 	}
 
 	var violations []core.Violation
-	for _, pkg := range ctx.Pkgs() {
+	for _, pkg := range pkgs {
 		violations = append(violations, r.checkPackage(pkg, ctx.Arch())...)
 	}
 	return violations
@@ -54,7 +58,7 @@ func (r *CrossDomainAnonymous) checkPackage(pkg *packages.Package, arch core.Arc
 
 	var violations []core.Violation
 	for _, file := range pkg.Syntax {
-		if isTestFile(pkg, file) {
+		if analysisutil.IsTestFile(file, pkg.Fset) {
 			continue
 		}
 		for _, decl := range file.Decls {

@@ -7,6 +7,16 @@ import (
 	"strings"
 )
 
+// IsTestFile reports whether file's source path ends with "_test.go". The
+// callsite supplies fset because *ast.File alone does not retain its
+// filename — only token.Position does.
+func IsTestFile(file *ast.File, fset *token.FileSet) bool {
+	if file == nil || fset == nil {
+		return false
+	}
+	return strings.HasSuffix(fset.Position(file.Pos()).Filename, "_test.go")
+}
+
 // TypeSpecInfo describes a single top-level type declaration in a Go file —
 // what InspectTypeSpecs extracts. Callers compute file-level metadata (e.g.
 // a relative path) once outside the loop; only per-decl fields live here.
