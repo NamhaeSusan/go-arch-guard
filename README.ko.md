@@ -806,6 +806,7 @@ go run github.com/NamhaeSusan/go-arch-guard/cmd/tui .
 | `naming.NewNoStutter()` / `NewImplSuffix()` / `NewSnakeCaseFiles()` / `NewNoLayerSuffix()` / `NewNoHandMock()` / `NewRepoFileInterface()` | 네이밍 규칙 |
 | `structural.NewAlias()` / `NewPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` | 구조 규칙 |
 | `interfaces.NewPattern()` / `NewContainer()` / `NewCrossDomainAnonymous()` | 인터페이스 규칙 |
+| `interfaces.WithMaxMethods(n)` | `interfaces.NewPattern`의 인터페이스 메서드 상한 옵션 (기본 0 = 비활성; DDD/CleanArch/Hexagonal 권장 번들은 10으로 활성화) |
 | `tx.New(tx.Config{...})` | 트랜잭션 경계 검사 (옵트인) |
 | `types.NewTypePattern()` / `types.NewNoSetter()` | 타입 패턴과 setter 규칙 |
 

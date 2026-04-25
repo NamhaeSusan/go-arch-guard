@@ -843,6 +843,7 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `naming.NewNoStutter()` / `NewImplSuffix()` / `NewSnakeCaseFiles()` / `NewNoLayerSuffix()` / `NewNoHandMock()` / `NewRepoFileInterface()` | naming rules |
 | `structural.NewAlias()` / `NewPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` | structure rules |
 | `interfaces.NewPattern()` / `NewContainer()` / `NewCrossDomainAnonymous()` | interface rules |
+| `interfaces.WithMaxMethods(n)` | option for `interfaces.NewPattern` setting the per-interface method cap (default 0 = disabled; DDD/CleanArch/Hexagonal recommended bundles bake in 10) |
 | `tx.New(tx.Config{...})` | transaction boundary enforcement (opt-in) |
 | `types.NewTypePattern()` / `types.NewNoSetter()` | type pattern and setter rules |
 
