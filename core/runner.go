@@ -32,13 +32,18 @@ import (
 //   - Effective severity precedence (highest wins):
 //     1. WithSeverityOverride(violationID, ...)
 //     2. RuleSpec.Violations[i].DefaultSeverity for matching ID
-//     3. RuleSpec.DefaultSeverity
-//     4. Error
+//     3. Warning, when the violation ID starts with "meta." (environmental
+//        meta.* violations should never block builds by accident)
+//     4. RuleSpec.DefaultSeverity
+//     5. Error
 //   - Violations are deduped by Rule field for any Rule starting with "meta.".
 //   - Final violations are sorted by (File, Line, Rule, Message) for
 //     deterministic output regardless of map iteration order inside rules.
 func Run(ctx *Context, rules RuleSet, opts ...RunOption) []Violation {
 	if err := ctx.Arch().Validate(); err != nil {
+		panic(fmt.Sprintf("core.Run: %v", err))
+	}
+	if err := validateRuleSet(rules); err != nil {
 		panic(fmt.Sprintf("core.Run: %v", err))
 	}
 
@@ -87,7 +92,15 @@ func Run(ctx *Context, rules RuleSet, opts ...RunOption) []Violation {
 			}
 			declared, ok := violationDefaults[v.Rule]
 			if !ok {
-				declared = ruleDefault
+				// meta.* IDs are environmental warnings (e.g.
+				// meta.no-matching-packages). Default them to Warning so a
+				// dependency rule that defaults to Error doesn't accidentally
+				// promote a configuration mismatch into a hard failure.
+				if strings.HasPrefix(v.Rule, "meta.") {
+					declared = Warning
+				} else {
+					declared = ruleDefault
+				}
 			}
 			effective := declared
 			if override, ok := o.severityFor(v.Rule); ok {
@@ -115,6 +128,40 @@ func Run(ctx *Context, rules RuleSet, opts ...RunOption) []Violation {
 	})
 
 	return out
+}
+
+// validateRuleSet checks for duplicate rule-type IDs across the set, and
+// duplicate violation IDs within any single rule's Violations catalog.
+// Both are silent foot-guns: dups collapse into a map so filters and
+// overrides cannot disambiguate them.
+func validateRuleSet(rs RuleSet) error {
+	var errs []string
+
+	seenRule := make(map[string]bool)
+	for _, r := range rs.Rules() {
+		spec := r.Spec()
+		if spec.ID == "" {
+			continue
+		}
+		if seenRule[spec.ID] {
+			errs = append(errs, fmt.Sprintf("RuleSet contains duplicate rule-type ID %q", spec.ID))
+		}
+		seenRule[spec.ID] = true
+
+		seenViolation := make(map[string]bool, len(spec.Violations))
+		for _, v := range spec.Violations {
+			if seenViolation[v.ID] {
+				errs = append(errs, fmt.Sprintf("rule %q declares duplicate violation ID %q in Spec().Violations", spec.ID, v.ID))
+			}
+			seenViolation[v.ID] = true
+		}
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+	sort.Strings(errs)
+	return fmt.Errorf("%s", strings.Join(errs, "; "))
 }
 
 func knownViolationIDs(rs RuleSet) map[string]bool {

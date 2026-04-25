@@ -116,6 +116,36 @@ func TestRunFallsBackToRuleSpecDefaultSeverity(t *testing.T) {
 	}
 }
 
+func TestRunDefaultsMetaIDToWarning(t *testing.T) {
+	// meta.* violations emitted by a rule whose RuleSpec.DefaultSeverity is
+	// Error must NOT inherit Error — they default to Warning so configuration
+	// mismatches don't block builds.
+	r := &fakeRule{
+		spec: RuleSpec{
+			ID:              "fake.harsh",
+			DefaultSeverity: Error, // simulates dependency.* rules
+			Violations:      []ViolationSpec{{ID: "fake.harsh", DefaultSeverity: Error}},
+		},
+		violations: []Violation{
+			{File: ".", Rule: "meta.no-matching-packages", Message: "module mismatch"},
+		},
+	}
+	ctx := NewContext(nil, "", "", validArchitecture(), nil)
+	got := Run(ctx, RuleSet{}.With(r))
+	if len(got) != 1 {
+		t.Fatalf("len = %d, want 1", len(got))
+	}
+	if got[0].DefaultSeverity != Warning || got[0].EffectiveSeverity != Warning {
+		t.Errorf("meta.* default=%v effective=%v, want both Warning", got[0].DefaultSeverity, got[0].EffectiveSeverity)
+	}
+
+	// Runtime override still wins.
+	got = Run(ctx, RuleSet{}.With(r), WithSeverityOverride("meta.no-matching-packages", Error))
+	if got[0].EffectiveSeverity != Error {
+		t.Errorf("override should win: got %v, want Error", got[0].EffectiveSeverity)
+	}
+}
+
 func TestRunAllowsUndeclaredMetaIDs(t *testing.T) {
 	// Rules may emit meta.* violations (e.g. meta.no-matching-packages)
 	// without declaring them in Spec().Violations. The runner must let
