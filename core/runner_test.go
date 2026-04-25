@@ -231,6 +231,32 @@ func TestRunDedupesMetaViolations(t *testing.T) {
 	}
 }
 
+// TestRunSeverityLevel5FallsBackToError covers the absolute fallback in
+// the severity precedence documented at runner.go:33-37. When a violation
+// has no override, no per-violation-ID spec, no meta.* prefix, and no
+// rule-level default severity, the Severity zero value (Error) is used.
+// Without this test, swapping the order of the Severity enum constants
+// (Warning=0, Error=1) would silently change the fallback behavior.
+func TestRunSeverityLevel5FallsBackToError(t *testing.T) {
+	r := &fakeRule{
+		spec: RuleSpec{ID: "fake.demo"}, // no DefaultSeverity, no Violations catalog
+		violations: []Violation{
+			{File: ".", Rule: "fake.demo", Message: "x"},
+		},
+	}
+	ctx := NewContext(nil, "", "", validArchitecture(), nil)
+	got := Run(ctx, RuleSet{}.With(r))
+	if len(got) != 1 {
+		t.Fatalf("len = %d, want 1", len(got))
+	}
+	if got[0].EffectiveSeverity != Error {
+		t.Fatalf("level-5 fallback EffectiveSeverity = %v, want Error", got[0].EffectiveSeverity)
+	}
+	if got[0].DefaultSeverity != Error {
+		t.Fatalf("level-5 fallback DefaultSeverity = %v, want Error", got[0].DefaultSeverity)
+	}
+}
+
 func TestRunPreservesMetaViolationsWithDifferentMessages(t *testing.T) {
 	r1 := &fakeRule{
 		spec: RuleSpec{ID: "fake.a"},

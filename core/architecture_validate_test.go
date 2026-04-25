@@ -33,6 +33,19 @@ func TestValidateAcceptsValid(t *testing.T) {
 	}
 }
 
+// TestValidateZeroValueArchitecture locks down the contract that an empty
+// Architecture is a legal "no-op" config: callers building one field at a
+// time must not see a panic from nil maps/slices, and Validate() must
+// succeed when no rules are configured. If a future change makes
+// validation stricter for zero values, that change must update this test
+// (and document the migration).
+func TestValidateZeroValueArchitecture(t *testing.T) {
+	var arch Architecture
+	if err := arch.Validate(); err != nil {
+		t.Fatalf("zero-value Architecture.Validate() = %v, want nil", err)
+	}
+}
+
 func TestValidateRejectsDirectionKeyMissing(t *testing.T) {
 	a := validArchitecture()
 	delete(a.Layers.Direction, "core/svc")
