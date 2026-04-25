@@ -2,6 +2,7 @@ package dependency_test
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/NamhaeSusan/go-arch-guard/analyzer"
@@ -78,6 +79,21 @@ func TestIsolationDDDAppServerTransport(t *testing.T) {
 	assertHasRule(t, violations, "isolation.transport-imports-domain")
 }
 
+func TestIsolationFlatLayoutEmitsMetaWarning(t *testing.T) {
+	ctx := loadFlatLayoutContext(t)
+	violations := dependency.NewIsolation().Check(ctx)
+	assertExactlyOneMetaLayoutNotSupported(t, violations, "dependency.isolation")
+}
+
+func TestIsolationDDDProjectHasNoMetaLayoutWarning(t *testing.T) {
+	ctx := loadContext(t, "../../testdata/valid", "github.com/kimtaeyun/testproject-dc", dddArchitecture(), "internal/...")
+	for _, v := range dependency.NewIsolation().Check(ctx) {
+		if v.Rule == "meta.layout-not-supported" {
+			t.Fatalf("internal/-based project must not emit meta.layout-not-supported: %s", v.String())
+		}
+	}
+}
+
 func TestIsolationExclude(t *testing.T) {
 	ctx := loadContextWithExclude(t,
 		"../../testdata/invalid",
@@ -94,6 +110,27 @@ func TestIsolationExclude(t *testing.T) {
 			v.File == "internal/config/orchestration.go" {
 			t.Fatalf("expected config package to be excluded, got %s", v.String())
 		}
+	}
+}
+
+func loadFlatLayoutContext(t *testing.T) *core.Context {
+	t.Helper()
+	return loadContext(t, "../../testdata/flat", "github.com/kimtaeyun/testproject-flat", dddArchitecture(), "...")
+}
+
+func assertExactlyOneMetaLayoutNotSupported(t *testing.T, violations []core.Violation, ruleID string) {
+	t.Helper()
+	var count int
+	for _, v := range violations {
+		if v.Rule == "meta.layout-not-supported" {
+			count++
+			if !strings.Contains(v.Message, ruleID) {
+				t.Fatalf("meta message should mention %q, got %q", ruleID, v.Message)
+			}
+		}
+	}
+	if count != 1 {
+		t.Fatalf("expected exactly 1 meta.layout-not-supported, got %d: %+v", count, violations)
 	}
 }
 

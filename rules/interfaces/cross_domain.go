@@ -12,15 +12,11 @@ import (
 )
 
 type CrossDomainAnonymous struct {
-	cfg config
+	cfg ruleConfig
 }
 
 func NewCrossDomainAnonymous(opts ...Option) *CrossDomainAnonymous {
-	cfg := config{severity: core.Error}
-	for _, opt := range opts {
-		opt(&cfg)
-	}
-	return &CrossDomainAnonymous{cfg: cfg}
+	return &CrossDomainAnonymous{cfg: newConfig(opts, core.Error)}
 }
 
 func (r *CrossDomainAnonymous) Spec() core.RuleSpec {
@@ -35,13 +31,22 @@ func (r *CrossDomainAnonymous) Spec() core.RuleSpec {
 }
 
 func (r *CrossDomainAnonymous) Check(ctx *core.Context) []core.Violation {
-	if ctx == nil || ctx.Arch().Layout.DomainDir == "" {
+	if ctx == nil {
+		return nil
+	}
+	pkgs := ctx.Pkgs()
+	projectModule := analysisutil.ResolveModuleFromContext(ctx, "")
+	arch := ctx.Arch()
+	if !hasInternalPackages(pkgs, projectModule, arch.Layout.InternalRoot) {
+		return []core.Violation{metaLayoutNotSupported("interfaces.cross-domain-anonymous", projectModule)}
+	}
+	if arch.Layout.DomainDir == "" {
 		return nil
 	}
 
 	var violations []core.Violation
-	for _, pkg := range ctx.Pkgs() {
-		violations = append(violations, r.checkPackage(pkg, ctx.Arch())...)
+	for _, pkg := range pkgs {
+		violations = append(violations, r.checkPackage(pkg, arch)...)
 	}
 	return violations
 }
@@ -54,7 +59,7 @@ func (r *CrossDomainAnonymous) checkPackage(pkg *packages.Package, arch core.Arc
 
 	var violations []core.Violation
 	for _, file := range pkg.Syntax {
-		if isTestFile(pkg, file) {
+		if analysisutil.IsTestFile(file, pkg.Fset) {
 			continue
 		}
 		for _, decl := range file.Decls {
@@ -140,7 +145,7 @@ func (r *CrossDomainAnonymous) checkAnonymousInterface(iface *ast.InterfaceType,
 		Line:              pos.Line,
 		Rule:              "interface.cross-domain-anonymous",
 		Message:           fmt.Sprintf("anonymous interface declared in package %q references types from domain(s) %v", pkg.PkgPath, domains),
-		Fix:               "move this adapter/abstraction into internal/" + arch.Layout.OrchestrationDir + "/",
+		Fix:               "move this adapter/abstraction into " + arch.Layout.InternalRoot + "/" + arch.Layout.OrchestrationDir + "/",
 		DefaultSeverity:   r.cfg.severity,
 		EffectiveSeverity: r.cfg.severity,
 	}}
@@ -190,7 +195,7 @@ func owningDomainForPath(pkgPath string, arch core.Architecture) string {
 	}
 	parts := strings.Split(pkgPath, "/")
 	for i := 0; i+2 < len(parts); i++ {
-		if parts[i] == "internal" && parts[i+1] == arch.Layout.DomainDir {
+		if parts[i] == arch.Layout.InternalRoot && parts[i+1] == arch.Layout.DomainDir {
 			return parts[i+2]
 		}
 	}
@@ -203,7 +208,7 @@ func isOrchestrationPath(pkgPath string, arch core.Architecture) bool {
 	}
 	parts := strings.Split(pkgPath, "/")
 	for i := 0; i+1 < len(parts); i++ {
-		if parts[i] == "internal" && parts[i+1] == arch.Layout.OrchestrationDir {
+		if parts[i] == arch.Layout.InternalRoot && parts[i+1] == arch.Layout.OrchestrationDir {
 			return true
 		}
 	}

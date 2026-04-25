@@ -17,9 +17,8 @@ type ModelRequired struct {
 }
 
 func NewModelRequired(opts ...Option) *ModelRequired {
-	r := &ModelRequired{severity: core.Error}
-	applyOptions(r, opts)
-	return r
+	cfg := newConfig(opts, core.Error)
+	return &ModelRequired{severity: cfg.severity}
 }
 
 func (r *ModelRequired) Spec() core.RuleSpec {
@@ -38,11 +37,14 @@ func (r *ModelRequired) Check(ctx *core.Context) []core.Violation {
 		return nil
 	}
 	arch := ctx.Arch()
+	if !hasInternalDir(ctx.Root(), arch.Layout.InternalRoot) {
+		return []core.Violation{metaLayoutNotSupported(ruleModelRequired)}
+	}
 	if arch.Layout.DomainDir == "" || !arch.Structure.RequireModel {
 		return nil
 	}
 
-	domainDir := filepath.Join(ctx.Root(), "internal", filepath.FromSlash(arch.Layout.DomainDir))
+	domainDir := filepath.Join(ctx.Root(), arch.Layout.InternalRoot, filepath.FromSlash(arch.Layout.DomainDir))
 	entries, err := os.ReadDir(domainDir)
 	if err != nil {
 		return nil
@@ -52,7 +54,7 @@ func (r *ModelRequired) Check(ctx *core.Context) []core.Violation {
 		if !entry.IsDir() {
 			continue
 		}
-		relPath := filepath.ToSlash(filepath.Join("internal", arch.Layout.DomainDir, entry.Name()))
+		relPath := filepath.ToSlash(filepath.Join(arch.Layout.InternalRoot, arch.Layout.DomainDir, entry.Name()))
 		if ctx.IsExcluded(relPath + "/") {
 			continue
 		}

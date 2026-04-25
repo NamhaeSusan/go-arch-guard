@@ -66,6 +66,8 @@ violations := core.Run(ctx, presets.RecommendedDDD())
 report.AssertNoViolations(t, violations)
 ```
 
+`module`과 `root`에 빈 문자열을 넘기면 로드된 패키지에서 자동 추출합니다. 모듈을 확인할 수 없으면 `meta.no-matching-packages` Warning을 냅니다. rule이 panic을 내면 `core.Run`은 `meta.rule-panic` Error violation을 내고 나머지 rule 실행을 계속합니다.
+
 다른 프리셋은 `presets.Hexagonal()`과 `presets.RecommendedHexagonal()`처럼
 아키텍처와 권장 ruleset을 같은 프리셋으로 맞춰 사용합니다.
 
@@ -790,7 +792,7 @@ go run github.com/NamhaeSusan/go-arch-guard/cmd/tui --preset hexagonal .
 |------|------|
 | `analyzer.Load(dir, patterns...)` | 분석용 Go 패키지 로드 |
 | `core.NewContext(pkgs, module, root, arch, exclude)` | 불변 분석 컨텍스트 생성 |
-| `core.Run(ctx, ruleset, opts...)` | ruleset 실행 후 `[]core.Violation` 반환 |
+| `core.Run(ctx, ruleset, opts...)` | ruleset 실행 후 `[]core.Violation` 반환; rule panic은 `meta.rule-panic` Error violation으로 변환 |
 | `core.RuleSet` | rule과 violation 필터를 담는 불변 컬렉션 |
 | `core.NewRuleSet(ruleValues...)` | 불변 ruleset 생성 |
 | `(rs).With(ruleValues...)` / `(rs).Without(ids...)` | rule 추가 또는 violation ID 필터링 |

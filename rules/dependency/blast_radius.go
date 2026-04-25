@@ -12,11 +12,8 @@ import (
 type BlastRadius struct{ severity core.Severity }
 
 func NewBlastRadius(opts ...Option) *BlastRadius {
-	r := &BlastRadius{severity: core.Warning}
-	for _, opt := range opts {
-		r.severity = opt.severity()
-	}
-	return r
+	cfg := newConfig(opts, core.Warning)
+	return &BlastRadius{severity: cfg.severity}
 }
 
 func (r *BlastRadius) Spec() core.RuleSpec {
@@ -30,13 +27,18 @@ func (r *BlastRadius) Spec() core.RuleSpec {
 
 func (r *BlastRadius) Check(ctx *core.Context) []core.Violation {
 	projectModule := analysisutil.ResolveModuleFromContext(ctx, "")
-	if warns := validateModule(ctx.Pkgs(), projectModule); len(warns) > 0 {
+	pkgs := ctx.Pkgs()
+	if warns := validateModule(pkgs, projectModule); len(warns) > 0 {
 		return warns
 	}
+	internalRoot := ctx.Arch().Layout.InternalRoot
+	if !hasInternalPackages(pkgs, projectModule, internalRoot) {
+		return []core.Violation{metaLayoutNotSupported("dependency.blast-radius", projectModule)}
+	}
 
-	internalPrefix := projectModule + "/internal/"
+	internalPrefix := projectModule + "/" + internalRoot + "/"
 	internalPkgs := make(map[string]bool)
-	for _, pkg := range ctx.Pkgs() {
+	for _, pkg := range pkgs {
 		if strings.HasPrefix(pkg.PkgPath, internalPrefix) &&
 			!isExcludedPackage(ctx, pkg.PkgPath, projectModule) {
 			internalPkgs[pkg.PkgPath] = true

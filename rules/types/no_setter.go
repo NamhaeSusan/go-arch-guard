@@ -3,6 +3,7 @@ package types
 import (
 	"fmt"
 	"go/ast"
+	"slices"
 	"strings"
 	"unicode"
 
@@ -34,11 +35,8 @@ type NoSetter struct {
 }
 
 func NewNoSetter(opts ...Option) *NoSetter {
-	r := &NoSetter{severity: core.Warning}
-	for _, opt := range opts {
-		opt.applyNoSetter(r)
-	}
-	return r
+	cfg := newConfig(opts, core.Warning)
+	return &NoSetter{severity: cfg.severity}
 }
 
 func (r *NoSetter) Spec() core.RuleSpec {
@@ -128,19 +126,14 @@ func receiverTypeString(fd *ast.FuncDecl) string {
 	if fd.Recv == nil || len(fd.Recv.List) == 0 {
 		return ""
 	}
-	return receiverTypeName(fd.Recv.List[0].Type)
+	return analysisutil.ReceiverTypeName(fd.Recv.List[0].Type)
 }
 
 func isFluentBuilder(fd *ast.FuncDecl) bool {
 	if fd.Type.Results == nil || len(fd.Type.Results.List) != 1 {
 		return false
 	}
-	result := fd.Type.Results.List[0].Type
-	if star, ok := result.(*ast.StarExpr); ok {
-		result = star.X
-	}
-	ident, ok := result.(*ast.Ident)
-	return ok && ident.Name == receiverTypeString(fd)
+	return analysisutil.ReceiverTypeName(fd.Type.Results.List[0].Type) == receiverTypeString(fd)
 }
 
 func autoExcludedFile(filename string) bool {
@@ -156,10 +149,5 @@ func autoExcludedPackage(pkg *packages.Package) bool {
 
 func hasPathSegment(path, segment string) bool {
 	path = analysisutil.NormalizeMatchPath(path)
-	for _, part := range strings.Split(path, "/") {
-		if part == segment {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(strings.Split(path, "/"), segment)
 }

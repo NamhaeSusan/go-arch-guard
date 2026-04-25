@@ -5,7 +5,6 @@ import (
 	"go/ast"
 	"go/token"
 	"sort"
-	"strings"
 
 	"github.com/NamhaeSusan/go-arch-guard/core"
 	"github.com/NamhaeSusan/go-arch-guard/core/analysisutil"
@@ -13,15 +12,11 @@ import (
 )
 
 type Container struct {
-	cfg config
+	cfg ruleConfig
 }
 
 func NewContainer(opts ...Option) *Container {
-	cfg := config{severity: core.Warning}
-	for _, opt := range opts {
-		opt(&cfg)
-	}
-	return &Container{cfg: cfg}
+	return &Container{cfg: newConfig(opts, core.Warning)}
 }
 
 func (r *Container) Spec() core.RuleSpec {
@@ -59,7 +54,7 @@ func (r *Container) checkPackage(pkg *packages.Package) []core.Violation {
 	}
 
 	for _, file := range pkg.Syntax {
-		if isTestFile(pkg, file) {
+		if analysisutil.IsTestFile(file, pkg.Fset) {
 			continue
 		}
 		ast.Inspect(file, func(n ast.Node) bool {
@@ -160,13 +155,21 @@ func countTypeRefs(expr ast.Expr, ifaces map[string]token.Position, usage map[st
 	case *ast.FuncType:
 		countFieldListRefs(e.Params, ifaces, usage, kind)
 		countFieldListRefs(e.Results, ifaces, usage, kind)
+	case *ast.IndexExpr:
+		countTypeRefs(e.X, ifaces, usage, kind)
+		countTypeRefs(e.Index, ifaces, usage, kind)
+	case *ast.IndexListExpr:
+		countTypeRefs(e.X, ifaces, usage, kind)
+		for _, idx := range e.Indices {
+			countTypeRefs(idx, ifaces, usage, kind)
+		}
 	}
 }
 
 func collectNonTestInterfaces(pkg *packages.Package) map[string]token.Position {
 	result := make(map[string]token.Position)
 	for _, file := range pkg.Syntax {
-		if isTestFile(pkg, file) {
+		if analysisutil.IsTestFile(file, pkg.Fset) {
 			continue
 		}
 		for _, decl := range file.Decls {
@@ -186,11 +189,6 @@ func collectNonTestInterfaces(pkg *packages.Package) map[string]token.Position {
 		}
 	}
 	return result
-}
-
-func isTestFile(pkg *packages.Package, file *ast.File) bool {
-	pos := pkg.Fset.Position(file.Pos())
-	return strings.HasSuffix(pos.Filename, "_test.go")
 }
 
 var _ core.Rule = (*Container)(nil)

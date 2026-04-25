@@ -68,6 +68,12 @@ func TestBlastRadiusDetectsOutlier(t *testing.T) {
 	}
 }
 
+func TestBlastRadiusFlatLayoutEmitsMetaWarning(t *testing.T) {
+	ctx := loadFlatLayoutContext(t)
+	violations := dependency.NewBlastRadius().Check(ctx)
+	assertExactlyOneMetaLayoutNotSupported(t, violations, "dependency.blast-radius")
+}
+
 func TestBlastRadiusExclude(t *testing.T) {
 	ctx := loadContextWithExclude(t,
 		"../../testdata/blast",

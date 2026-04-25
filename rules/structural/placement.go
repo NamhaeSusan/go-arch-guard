@@ -1,7 +1,6 @@
 package structural
 
 import (
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -23,9 +22,8 @@ type Placement struct {
 }
 
 func NewPlacement(opts ...Option) *Placement {
-	r := &Placement{severity: core.Error}
-	applyOptions(r, opts)
-	return r
+	cfg := newConfig(opts, core.Error)
+	return &Placement{severity: cfg.severity}
 }
 
 func (r *Placement) Spec() core.RuleSpec {
@@ -45,11 +43,11 @@ func (r *Placement) Check(ctx *core.Context) []core.Violation {
 	if ctx == nil {
 		return nil
 	}
-	internalDir := filepath.Join(ctx.Root(), "internal")
-	if _, err := os.Stat(internalDir); err != nil {
-		return nil
-	}
 	arch := ctx.Arch()
+	if !hasInternalDir(ctx.Root(), arch.Layout.InternalRoot) {
+		return []core.Violation{metaLayoutNotSupported(rulePlacement)}
+	}
+	internalDir := filepath.Join(ctx.Root(), arch.Layout.InternalRoot)
 	violations := r.checkLayerPlacement(ctx, internalDir, arch)
 	violations = append(violations, r.checkMiddlewarePlacement(ctx, internalDir, arch)...)
 	if arch.Layout.DomainDir != "" {
@@ -69,7 +67,7 @@ func (r *Placement) checkLayerPlacement(ctx *core.Context, internalDir string, a
 			return nil
 		}
 		rel = filepath.ToSlash(rel)
-		if rel == "internal" {
+		if rel == arch.Layout.InternalRoot {
 			return nil
 		}
 		if ctx.IsExcluded(rel + "/") {
@@ -84,14 +82,14 @@ func (r *Placement) checkLayerPlacement(ctx *core.Context, internalDir string, a
 		}
 		violations = append(violations, violation(r.severity, misplacedLayer, rel+"/",
 			`layer package "`+name+`" is misplaced`,
-			fmt.Sprintf("place layer packages only in configured domain slices or %s handler", arch.Layout.OrchestrationDir)))
+			"place layer packages only in configured domain slices or "+arch.Layout.OrchestrationDir+" handler"))
 		return nil
 	})
 	return violations
 }
 
 func (r *Placement) checkMiddlewarePlacement(ctx *core.Context, internalDir string, arch core.Architecture) []core.Violation {
-	allowedPath := filepath.ToSlash(filepath.Join("internal", arch.Layout.SharedDir, "middleware"))
+	allowedPath := filepath.ToSlash(filepath.Join(arch.Layout.InternalRoot, arch.Layout.SharedDir, "middleware"))
 	var violations []core.Violation
 	_ = filepath.WalkDir(internalDir, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil || !entry.IsDir() || entry.Name() != "middleware" {
@@ -143,7 +141,7 @@ func (r *Placement) checkDTOPlacement(ctx *core.Context, internalDir string, arc
 		}
 		violations = append(violations, violation(r.severity, dtoPlacement, rel,
 			`"`+name+`" found in forbidden layer`,
-			fmt.Sprintf("DTOs belong in %v", arch.Structure.DTOAllowedLayers)))
+			"DTOs belong in "+strings.Join(arch.Structure.DTOAllowedLayers, ", ")))
 		return nil
 	})
 	return violations
@@ -155,19 +153,19 @@ func isMisplacedLayerDir(arch core.Architecture, rel, name string) bool {
 	}
 	switch name {
 	case "app", "infra":
-		if name == "app" && arch.Layout.AppDir != "" && rel == filepath.ToSlash(filepath.Join("internal", arch.Layout.AppDir)) {
+		if name == "app" && arch.Layout.AppDir != "" && rel == filepath.ToSlash(filepath.Join(arch.Layout.InternalRoot, arch.Layout.AppDir)) {
 			return false
 		}
 		return !matchesDomainLayer(arch, rel, name)
 	case "handler":
 		if arch.Layout.ServerDir != "" {
-			serverBase := filepath.ToSlash(filepath.Join("internal", arch.Layout.ServerDir))
+			serverBase := filepath.ToSlash(filepath.Join(arch.Layout.InternalRoot, arch.Layout.ServerDir))
 			if strings.HasPrefix(rel, serverBase+"/") || rel == serverBase {
 				return false
 			}
 		}
 		return !matchesDomainLayer(arch, rel, name) &&
-			rel != filepath.ToSlash(filepath.Join("internal", arch.Layout.OrchestrationDir, "handler"))
+			rel != filepath.ToSlash(filepath.Join(arch.Layout.InternalRoot, arch.Layout.OrchestrationDir, "handler"))
 	default:
 		return false
 	}
@@ -175,15 +173,26 @@ func isMisplacedLayerDir(arch core.Architecture, rel, name string) bool {
 
 func matchesDomainLayer(arch core.Architecture, rel, name string) bool {
 	parts := strings.Split(rel, "/")
-	return len(parts) == 4 && parts[0] == "internal" && parts[1] == arch.Layout.DomainDir && parts[2] != "" && parts[3] == name
+	return len(parts) == 4 && parts[0] == arch.Layout.InternalRoot && parts[1] == arch.Layout.DomainDir && parts[2] != "" && parts[3] == name
 }
 
+// isDTOAllowedSublayer reports whether the file at rel sits in one of the
+// DTOAllowedLayers. The check tries every nested depth from the sublayer
+// start position so DTOAllowedLayers entries like "core/repo" match nested
+// directories — "core" is tested first, then "core/repo", and so on. The
+// last segment of parts is the filename, so it is excluded from candidates.
 func isDTOAllowedSublayer(arch core.Architecture, rel string) bool {
 	domainDepth := len(strings.Split(arch.Layout.DomainDir, "/"))
 	parts := strings.Split(rel, "/")
-	sublayerIdx := 1 + domainDepth + 1
-	if len(parts) <= sublayerIdx {
+	sublayerStart := 1 + domainDepth + 1
+	if len(parts) <= sublayerStart {
 		return false
 	}
-	return slices.Contains(arch.Structure.DTOAllowedLayers, parts[sublayerIdx])
+	for depth := 1; sublayerStart+depth < len(parts); depth++ {
+		candidate := strings.Join(parts[sublayerStart:sublayerStart+depth], "/")
+		if slices.Contains(arch.Structure.DTOAllowedLayers, candidate) {
+			return true
+		}
+	}
+	return false
 }

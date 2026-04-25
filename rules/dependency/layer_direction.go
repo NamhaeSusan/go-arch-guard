@@ -13,11 +13,8 @@ import (
 type LayerDirection struct{ severity core.Severity }
 
 func NewLayerDirection(opts ...Option) *LayerDirection {
-	r := &LayerDirection{severity: core.Error}
-	for _, opt := range opts {
-		r.severity = opt.severity()
-	}
-	return r
+	cfg := newConfig(opts, core.Error)
+	return &LayerDirection{severity: cfg.severity}
 }
 
 func (r *LayerDirection) Spec() core.RuleSpec {
@@ -36,12 +33,17 @@ func (r *LayerDirection) Spec() core.RuleSpec {
 func (r *LayerDirection) Check(ctx *core.Context) []core.Violation {
 	projectModule := analysisutil.ResolveModuleFromContext(ctx, "")
 	projectRoot := analysisutil.ResolveRootFromContext(ctx, "")
-	if warns := validateModule(ctx.Pkgs(), projectModule); len(warns) > 0 {
+	pkgs := ctx.Pkgs()
+	if warns := validateModule(pkgs, projectModule); len(warns) > 0 {
 		return warns
 	}
-	internalPrefix := projectModule + "/internal/"
+	arch := ctx.Arch()
+	if !hasInternalPackages(pkgs, projectModule, arch.Layout.InternalRoot) {
+		return []core.Violation{metaLayoutNotSupported("dependency.layer-direction", projectModule)}
+	}
+	internalPrefix := projectModule + "/" + arch.Layout.InternalRoot + "/"
 
-	if ctx.Arch().Layout.DomainDir == "" {
+	if arch.Layout.DomainDir == "" {
 		return r.checkFlat(ctx, projectModule, projectRoot, internalPrefix)
 	}
 	return r.checkDomain(ctx, projectModule, projectRoot, internalPrefix)
@@ -80,7 +82,7 @@ func (r *LayerDirection) checkDomain(ctx *core.Context, projectModule, projectRo
 					file, line := analysisutil.FindImportPosition(pkg, impPath, projectRoot)
 					violations = append(violations, r.violation(file, line,
 						"layer.inner-imports-pkg",
-						fmt.Sprintf("inner sublayer %q must not import internal/%s in domain %q", src.Sublayer, arch.Layout.SharedDir, src.Domain),
+						fmt.Sprintf("inner sublayer %q must not import %s/%s in domain %q", src.Sublayer, arch.Layout.InternalRoot, arch.Layout.SharedDir, src.Domain),
 						"keep core and event layers self-contained; move shared concerns outward to app, handler, or infra",
 					))
 				}
@@ -131,7 +133,7 @@ func (r *LayerDirection) checkFlat(ctx *core.Context, projectModule, projectRoot
 					file, line := analysisutil.FindImportPosition(pkg, impPath, projectRoot)
 					violations = append(violations, r.violation(file, line,
 						"layer.inner-imports-pkg",
-						fmt.Sprintf("inner sublayer %q must not import internal/%s", src.Sublayer, arch.Layout.SharedDir),
+						fmt.Sprintf("inner sublayer %q must not import %s/%s", src.Sublayer, arch.Layout.InternalRoot, arch.Layout.SharedDir),
 						"keep inner layers self-contained; move shared concerns to an outer layer",
 					))
 				}

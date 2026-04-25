@@ -16,10 +16,17 @@ func NewRuleSet(rules ...Rule) RuleSet {
 	return RuleSet{}.With(rules...)
 }
 
-// With returns a new RuleSet with the given rules appended.
+// With returns a new RuleSet with the given rules appended. nil rules are
+// silently dropped so callers can compose conditional rule lists like
+// rs.With(maybeRule()) without an explicit nil check at every site.
 func (rs RuleSet) With(rules ...Rule) RuleSet {
 	out := rs.copy()
-	out.rules = append(out.rules, rules...)
+	for _, r := range rules {
+		if r == nil {
+			continue
+		}
+		out.rules = append(out.rules, r)
+	}
 	return out
 }
 

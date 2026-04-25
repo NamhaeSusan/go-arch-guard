@@ -12,35 +12,12 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-type Option func(*config)
-
-type config struct {
-	severity   core.Severity
-	maxMethods int
-}
-
-func WithSeverity(s core.Severity) Option {
-	return func(c *config) {
-		c.severity = s
-	}
-}
-
-func WithMaxMethods(n int) Option {
-	return func(c *config) {
-		c.maxMethods = n
-	}
-}
-
 type Pattern struct {
-	cfg config
+	cfg ruleConfig
 }
 
 func NewPattern(opts ...Option) *Pattern {
-	cfg := config{severity: core.Error}
-	for _, opt := range opts {
-		opt(&cfg)
-	}
-	return &Pattern{cfg: cfg}
+	return &Pattern{cfg: newConfig(opts, core.Error)}
 }
 
 func (r *Pattern) Spec() core.RuleSpec {
@@ -62,10 +39,16 @@ func (r *Pattern) Check(ctx *core.Context) []core.Violation {
 	if ctx == nil {
 		return nil
 	}
+	pkgs := ctx.Pkgs()
+	projectModule := analysisutil.ResolveModuleFromContext(ctx, "")
+	arch := ctx.Arch()
+	if !hasInternalPackages(pkgs, projectModule, arch.Layout.InternalRoot) {
+		return []core.Violation{metaLayoutNotSupported("interfaces.pattern", projectModule)}
+	}
 
 	var violations []core.Violation
-	for _, pkg := range ctx.Pkgs() {
-		if isExcludedInterfacePatternPkg(ctx.Arch(), pkg) {
+	for _, pkg := range pkgs {
+		if isExcludedInterfacePatternPkg(arch, pkg) {
 			continue
 		}
 
@@ -88,7 +71,7 @@ func isExcludedInterfacePatternPkg(arch core.Architecture, pkg *packages.Package
 	parts := strings.Split(pkg.PkgPath, "/")
 	internalIdx := -1
 	for i, p := range parts {
-		if p == "internal" {
+		if p == arch.Layout.InternalRoot {
 			internalIdx = i
 			break
 		}
@@ -211,8 +194,19 @@ func (r *Pattern) checkExportedImpl(pkg *packages.Package) []core.Violation {
 		return nil
 	}
 
+	structNames := make([]string, 0, len(structs))
+	for name := range structs {
+		structNames = append(structNames, name)
+	}
+	sort.Strings(structNames)
+	ifaceNames := make([]string, 0, len(typedIfaces))
+	for name := range typedIfaces {
+		ifaceNames = append(ifaceNames, name)
+	}
+	sort.Strings(ifaceNames)
+
 	var violations []core.Violation
-	for structName := range structs {
+	for _, structName := range structNames {
 		obj := scope.Lookup(structName)
 		if obj == nil {
 			continue
@@ -222,7 +216,8 @@ func (r *Pattern) checkExportedImpl(pkg *packages.Package) []core.Violation {
 			continue
 		}
 		ptrType := types.NewPointer(named)
-		for ifaceName, iface := range typedIfaces {
+		for _, ifaceName := range ifaceNames {
+			iface := typedIfaces[ifaceName]
 			if !types.Implements(named, iface) && !types.Implements(ptrType, iface) {
 				continue
 			}
@@ -330,9 +325,49 @@ func formatTypeExpr(expr ast.Expr) string {
 		return "[]" + formatTypeExpr(e.Elt)
 	case *ast.MapType:
 		return "map[" + formatTypeExpr(e.Key) + "]" + formatTypeExpr(e.Value)
+	case *ast.ChanType:
+		switch e.Dir {
+		case ast.SEND:
+			return "chan<- " + formatTypeExpr(e.Value)
+		case ast.RECV:
+			return "<-chan " + formatTypeExpr(e.Value)
+		default:
+			return "chan " + formatTypeExpr(e.Value)
+		}
+	case *ast.FuncType:
+		return "func" + formatFieldList(e.Params) + formatFuncResults(e.Results)
+	case *ast.IndexExpr:
+		return formatTypeExpr(e.X) + "[" + formatTypeExpr(e.Index) + "]"
+	case *ast.IndexListExpr:
+		parts := make([]string, 0, len(e.Indices))
+		for _, idx := range e.Indices {
+			parts = append(parts, formatTypeExpr(idx))
+		}
+		return formatTypeExpr(e.X) + "[" + strings.Join(parts, ", ") + "]"
 	default:
 		return "unknown"
 	}
+}
+
+func formatFieldList(fields *ast.FieldList) string {
+	if fields == nil {
+		return "()"
+	}
+	parts := make([]string, 0, len(fields.List))
+	for _, f := range fields.List {
+		parts = append(parts, formatTypeExpr(f.Type))
+	}
+	return "(" + strings.Join(parts, ", ") + ")"
+}
+
+func formatFuncResults(fields *ast.FieldList) string {
+	if fields == nil || len(fields.List) == 0 {
+		return ""
+	}
+	if len(fields.List) == 1 && len(fields.List[0].Names) == 0 {
+		return " " + formatTypeExpr(fields.List[0].Type)
+	}
+	return " " + formatFieldList(fields)
 }
 
 func (r *Pattern) violation(pkg *packages.Package, line int, id, message, fix string) core.Violation {

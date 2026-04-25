@@ -72,7 +72,7 @@ func (r *NoHandMock) checkFile(path, relPath string) []core.Violation {
 		if !ok || fd.Recv == nil || len(fd.Recv.List) == 0 {
 			continue
 		}
-		recvName := receiverTypeName(fd.Recv.List[0].Type)
+		recvName := analysisutil.ReceiverTypeName(fd.Recv.List[0].Type)
 		line, ok := structs[recvName]
 		if !ok {
 			continue
@@ -113,16 +113,6 @@ func collectMockStructs(fset *token.FileSet, file *ast.File) map[string]int {
 		}
 	}
 	return result
-}
-
-func receiverTypeName(expr ast.Expr) string {
-	if star, ok := expr.(*ast.StarExpr); ok {
-		expr = star.X
-	}
-	if ident, ok := expr.(*ast.Ident); ok {
-		return ident.Name
-	}
-	return ""
 }
 
 var _ core.Rule = (*NoHandMock)(nil)

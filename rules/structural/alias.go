@@ -1,7 +1,6 @@
 package structural
 
 import (
-	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
@@ -21,33 +20,13 @@ const (
 	aliasContractExport = "structure.domain-alias-contract-reexport"
 )
 
-type Option func(any)
-
-func WithSeverity(s core.Severity) Option {
-	return func(rule any) {
-		switch r := rule.(type) {
-		case *Alias:
-			r.severity = s
-		case *Placement:
-			r.severity = s
-		case *BannedPackage:
-			r.severity = s
-		case *ModelRequired:
-			r.severity = s
-		case *InternalTopLevel:
-			r.severity = s
-		}
-	}
-}
-
 type Alias struct {
 	severity core.Severity
 }
 
 func NewAlias(opts ...Option) *Alias {
-	r := &Alias{severity: core.Error}
-	applyOptions(r, opts)
-	return r
+	cfg := newConfig(opts, core.Error)
+	return &Alias{severity: cfg.severity}
 }
 
 func (r *Alias) Spec() core.RuleSpec {
@@ -70,11 +49,14 @@ func (r *Alias) Check(ctx *core.Context) []core.Violation {
 		return nil
 	}
 	arch := ctx.Arch()
+	if !hasInternalDir(ctx.Root(), arch.Layout.InternalRoot) {
+		return []core.Violation{metaLayoutNotSupported(ruleAlias)}
+	}
 	if arch.Layout.DomainDir == "" || !arch.Structure.RequireAlias {
 		return nil
 	}
 
-	domainDir := filepath.Join(ctx.Root(), "internal", filepath.FromSlash(arch.Layout.DomainDir))
+	domainDir := filepath.Join(ctx.Root(), arch.Layout.InternalRoot, filepath.FromSlash(arch.Layout.DomainDir))
 	entries, err := os.ReadDir(domainDir)
 	if err != nil {
 		return nil
@@ -86,7 +68,7 @@ func (r *Alias) Check(ctx *core.Context) []core.Violation {
 			continue
 		}
 		domainName := entry.Name()
-		relPath := filepath.ToSlash(filepath.Join("internal", arch.Layout.DomainDir, domainName))
+		relPath := filepath.ToSlash(filepath.Join(arch.Layout.InternalRoot, arch.Layout.DomainDir, domainName))
 		if ctx.IsExcluded(relPath + "/") {
 			continue
 		}
@@ -148,70 +130,23 @@ func (r *Alias) checkAliasTypes(aliasPath, aliasRel, aliasName string, arch core
 		return nil
 	}
 	var violations []core.Violation
-	for _, info := range inspectTypeSpecs(file, fset) {
-		if info.isInterface {
+	for _, info := range analysisutil.InspectTypeSpecs(file, fset) {
+		if info.IsInterface {
 			v := violation(r.severity, aliasNoInterface, aliasRel,
-				aliasName+` re-exports interface "`+info.name+`" - suspected cross-domain dependency; use `+arch.Layout.OrchestrationDir+`/ instead`,
+				aliasName+` re-exports interface "`+info.Name+`" - suspected cross-domain dependency; use `+arch.Layout.OrchestrationDir+`/ instead`,
 				"move cross-domain coordination to "+arch.Layout.OrchestrationDir+"/handler/ or "+arch.Layout.OrchestrationDir+"/")
-			v.Line = info.line
+			v.Line = info.Line
 			violations = append(violations, v)
 		}
-		if src := analysisutil.MatchContractSublayer(arch.Layers, info.aliasFrom); src != "" {
+		if src := analysisutil.MatchContractSublayer(arch.Layers, info.AliasFrom); src != "" {
 			v := violation(r.severity, aliasContractExport, aliasRel,
-				aliasName+` re-exports "`+info.name+`" from `+src+` - suspected cross-domain dependency; use `+arch.Layout.OrchestrationDir+`/ instead`,
+				aliasName+` re-exports "`+info.Name+`" from `+src+` - suspected cross-domain dependency; use `+arch.Layout.OrchestrationDir+`/ instead`,
 				"move cross-domain coordination to "+arch.Layout.OrchestrationDir+"/handler/ or "+arch.Layout.OrchestrationDir+"/")
-			v.Line = info.line
+			v.Line = info.Line
 			violations = append(violations, v)
 		}
 	}
 	return violations
-}
-
-type typeSpecInfo struct {
-	name        string
-	line        int
-	isInterface bool
-	aliasFrom   string
-}
-
-func inspectTypeSpecs(file *ast.File, fset *token.FileSet) []typeSpecInfo {
-	var result []typeSpecInfo
-	for _, decl := range file.Decls {
-		gen, ok := decl.(*ast.GenDecl)
-		if !ok {
-			continue
-		}
-		for _, spec := range gen.Specs {
-			typeSpec, ok := spec.(*ast.TypeSpec)
-			if !ok {
-				continue
-			}
-			info := typeSpecInfo{
-				name: typeSpec.Name.Name,
-				line: fset.Position(typeSpec.Name.Pos()).Line,
-			}
-			if _, ok := typeSpec.Type.(*ast.InterfaceType); ok {
-				info.isInterface = true
-			}
-			if typeSpec.Assign != 0 {
-				if sel, ok := typeSpec.Type.(*ast.SelectorExpr); ok {
-					if ident, ok := sel.X.(*ast.Ident); ok {
-						info.aliasFrom = analysisutil.ResolveIdentImportPath(file, ident.Name)
-					}
-				}
-			}
-			if info.isInterface || info.aliasFrom != "" {
-				result = append(result, info)
-			}
-		}
-	}
-	return result
-}
-
-func applyOptions(rule any, opts []Option) {
-	for _, opt := range opts {
-		opt(rule)
-	}
 }
 
 func withSeverity(spec core.RuleSpec, severity core.Severity) core.RuleSpec {

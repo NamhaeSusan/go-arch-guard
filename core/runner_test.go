@@ -231,6 +231,138 @@ func TestRunDedupesMetaViolations(t *testing.T) {
 	}
 }
 
+// TestRunSeverityLevel5FallsBackToError covers the absolute fallback in
+// the severity precedence documented at runner.go:33-37. When a violation
+// has no override, no per-violation-ID spec, no meta.* prefix, and no
+// rule-level default severity, the Severity zero value (Error) is used.
+// Without this test, swapping the order of the Severity enum constants
+// (Warning=0, Error=1) would silently change the fallback behavior.
+// panickingRule is a test double whose Check panics on every call.
+type panickingRule struct {
+	id string
+}
+
+func (p *panickingRule) Spec() RuleSpec { return RuleSpec{ID: p.id} }
+func (p *panickingRule) Check(_ *Context) []Violation {
+	panic("intentional rule bug for testing")
+}
+
+func TestRunRecoversRulePanicAsMetaError(t *testing.T) {
+	r := &panickingRule{id: "fake.bombs"}
+	ctx := NewContext(nil, "", "", validArchitecture(), nil)
+	got := Run(ctx, RuleSet{}.With(r))
+
+	if len(got) != 1 {
+		t.Fatalf("len = %d, want 1: %+v", len(got), got)
+	}
+	v := got[0]
+	if v.Rule != "meta.rule-panic" {
+		t.Errorf("Rule = %q, want meta.rule-panic", v.Rule)
+	}
+	if v.EffectiveSeverity != Error {
+		t.Errorf("EffectiveSeverity = %v, want Error (panic means the analysis did not complete reliably)", v.EffectiveSeverity)
+	}
+	if !strings.Contains(v.Message, "fake.bombs") {
+		t.Errorf("Message = %q, want it to mention rule ID", v.Message)
+	}
+	if !strings.Contains(v.Message, "intentional rule bug for testing") {
+		t.Errorf("Message = %q, want it to include the panic value", v.Message)
+	}
+}
+
+func TestRunRulePanicDoesNotBlockOtherRules(t *testing.T) {
+	bomb := &panickingRule{id: "fake.bombs"}
+	ok := &fakeRule{
+		spec: RuleSpec{ID: "fake.ok"},
+		violations: []Violation{
+			{File: "x.go", Rule: "fake.ok", Message: "still here"},
+		},
+	}
+	ctx := NewContext(nil, "", "", validArchitecture(), nil)
+	got := Run(ctx, RuleSet{}.With(bomb).With(ok))
+
+	var sawPanic, sawOk bool
+	for _, v := range got {
+		switch v.Rule {
+		case "meta.rule-panic":
+			sawPanic = true
+		case "fake.ok":
+			sawOk = true
+		}
+	}
+	if !sawPanic || !sawOk {
+		t.Fatalf("expected both meta.rule-panic AND fake.ok, got panic=%v ok=%v: %+v", sawPanic, sawOk, got)
+	}
+}
+
+func TestRunRulePanicSeverityOverrideWorks(t *testing.T) {
+	r := &panickingRule{id: "fake.bombs"}
+	ctx := NewContext(nil, "", "", validArchitecture(), nil)
+	got := Run(ctx, RuleSet{}.With(r), WithSeverityOverride("meta.rule-panic", Warning))
+
+	if len(got) != 1 {
+		t.Fatalf("len = %d, want 1", len(got))
+	}
+	if got[0].EffectiveSeverity != Warning {
+		t.Errorf("EffectiveSeverity = %v, want Warning (override must apply)", got[0].EffectiveSeverity)
+	}
+	if got[0].DefaultSeverity != Error {
+		t.Errorf("DefaultSeverity = %v, want Error (default unchanged by override)", got[0].DefaultSeverity)
+	}
+}
+
+func TestRunSeverityLevel5FallsBackToError(t *testing.T) {
+	r := &fakeRule{
+		spec: RuleSpec{ID: "fake.demo"}, // no DefaultSeverity, no Violations catalog
+		violations: []Violation{
+			{File: ".", Rule: "fake.demo", Message: "x"},
+		},
+	}
+	ctx := NewContext(nil, "", "", validArchitecture(), nil)
+	got := Run(ctx, RuleSet{}.With(r))
+	if len(got) != 1 {
+		t.Fatalf("len = %d, want 1", len(got))
+	}
+	if got[0].EffectiveSeverity != Error {
+		t.Fatalf("level-5 fallback EffectiveSeverity = %v, want Error", got[0].EffectiveSeverity)
+	}
+	if got[0].DefaultSeverity != Error {
+		t.Fatalf("level-5 fallback DefaultSeverity = %v, want Error", got[0].DefaultSeverity)
+	}
+}
+
+func TestRunPreservesMetaViolationsWithDifferentMessages(t *testing.T) {
+	r1 := &fakeRule{
+		spec: RuleSpec{ID: "fake.a"},
+		violations: []Violation{
+			{File: ".", Rule: "meta.no-matching-packages", Message: "module not determined"},
+		},
+	}
+	r2 := &fakeRule{
+		spec: RuleSpec{ID: "fake.b"},
+		violations: []Violation{
+			{File: ".", Rule: "meta.no-matching-packages", Message: "module does not match any loaded package"},
+		},
+	}
+	ctx := NewContext(nil, "", "", validArchitecture(), nil)
+	got := Run(ctx, RuleSet{}.With(r1).With(r2))
+
+	var count int
+	messages := make(map[string]bool)
+	for _, v := range got {
+		if v.Rule == "meta.no-matching-packages" {
+			count++
+			messages[v.Message] = true
+		}
+	}
+	if count != 2 {
+		t.Fatalf("len = %d, want 2 (different messages must NOT be deduped): %+v", count, got)
+	}
+	if !messages["module not determined"] || !messages["module does not match any loaded package"] {
+		t.Fatalf("expected both messages preserved, got %v", messages)
+	}
+}
+
 func TestRunRejectsUnknownWithoutID(t *testing.T) {
 	r := &fakeRule{
 		spec: RuleSpec{

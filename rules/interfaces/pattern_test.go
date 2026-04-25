@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/NamhaeSusan/go-arch-guard/analyzer"
@@ -126,6 +127,45 @@ func TestPatternWithSeverity(t *testing.T) {
 		if v.DefaultSeverity != core.Warning {
 			t.Fatalf("%s DefaultSeverity = %v, want Warning", v.ID, v.DefaultSeverity)
 		}
+	}
+}
+
+func TestPatternConstructorReturnsInterfaceFormatsGenericReturn(t *testing.T) {
+	root := writeFixture(t, "example.com/pattern-generic-return", map[string]string{
+		"internal/store/store.go": `package store
+
+type Store interface {
+	Get(id string) string
+}
+
+type Cache[T any] struct{ v T }
+
+type s struct{}
+
+func (impl *s) Get(id string) string { return "" }
+
+// New does not return an interface — should be flagged with a readable type name.
+func New() *Cache[Store] { return &Cache[Store]{} }
+`,
+	})
+
+	violations := interfaces.NewPattern().Check(loadContext(t, root, flatArchitecture(), "example.com/pattern-generic-return"))
+
+	var found bool
+	for _, v := range violations {
+		if v.Rule != "interface.constructor-returns-interface" {
+			continue
+		}
+		found = true
+		if !strings.Contains(v.Message, "*Cache[Store]") {
+			t.Fatalf("Message should format generic type *Cache[Store], got %q", v.Message)
+		}
+		if strings.Contains(v.Message, "unknown") {
+			t.Fatalf("Message must not say 'unknown', got %q", v.Message)
+		}
+	}
+	if !found {
+		t.Fatalf("expected constructor-returns-interface violation, got %+v", violations)
 	}
 }
 

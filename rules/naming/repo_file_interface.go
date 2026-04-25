@@ -62,7 +62,7 @@ func (r *RepoFileInterface) checkPortPackage(ctx *core.Context, pkg *packages.Pa
 		if ctx.IsExcluded(relPath) {
 			continue
 		}
-		expected := snakeToPascal(strings.TrimSuffix(base, ".go"))
+		expected := analysisutil.SnakeToPascal(strings.TrimSuffix(base, ".go"))
 		ifaces := collectInterfacesFromFile(file)
 		if _, ok := ifaces[expected]; !ok {
 			violations = append(violations, r.violation(
@@ -106,22 +106,22 @@ func (r *RepoFileInterface) checkInterfacePlacement(ctx *core.Context, pkg *pack
 		if ctx.IsExcluded(filePath) {
 			continue
 		}
-		for _, info := range inspectTypeSpecs(file, pkg) {
-			if info.isIface && isRepoPortName(info.name) {
+		for _, info := range analysisutil.InspectTypeSpecs(file, pkg.Fset) {
+			if info.IsInterface && isRepoPortName(info.Name) {
 				violations = append(violations, r.violation(
-					info.file,
-					info.line,
+					filePath,
+					info.Line,
 					"structure.interface-placement",
-					`interface "`+info.name+`" matches repository-port naming and must be defined in `+repoName+`/, not in `+path.Base(path.Dir(pkg.PkgPath))+`/`,
+					`interface "`+info.Name+`" matches repository-port naming and must be defined in `+repoName+`/, not in `+path.Base(path.Dir(pkg.PkgPath))+`/`,
 					"move to "+repoName+"/, or rename if it's a consumer-defined interface",
 				))
 			}
-			if info.aliasFrom != "" && analysisutil.MatchPortSublayer(arch.Layers, info.aliasFrom) != "" {
+			if info.AliasFrom != "" && analysisutil.MatchPortSublayer(arch.Layers, info.AliasFrom) != "" {
 				violations = append(violations, r.violation(
-					info.file,
-					info.line,
+					filePath,
+					info.Line,
 					"structure.interface-placement",
-					`type alias "`+info.name+`" re-exports interface from `+repoName+` - suspected cross-domain dependency; use `+arch.Layout.OrchestrationDir+`/ instead`,
+					`type alias "`+info.Name+`" re-exports interface from `+repoName+` - suspected cross-domain dependency; use `+arch.Layout.OrchestrationDir+`/ instead`,
 					"remove alias and move cross-domain coordination to "+arch.Layout.OrchestrationDir+"/",
 				))
 			}
@@ -140,19 +140,6 @@ func (r *RepoFileInterface) violation(file string, line int, rule, message, fix 
 		DefaultSeverity:   r.severity,
 		EffectiveSeverity: r.severity,
 	}
-}
-
-func snakeToPascal(s string) string {
-	parts := strings.Split(s, "_")
-	var b strings.Builder
-	for _, part := range parts {
-		if part == "" {
-			continue
-		}
-		b.WriteString(strings.ToUpper(part[:1]))
-		b.WriteString(part[1:])
-	}
-	return b.String()
 }
 
 func collectInterfacesFromFile(file *ast.File) map[string]*ast.InterfaceType {
@@ -176,55 +163,11 @@ func collectInterfacesFromFile(file *ast.File) map[string]*ast.InterfaceType {
 }
 
 func isDomainPackage(arch core.Architecture, pkgPath string) bool {
-	return arch.Layout.DomainDir != "" && strings.Contains(pkgPath, "/internal/"+arch.Layout.DomainDir+"/")
+	return arch.Layout.DomainDir != "" && strings.Contains(pkgPath, "/"+arch.Layout.InternalRoot+"/"+arch.Layout.DomainDir+"/")
 }
 
 func isRepoPortName(name string) bool {
 	return strings.HasSuffix(name, "Repository") || strings.HasSuffix(name, "Repo")
-}
-
-type typeSpecInfo struct {
-	name      string
-	file      string
-	line      int
-	isIface   bool
-	aliasFrom string
-}
-
-func inspectTypeSpecs(file *ast.File, pkg *packages.Package) []typeSpecInfo {
-	var result []typeSpecInfo
-	for _, decl := range file.Decls {
-		gd, ok := decl.(*ast.GenDecl)
-		if !ok {
-			continue
-		}
-		for _, spec := range gd.Specs {
-			ts, ok := spec.(*ast.TypeSpec)
-			if !ok {
-				continue
-			}
-			pos := pkg.Fset.Position(ts.Name.Pos())
-			info := typeSpecInfo{
-				name: ts.Name.Name,
-				file: analysisutil.RelativePathForPackage(pkg, pos.Filename),
-				line: pos.Line,
-			}
-			if _, ok := ts.Type.(*ast.InterfaceType); ok {
-				info.isIface = true
-			}
-			if ts.Assign != 0 {
-				if sel, ok := ts.Type.(*ast.SelectorExpr); ok {
-					if ident, ok := sel.X.(*ast.Ident); ok {
-						info.aliasFrom = analysisutil.ResolveIdentImportPath(file, ident.Name)
-					}
-				}
-			}
-			if info.isIface || info.aliasFrom != "" {
-				result = append(result, info)
-			}
-		}
-	}
-	return result
 }
 
 var _ core.Rule = (*RepoFileInterface)(nil)

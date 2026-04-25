@@ -29,6 +29,26 @@ func TestRuleSetWithAppendsRules(t *testing.T) {
 	}
 }
 
+func TestRuleSetWithDropsNilRules(t *testing.T) {
+	r := &fakeRule{spec: RuleSpec{ID: "a"}}
+	rs := RuleSet{}.With(nil, r, nil)
+	if got := len(rs.Rules()); got != 1 {
+		t.Fatalf("len(Rules()) = %d, want 1 (nils must be dropped)", got)
+	}
+	if rs.Rules()[0].Spec().ID != "a" {
+		t.Errorf("Rules()[0].ID = %q", rs.Rules()[0].Spec().ID)
+	}
+}
+
+func TestRunDoesNotPanicOnNilOnlyRuleSet(t *testing.T) {
+	rs := RuleSet{}.With(nil)
+	ctx := NewContext(nil, "", "", validArchitecture(), nil)
+	got := Run(ctx, rs)
+	if len(got) != 0 {
+		t.Fatalf("got %d violations from nil-only RuleSet, want 0: %+v", len(got), got)
+	}
+}
+
 func TestRuleSetWithoutAccumulatesIDs(t *testing.T) {
 	rs := RuleSet{}.Without("isolation.cross-domain").Without("blast.high-coupling")
 	if !rs.IsViolationSkipped("isolation.cross-domain") {

@@ -2,9 +2,110 @@ package analysisutil
 
 import (
 	"go/ast"
+	"go/token"
 	"go/types"
 	"strings"
 )
+
+// IsTestFile reports whether file's source path ends with "_test.go". The
+// callsite supplies fset because *ast.File alone does not retain its
+// filename — only token.Position does.
+func IsTestFile(file *ast.File, fset *token.FileSet) bool {
+	if file == nil || fset == nil {
+		return false
+	}
+	return strings.HasSuffix(fset.Position(file.Pos()).Filename, "_test.go")
+}
+
+// TypeSpecInfo describes a single top-level type declaration in a Go file —
+// what InspectTypeSpecs extracts. Callers compute file-level metadata (e.g.
+// a relative path) once outside the loop; only per-decl fields live here.
+type TypeSpecInfo struct {
+	Name        string
+	Line        int
+	IsInterface bool
+	AliasFrom   string // import path of `type X = pkg.Y`; empty if not an alias
+}
+
+// InspectTypeSpecs walks the top-level type decls in file and returns one
+// entry per interface declaration or per type alias whose RHS is
+// `<ident>.<Name>`. Other type decls are skipped. Callers usually want to
+// detect interfaces or detect re-exports of types from other packages.
+func InspectTypeSpecs(file *ast.File, fset *token.FileSet) []TypeSpecInfo {
+	var result []TypeSpecInfo
+	for _, decl := range file.Decls {
+		gd, ok := decl.(*ast.GenDecl)
+		if !ok {
+			continue
+		}
+		for _, spec := range gd.Specs {
+			ts, ok := spec.(*ast.TypeSpec)
+			if !ok {
+				continue
+			}
+			info := TypeSpecInfo{
+				Name: ts.Name.Name,
+				Line: fset.Position(ts.Name.Pos()).Line,
+			}
+			if _, ok := ts.Type.(*ast.InterfaceType); ok {
+				info.IsInterface = true
+			}
+			if ts.Assign != 0 {
+				if sel, ok := ts.Type.(*ast.SelectorExpr); ok {
+					if ident, ok := sel.X.(*ast.Ident); ok {
+						info.AliasFrom = ResolveIdentImportPath(file, ident.Name)
+					}
+				}
+			}
+			if info.IsInterface || info.AliasFrom != "" {
+				result = append(result, info)
+			}
+		}
+	}
+	return result
+}
+
+// ReceiverTypeName extracts the unqualified receiver type name from an
+// *ast.FuncDecl receiver expression. It unwraps a leading pointer and
+// handles generic receivers — *ast.IndexExpr (T[U]) and *ast.IndexListExpr
+// (T[U, V]) — so callers do not silently miss methods on parameterized
+// types. Returns "" if the expression does not match a recognized shape.
+func ReceiverTypeName(expr ast.Expr) string {
+	if star, ok := expr.(*ast.StarExpr); ok {
+		expr = star.X
+	}
+	switch t := expr.(type) {
+	case *ast.Ident:
+		return t.Name
+	case *ast.IndexExpr:
+		if id, ok := t.X.(*ast.Ident); ok {
+			return id.Name
+		}
+	case *ast.IndexListExpr:
+		if id, ok := t.X.(*ast.Ident); ok {
+			return id.Name
+		}
+	}
+	return ""
+}
+
+// SnakeToPascal converts a snake_case identifier (e.g. "user_repository")
+// to PascalCase (e.g. "UserRepository"). Empty segments are skipped, so
+// leading/trailing/double underscores do not produce empty letters. Input
+// is assumed to be ASCII; non-ASCII first bytes in a segment are not
+// case-converted but are preserved.
+func SnakeToPascal(s string) string {
+	parts := strings.Split(s, "_")
+	var b strings.Builder
+	for _, part := range parts {
+		if part == "" {
+			continue
+		}
+		b.WriteString(strings.ToUpper(part[:1]))
+		b.WriteString(part[1:])
+	}
+	return b.String()
+}
 
 func ResolveIdentImportPath(file *ast.File, identName string) string {
 	for _, imp := range file.Imports {
