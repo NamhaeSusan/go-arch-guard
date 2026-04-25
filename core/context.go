@@ -38,17 +38,17 @@ func NewContext(pkgs []*packages.Package, module, root string, arch Architecture
 	}
 }
 
-// Pkgs returns the loaded packages.
+// Pkgs returns the loaded packages. Treat the returned *packages.Package
+// values as read-only — mutation is undefined behavior.
 //
-// IMPORTANT: This is a slice-header copy only. Reslicing or appending to
-// the returned slice cannot affect other rules. However, the
-// *packages.Package values it points at are SHARED across rules — Go does
-// not let us deep-clone them cheaply, and a true copy would re-walk the
-// type system per rule. Mutating any field of a *packages.Package
-// (Imports, Types, Syntax, Errors, …) is therefore a contract violation:
-// rules MUST be pure functions of their input. Violating this corrupts
-// later rules' view of the world and is undefined behavior under any
-// future parallel runner.
+// The returned slice is a header copy: reslicing or appending to it
+// cannot affect other rules. However, the *packages.Package values it
+// points at are SHARED across rules — Go does not let us deep-clone them
+// cheaply, and a true copy would re-walk the type system per rule.
+// Mutating any field of a *packages.Package (Imports, Types, Syntax,
+// Errors, …) is therefore a contract violation: rules MUST be pure
+// functions of their input. Violating this corrupts later rules' view of
+// the world and is undefined behavior under any future parallel runner.
 func (c *Context) Pkgs() []*packages.Package {
 	if c.pkgs == nil {
 		return nil

@@ -101,6 +101,21 @@ func (a Architecture) Validate() error {
 		}
 	}
 
+	// LayerDirNames keys are basenames recognized by placement rules. They
+	// don't have to map to Sublayers, but empty keys are always a typo.
+	for k := range a.Layers.LayerDirNames {
+		if k == "" {
+			errs = append(errs, "LayerDirNames contains empty-string key")
+		}
+	}
+	// InternalTopLevel keys are top-level dir names; they don't have to map
+	// to Sublayers either, but empty keys are always a typo.
+	for k := range a.Layers.InternalTopLevel {
+		if k == "" {
+			errs = append(errs, "InternalTopLevel contains empty-string key")
+		}
+	}
+
 	// TypePatterns: each pattern's Dir must be a declared sublayer.
 	for _, tp := range a.Structure.TypePatterns {
 		if tp.Dir == "" {

@@ -46,6 +46,35 @@ func TestValidateZeroValueArchitecture(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsEmptyLayerDirNamesKey(t *testing.T) {
+	a := validArchitecture()
+	a.Layers.LayerDirNames = map[string]bool{"": true}
+	err := a.Validate()
+	if err == nil || !strings.Contains(err.Error(), "LayerDirNames") || !strings.Contains(err.Error(), "empty") {
+		t.Errorf("expected empty-key error for LayerDirNames, got %v", err)
+	}
+}
+
+func TestValidateRejectsEmptyInternalTopLevelKey(t *testing.T) {
+	a := validArchitecture()
+	a.Layers.InternalTopLevel = map[string]bool{"": true}
+	err := a.Validate()
+	if err == nil || !strings.Contains(err.Error(), "InternalTopLevel") || !strings.Contains(err.Error(), "empty") {
+		t.Errorf("expected empty-key error for InternalTopLevel, got %v", err)
+	}
+}
+
+func TestValidateAcceptsLayerDirNamesNotInSublayers(t *testing.T) {
+	// LayerDirNames carries basenames that intentionally do NOT have to
+	// match Sublayers entries — "repo" is a basename even though only
+	// "core/repo" lives in Sublayers. Validate must NOT reject this.
+	a := validArchitecture()
+	a.Layers.LayerDirNames = map[string]bool{"repo": true, "svc": true, "model": true, "handler": true, "app": true}
+	if err := a.Validate(); err != nil {
+		t.Fatalf("LayerDirNames basenames must be allowed regardless of Sublayers, got %v", err)
+	}
+}
+
 func TestValidateRejectsDirectionKeyMissing(t *testing.T) {
 	a := validArchitecture()
 	delete(a.Layers.Direction, "core/svc")

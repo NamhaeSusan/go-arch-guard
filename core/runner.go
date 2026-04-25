@@ -74,7 +74,11 @@ func Run(ctx *Context, rules RuleSet, opts ...RunOption) []Violation {
 		ruleDefault := spec.DefaultSeverity
 		ruleKnown := ruleKnownIDs(spec)
 
-		for _, v := range r.Check(ctx) {
+		// panicked is intentionally discarded; the meta.rule-panic
+		// violation itself carries the signal through the standard
+		// severity / dedup pipeline below.
+		emitted, _ := safeCheck(r, ctx)
+		for _, v := range emitted {
 			// meta.* IDs are emergency emit by any rule (e.g. "meta.no-matching-packages"
 			// when the project module cannot be resolved) and are not part of any
 			// rule's catalog. Allow them through unconditionally.
@@ -196,6 +200,32 @@ func defaultsByID(spec RuleSpec) map[string]Severity {
 		out[v.ID] = v.DefaultSeverity
 	}
 	return out
+}
+
+// safeCheck invokes rule.Check inside a deferred recover. A panic from a
+// rule is converted into a single meta.rule-panic violation so a buggy
+// rule does not crash the entire run; other rules continue to execute.
+// The returned violation goes through the runner's normal meta.* path:
+// default severity is Warning (so a buggy rule does not block the build),
+// dedup collapses repeated panics from the same rule, and callers can
+// promote it to Error with WithSeverityOverride("meta.rule-panic", Error).
+func safeCheck(rule Rule, ctx *Context) (violations []Violation, panicked bool) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			ruleID := "<unknown>"
+			func() {
+				defer func() { _ = recover() }()
+				ruleID = rule.Spec().ID
+			}()
+			violations = []Violation{{
+				Rule:    "meta.rule-panic",
+				Message: fmt.Sprintf("rule %q panicked: %v", ruleID, rec),
+				Fix:     "report the panic to the rule author; other rules continue to run",
+			}}
+			panicked = true
+		}
+	}()
+	return rule.Check(ctx), false
 }
 
 // dedupeMetaViolations collapses duplicate meta.* violations. The dedup key

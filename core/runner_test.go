@@ -237,6 +237,80 @@ func TestRunDedupesMetaViolations(t *testing.T) {
 // rule-level default severity, the Severity zero value (Error) is used.
 // Without this test, swapping the order of the Severity enum constants
 // (Warning=0, Error=1) would silently change the fallback behavior.
+// panickingRule is a test double whose Check panics on every call.
+type panickingRule struct {
+	id string
+}
+
+func (p *panickingRule) Spec() RuleSpec { return RuleSpec{ID: p.id} }
+func (p *panickingRule) Check(_ *Context) []Violation {
+	panic("intentional rule bug for testing")
+}
+
+func TestRunRecoversRulePanicAsMetaWarning(t *testing.T) {
+	r := &panickingRule{id: "fake.bombs"}
+	ctx := NewContext(nil, "", "", validArchitecture(), nil)
+	got := Run(ctx, RuleSet{}.With(r))
+
+	if len(got) != 1 {
+		t.Fatalf("len = %d, want 1: %+v", len(got), got)
+	}
+	v := got[0]
+	if v.Rule != "meta.rule-panic" {
+		t.Errorf("Rule = %q, want meta.rule-panic", v.Rule)
+	}
+	if v.EffectiveSeverity != Warning {
+		t.Errorf("EffectiveSeverity = %v, want Warning (panic must NOT block builds by default)", v.EffectiveSeverity)
+	}
+	if !strings.Contains(v.Message, "fake.bombs") {
+		t.Errorf("Message = %q, want it to mention rule ID", v.Message)
+	}
+	if !strings.Contains(v.Message, "intentional rule bug for testing") {
+		t.Errorf("Message = %q, want it to include the panic value", v.Message)
+	}
+}
+
+func TestRunRulePanicDoesNotBlockOtherRules(t *testing.T) {
+	bomb := &panickingRule{id: "fake.bombs"}
+	ok := &fakeRule{
+		spec: RuleSpec{ID: "fake.ok"},
+		violations: []Violation{
+			{File: "x.go", Rule: "fake.ok", Message: "still here"},
+		},
+	}
+	ctx := NewContext(nil, "", "", validArchitecture(), nil)
+	got := Run(ctx, RuleSet{}.With(bomb).With(ok))
+
+	var sawPanic, sawOk bool
+	for _, v := range got {
+		switch v.Rule {
+		case "meta.rule-panic":
+			sawPanic = true
+		case "fake.ok":
+			sawOk = true
+		}
+	}
+	if !sawPanic || !sawOk {
+		t.Fatalf("expected both meta.rule-panic AND fake.ok, got panic=%v ok=%v: %+v", sawPanic, sawOk, got)
+	}
+}
+
+func TestRunRulePanicSeverityOverrideWorks(t *testing.T) {
+	r := &panickingRule{id: "fake.bombs"}
+	ctx := NewContext(nil, "", "", validArchitecture(), nil)
+	got := Run(ctx, RuleSet{}.With(r), WithSeverityOverride("meta.rule-panic", Error))
+
+	if len(got) != 1 {
+		t.Fatalf("len = %d, want 1", len(got))
+	}
+	if got[0].EffectiveSeverity != Error {
+		t.Errorf("EffectiveSeverity = %v, want Error (override must apply)", got[0].EffectiveSeverity)
+	}
+	if got[0].DefaultSeverity != Warning {
+		t.Errorf("DefaultSeverity = %v, want Warning (default unchanged by override)", got[0].DefaultSeverity)
+	}
+}
+
 func TestRunSeverityLevel5FallsBackToError(t *testing.T) {
 	r := &fakeRule{
 		spec: RuleSpec{ID: "fake.demo"}, // no DefaultSeverity, no Violations catalog
