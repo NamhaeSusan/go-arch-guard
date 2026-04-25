@@ -115,6 +115,38 @@ func TestValidateRejectsContractLayersUnknown(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsDirectionCycle(t *testing.T) {
+	a := Architecture{
+		Layers: LayerModel{
+			Sublayers: []string{"a", "b"},
+			Direction: map[string][]string{
+				"a": {"b"},
+				"b": {"a"},
+			},
+		},
+	}
+	err := a.Validate()
+	if err == nil {
+		t.Fatalf("Validate() should reject Direction cycle")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "cycle") || !strings.Contains(msg, "a") || !strings.Contains(msg, "b") {
+		t.Errorf("error should mention cycle and offending layers, got %q", msg)
+	}
+}
+
+func TestValidateRejectsSelfLoopInDirection(t *testing.T) {
+	a := Architecture{
+		Layers: LayerModel{
+			Sublayers: []string{"a"},
+			Direction: map[string][]string{"a": {"a"}},
+		},
+	}
+	if err := a.Validate(); err == nil || !strings.Contains(err.Error(), "cycle") {
+		t.Errorf("self-loop Direction[a]=[a] should be rejected as cycle, got %v", err)
+	}
+}
+
 func TestPackageLevelValidateMatchesMethod(t *testing.T) {
 	a := validArchitecture()
 	if Validate(a) != nil {

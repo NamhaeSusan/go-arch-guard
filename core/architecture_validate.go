@@ -96,6 +96,12 @@ func (a Architecture) Validate() error {
 		}
 	}
 
+	// Direction must be a DAG. Cycles silently allow bidirectional imports
+	// and defeat the purpose of layer-direction enforcement.
+	if cycle := findDirectionCycle(a.Layers.Direction); cycle != nil {
+		errs = append(errs, fmt.Sprintf("Direction contains cycle %s", strings.Join(cycle, " -> ")))
+	}
+
 	if len(errs) == 0 {
 		return nil
 	}
@@ -106,3 +112,65 @@ func (a Architecture) Validate() error {
 // Validate is the package-level form of Architecture.Validate. Presets that
 // prefer the functional form (e.g. `core.Validate(arch)`) can call this.
 func Validate(a Architecture) error { return a.Validate() }
+
+// findDirectionCycle does a DFS for cycles in the Direction adjacency.
+// Returns the cycle as a node sequence (starting and ending at the same
+// node), or nil if the graph is a DAG. Order of source iteration is
+// stabilized by visiting layers in Sublayers order to keep error messages
+// deterministic.
+func findDirectionCycle(direction map[string][]string) []string {
+	const (
+		white = 0 // unvisited
+		gray  = 1 // on stack
+		black = 2 // fully explored
+	)
+	color := make(map[string]int, len(direction))
+	var stack []string
+
+	var dfs func(node string) []string
+	dfs = func(node string) []string {
+		color[node] = gray
+		stack = append(stack, node)
+		for _, next := range direction[node] {
+			switch color[next] {
+			case gray:
+				// Cycle: extract the path from `next` to current top.
+				start := -1
+				for i, n := range stack {
+					if n == next {
+						start = i
+						break
+					}
+				}
+				if start < 0 {
+					return nil
+				}
+				cycle := append([]string{}, stack[start:]...)
+				cycle = append(cycle, next)
+				return cycle
+			case white:
+				if c := dfs(next); c != nil {
+					return c
+				}
+			}
+		}
+		stack = stack[:len(stack)-1]
+		color[node] = black
+		return nil
+	}
+
+	// Sort sources for deterministic error reporting.
+	sources := make([]string, 0, len(direction))
+	for src := range direction {
+		sources = append(sources, src)
+	}
+	sort.Strings(sources)
+	for _, src := range sources {
+		if color[src] == white {
+			if c := dfs(src); c != nil {
+				return c
+			}
+		}
+	}
+	return nil
+}
