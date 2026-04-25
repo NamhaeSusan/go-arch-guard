@@ -37,8 +37,8 @@ type holder struct {
 	for _, v := range vs {
 		if v.Rule == "interface.container-only" {
 			found = true
-			if v.Severity != rules.Warning {
-				t.Errorf("expected Warning severity, got %v", v.Severity)
+			if v.EffectiveSeverity != rules.Warning {
+				t.Errorf("expected Warning severity, got %v", v.EffectiveSeverity)
 			}
 			break
 		}
@@ -308,8 +308,8 @@ type holder struct {
 	for _, v := range vs {
 		if v.Rule == "interface.container-only" {
 			found = true
-			if v.Severity != rules.Error {
-				t.Errorf("expected Error severity after WithSeverity(Error), got %v", v.Severity)
+			if v.EffectiveSeverity != rules.Error {
+				t.Errorf("expected Error severity after WithSeverity(Error), got %v", v.EffectiveSeverity)
 			}
 		}
 	}

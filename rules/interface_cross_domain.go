@@ -157,12 +157,13 @@ func checkAnonymousInterface(iface *ast.InterfaceType, file *ast.File, pkg *pack
 	sortStrings(domains)
 
 	return []Violation{{
-		File:     file_,
-		Line:     pos.Line,
-		Rule:     "interface.cross-domain-anonymous",
-		Message:  fmt.Sprintf("anonymous interface declared in package %q references types from domain(s) %v — cross-domain abstractions must be owned by the orchestration layer, not declared inline outside it", pkg.PkgPath, domains),
-		Fix:      "move this adapter/abstraction into internal/" + m.OrchestrationDir + "/ — that's the designated place for cross-domain coordination. Wiring code (cmd/, etc.) should depend on orchestration constructors, not declare its own cross-domain interfaces",
-		Severity: sev,
+		File:              file_,
+		Line:              pos.Line,
+		Rule:              "interface.cross-domain-anonymous",
+		Message:           fmt.Sprintf("anonymous interface declared in package %q references types from domain(s) %v — cross-domain abstractions must be owned by the orchestration layer, not declared inline outside it", pkg.PkgPath, domains),
+		Fix:               "move this adapter/abstraction into internal/" + m.OrchestrationDir + "/ — that's the designated place for cross-domain coordination. Wiring code (cmd/, etc.) should depend on orchestration constructors, not declare its own cross-domain interfaces",
+		DefaultSeverity:   sev,
+		EffectiveSeverity: sev,
 	}}
 }
 

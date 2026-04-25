@@ -61,8 +61,8 @@ func TestCheckNoSetters_RespectsSeverity(t *testing.T) {
 	got := rules.CheckNoSetters(pkgs, rules.WithSeverity(rules.Error))
 
 	for _, v := range got {
-		if v.Rule == "setter.forbidden" && v.Severity != rules.Error {
-			t.Errorf("expected Error severity, got %v for %+v", v.Severity, v)
+		if v.Rule == "setter.forbidden" && v.EffectiveSeverity != rules.Error {
+			t.Errorf("expected Error severity, got %v for %+v", v.EffectiveSeverity, v)
 		}
 	}
 }
@@ -72,8 +72,8 @@ func TestCheckNoSetters_DefaultSeverityWarning(t *testing.T) {
 	got := rules.CheckNoSetters(pkgs)
 
 	for _, v := range got {
-		if v.Rule == "setter.forbidden" && v.Severity != rules.Warning {
-			t.Errorf("expected Warning severity by default, got %v for %+v", v.Severity, v)
+		if v.Rule == "setter.forbidden" && v.EffectiveSeverity != rules.Warning {
+			t.Errorf("expected Warning severity by default, got %v for %+v", v.EffectiveSeverity, v)
 		}
 	}
 }

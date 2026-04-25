@@ -86,8 +86,8 @@ func TestCheckTxBoundary_RespectsSeverity(t *testing.T) {
 		t.Fatal("expected at least one violation")
 	}
 	for _, v := range got {
-		if v.Severity != rules.Warning {
-			t.Errorf("expected Warning severity, got %v", v.Severity)
+		if v.EffectiveSeverity != rules.Warning {
+			t.Errorf("expected Warning severity, got %v", v.EffectiveSeverity)
 		}
 	}
 }

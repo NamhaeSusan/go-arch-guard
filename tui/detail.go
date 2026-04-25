@@ -123,7 +123,7 @@ func (d *DetailPanel) renderGroup(node *PkgNode) {
 	// Count by severity.
 	errors, warnings := 0, 0
 	for _, vp := range allViols {
-		if vp.Severity == rules.Error {
+		if vp.EffectiveSeverity == rules.Error {
 			errors++
 		} else {
 			warnings++
@@ -144,8 +144,8 @@ func (d *DetailPanel) renderGroup(node *PkgNode) {
 
 	// Sort: errors first, then warnings. Within each group, sort by file.
 	sort.Slice(allViols, func(i, j int) bool {
-		if allViols[i].Severity != allViols[j].Severity {
-			return allViols[i].Severity < allViols[j].Severity // Error(0) before Warning(1)
+		if allViols[i].EffectiveSeverity != allViols[j].EffectiveSeverity {
+			return allViols[i].EffectiveSeverity < allViols[j].EffectiveSeverity // Error(0) before Warning(1)
 		}
 		return allViols[i].File < allViols[j].File
 	})
@@ -154,7 +154,7 @@ func (d *DetailPanel) renderGroup(node *PkgNode) {
 	if errors > 0 {
 		b.WriteString("[red::b]── Errors ──\n")
 		for _, vp := range allViols {
-			if vp.Severity != rules.Error {
+			if vp.EffectiveSeverity != rules.Error {
 				break
 			}
 			fmt.Fprintf(&b, "[red]  ✗ [%s] %s\n", vp.Rule, vp.File)
@@ -170,7 +170,7 @@ func (d *DetailPanel) renderGroup(node *PkgNode) {
 	if warnings > 0 {
 		b.WriteString("[yellow::b]── Warnings ──\n")
 		for _, vp := range allViols {
-			if vp.Severity != rules.Warning {
+			if vp.EffectiveSeverity != rules.Warning {
 				continue
 			}
 			fmt.Fprintf(&b, "[yellow]  ⚠ [%s] %s\n", vp.Rule, vp.File)
@@ -191,8 +191,8 @@ func (d *DetailPanel) writeViolations(b *strings.Builder, relPath string) {
 		return
 	}
 	sort.Slice(viols, func(i, j int) bool {
-		if viols[i].Severity != viols[j].Severity {
-			return viols[i].Severity < viols[j].Severity
+		if viols[i].EffectiveSeverity != viols[j].EffectiveSeverity {
+			return viols[i].EffectiveSeverity < viols[j].EffectiveSeverity
 		}
 		return viols[i].File < viols[j].File
 	})
@@ -200,7 +200,7 @@ func (d *DetailPanel) writeViolations(b *strings.Builder, relPath string) {
 	for _, v := range viols {
 		color := "red"
 		sev := "ERR"
-		if v.Severity == rules.Warning {
+		if v.EffectiveSeverity == rules.Warning {
 			color = "yellow"
 			sev = "WARN"
 		}

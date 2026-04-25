@@ -13,7 +13,7 @@ func TestAnalyzeBlastRadius(t *testing.T) {
 		pkgs := loadValid(t)
 		violations := rules.AnalyzeBlastRadius(pkgs, "github.com/kimtaeyun/testproject-dc", "../testdata/valid")
 		for _, v := range violations {
-			if v.Severity == rules.Error {
+			if v.EffectiveSeverity == rules.Error {
 				t.Errorf("unexpected error violation: %s", v.String())
 			}
 		}
@@ -33,8 +33,8 @@ func TestAnalyzeBlastRadius_DetectsOutlier(t *testing.T) {
 		if v.Rule != "blast.high-coupling" {
 			t.Errorf("unexpected rule: %s", v.Rule)
 		}
-		if v.Severity != rules.Warning {
-			t.Errorf("expected Warning severity, got %v", v.Severity)
+		if v.EffectiveSeverity != rules.Warning {
+			t.Errorf("expected Warning severity, got %v", v.EffectiveSeverity)
 		}
 		if strings.Contains(v.File, "internal/pkg") {
 			foundPkg = true
@@ -50,7 +50,7 @@ func TestAnalyzeBlastRadius_SkipsTooFewPackages(t *testing.T) {
 	pkgs := loadValid(t)
 	violations := rules.AnalyzeBlastRadius(pkgs, "github.com/kimtaeyun/testproject-dc", "../testdata/valid")
 	for _, v := range violations {
-		if v.Severity == rules.Error {
+		if v.EffectiveSeverity == rules.Error {
 			t.Errorf("unexpected error-severity violation: %s", v.String())
 		}
 	}
@@ -113,8 +113,8 @@ func TestAnalyzeBlastRadius_RespectsSeverity(t *testing.T) {
 		rules.WithSeverity(rules.Error),
 	)
 	for _, v := range violations {
-		if v.Severity != rules.Error {
-			t.Errorf("expected Error severity, got %v", v.Severity)
+		if v.EffectiveSeverity != rules.Error {
+			t.Errorf("expected Error severity, got %v", v.EffectiveSeverity)
 		}
 	}
 }

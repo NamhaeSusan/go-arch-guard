@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/NamhaeSusan/go-arch-guard/rules"
+	"github.com/NamhaeSusan/go-arch-guard/core"
 )
 
 const jsonReportSchema = "go-arch-guard.report.v1"
@@ -20,14 +20,15 @@ type JSONSummary struct {
 	Rules    []string `json:"rules"`
 }
 
-// JSONViolation is a JSON-friendly view of a rules.Violation.
+// JSONViolation is a JSON-friendly view of a core.Violation.
 type JSONViolation struct {
-	File     string `json:"file,omitempty"`
-	Line     int    `json:"line,omitempty"`
-	Rule     string `json:"rule"`
-	Message  string `json:"message"`
-	Fix      string `json:"fix,omitempty"`
-	Severity string `json:"severity"`
+	File              string `json:"file,omitempty"`
+	Line              int    `json:"line,omitempty"`
+	Rule              string `json:"rule"`
+	Message           string `json:"message"`
+	Fix               string `json:"fix,omitempty"`
+	EffectiveSeverity string `json:"effectiveSeverity"`
+	DefaultSeverity   string `json:"defaultSeverity"`
 }
 
 // JSONReport is a stable machine-readable report for automation and AI agents.
@@ -38,7 +39,7 @@ type JSONReport struct {
 }
 
 // BuildJSONReport converts violations into a machine-readable report.
-func BuildJSONReport(violations []rules.Violation) JSONReport {
+func BuildJSONReport(violations []core.Violation) JSONReport {
 	report := JSONReport{
 		Schema:     jsonReportSchema,
 		Violations: make([]JSONViolation, 0, len(violations)),
@@ -48,15 +49,16 @@ func BuildJSONReport(violations []rules.Violation) JSONReport {
 
 	for _, v := range violations {
 		report.Violations = append(report.Violations, JSONViolation{
-			File:     v.File,
-			Line:     v.Line,
-			Rule:     v.Rule,
-			Message:  v.Message,
-			Fix:      v.Fix,
-			Severity: strings.ToLower(v.Severity.String()),
+			File:              v.File,
+			Line:              v.Line,
+			Rule:              v.Rule,
+			Message:           v.Message,
+			Fix:               v.Fix,
+			EffectiveSeverity: strings.ToLower(v.EffectiveSeverity.String()),
+			DefaultSeverity:   strings.ToLower(v.DefaultSeverity.String()),
 		})
 		report.Summary.Total++
-		if v.Severity == rules.Error {
+		if v.EffectiveSeverity == core.Error {
 			report.Summary.Errors++
 		} else {
 			report.Summary.Warnings++
@@ -79,13 +81,13 @@ func BuildJSONReport(violations []rules.Violation) JSONReport {
 }
 
 // MarshalJSONReport marshals a machine-readable report with stable indentation.
-func MarshalJSONReport(violations []rules.Violation) ([]byte, error) {
+func MarshalJSONReport(violations []core.Violation) ([]byte, error) {
 	return json.MarshalIndent(BuildJSONReport(violations), "", "  ")
 }
 
 // WriteJSONReport writes a machine-readable report with stable indentation.
 // Unlike MarshalJSONReport, the output includes a trailing newline.
-func WriteJSONReport(w io.Writer, violations []rules.Violation) error {
+func WriteJSONReport(w io.Writer, violations []core.Violation) error {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	return enc.Encode(BuildJSONReport(violations))

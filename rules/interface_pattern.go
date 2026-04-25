@@ -98,11 +98,12 @@ func checkSingleInterfacePerPackage(pkg *packages.Package, ifaces map[string]*as
 	}
 	sort.Strings(names)
 	return []Violation{{
-		File:     relativePackageFile(pkg),
-		Rule:     "interface.single-per-package",
-		Message:  fmt.Sprintf("package has %d exported interfaces (%s), expected at most 1", len(ifaces), strings.Join(names, ", ")),
-		Fix:      "split into separate packages, one interface each",
-		Severity: cfg.Sev,
+		File:              relativePackageFile(pkg),
+		Rule:              "interface.single-per-package",
+		Message:           fmt.Sprintf("package has %d exported interfaces (%s), expected at most 1", len(ifaces), strings.Join(names, ", ")),
+		Fix:               "split into separate packages, one interface each",
+		DefaultSeverity:   cfg.Sev,
+		EffectiveSeverity: cfg.Sev,
 	}}
 }
 
@@ -155,11 +156,12 @@ func checkExportedImpl(pkg *packages.Package, cfg Config) []Violation {
 		for ifaceName, iface := range typedIfaces {
 			if types.Implements(named, iface) || types.Implements(ptrType, iface) {
 				violations = append(violations, Violation{
-					File:     relativePackageFile(pkg),
-					Rule:     "interface.exported-impl",
-					Message:  fmt.Sprintf("type %q is exported but implements interface %q; make it unexported", structName, ifaceName),
-					Fix:      fmt.Sprintf("rename to %q", strings.ToLower(structName[:1])+structName[1:]),
-					Severity: cfg.Sev,
+					File:              relativePackageFile(pkg),
+					Rule:              "interface.exported-impl",
+					Message:           fmt.Sprintf("type %q is exported but implements interface %q; make it unexported", structName, ifaceName),
+					Fix:               fmt.Sprintf("rename to %q", strings.ToLower(structName[:1])+structName[1:]),
+					DefaultSeverity:   cfg.Sev,
+					EffectiveSeverity: cfg.Sev,
 				})
 			}
 		}
@@ -221,11 +223,12 @@ func checkConstructorName(pkg *packages.Package, cfg Config) []Violation {
 			}
 			if strings.HasPrefix(name, "New") && name != "New" {
 				violations = append(violations, Violation{
-					File:     relativePackageFile(pkg),
-					Rule:     "interface.constructor-name",
-					Message:  fmt.Sprintf("constructor %q must be named \"New\"; NewXxx variants are not allowed", name),
-					Fix:      "rename to \"New\"",
-					Severity: cfg.Sev,
+					File:              relativePackageFile(pkg),
+					Rule:              "interface.constructor-name",
+					Message:           fmt.Sprintf("constructor %q must be named \"New\"; NewXxx variants are not allowed", name),
+					Fix:               "rename to \"New\"",
+					DefaultSeverity:   cfg.Sev,
+					EffectiveSeverity: cfg.Sev,
 				})
 			}
 		}
@@ -263,11 +266,12 @@ func checkConstructorReturnsInterface(pkg *packages.Package, ifaces map[string]*
 			}
 
 			violations = append(violations, Violation{
-				File:     relativePackageFile(pkg),
-				Rule:     "interface.constructor-returns-interface",
-				Message:  fmt.Sprintf("New() returns %s, should return an interface", returnStr),
-				Fix:      fix,
-				Severity: cfg.Sev,
+				File:              relativePackageFile(pkg),
+				Rule:              "interface.constructor-returns-interface",
+				Message:           fmt.Sprintf("New() returns %s, should return an interface", returnStr),
+				Fix:               fix,
+				DefaultSeverity:   cfg.Sev,
+				EffectiveSeverity: cfg.Sev,
 			})
 		}
 	}

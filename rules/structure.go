@@ -66,11 +66,12 @@ func checkInternalTopLevelPackages(internalDir string, m Model, cfg Config) []Vi
 				continue
 			}
 			violations = append(violations, Violation{
-				File:     relPath + "/",
-				Rule:     "structure.internal-top-level",
-				Message:  `internal/ top-level package "` + entry.Name() + `" is not allowed`,
-				Fix:      fmt.Sprintf("use only %v at the internal/ top level", allowedNames),
-				Severity: cfg.Sev,
+				File:              relPath + "/",
+				Rule:              "structure.internal-top-level",
+				Message:           `internal/ top-level package "` + entry.Name() + `" is not allowed`,
+				Fix:               fmt.Sprintf("use only %v at the internal/ top level", allowedNames),
+				DefaultSeverity:   cfg.Sev,
+				EffectiveSeverity: cfg.Sev,
 			})
 			continue
 		}
@@ -82,11 +83,12 @@ func checkInternalTopLevelPackages(internalDir string, m Model, cfg Config) []Vi
 			continue
 		}
 		violations = append(violations, Violation{
-			File:     relPath,
-			Rule:     "structure.internal-top-level",
-			Message:  `internal/ top-level Go file "` + entry.Name() + `" is not allowed`,
-			Fix:      fmt.Sprintf("move code under %v", allowedNames),
-			Severity: cfg.Sev,
+			File:              relPath,
+			Rule:              "structure.internal-top-level",
+			Message:           `internal/ top-level Go file "` + entry.Name() + `" is not allowed`,
+			Fix:               fmt.Sprintf("move code under %v", allowedNames),
+			DefaultSeverity:   cfg.Sev,
+			EffectiveSeverity: cfg.Sev,
 		})
 	}
 	return violations
@@ -111,11 +113,12 @@ func checkDomainRootAliasRequired(domainDir string, m Model, cfg Config) []Viola
 			continue
 		}
 		violations = append(violations, Violation{
-			File:     relPath + "/",
-			Rule:     "structure.domain-alias-exists",
-			Message:  `domain root "` + e.Name() + `" must define ` + m.AliasFileName,
-			Fix:      "add " + m.AliasFileName + " as the single public surface file for the domain root package",
-			Severity: cfg.Sev,
+			File:              relPath + "/",
+			Rule:              "structure.domain-alias-exists",
+			Message:           `domain root "` + e.Name() + `" must define ` + m.AliasFileName,
+			Fix:               "add " + m.AliasFileName + " as the single public surface file for the domain root package",
+			DefaultSeverity:   cfg.Sev,
+			EffectiveSeverity: cfg.Sev,
 		})
 	}
 	return violations
@@ -147,11 +150,12 @@ func checkDomainRootAliasPackage(domainDir string, m Model, cfg Config) []Violat
 			continue
 		}
 		violations = append(violations, Violation{
-			File:     relPath + "/" + m.AliasFileName,
-			Rule:     "structure.domain-alias-package",
-			Message:  m.AliasFileName + ` package name must match domain root "` + e.Name() + `"`,
-			Fix:      `set "package ` + e.Name() + `" in ` + m.AliasFileName,
-			Severity: cfg.Sev,
+			File:              relPath + "/" + m.AliasFileName,
+			Rule:              "structure.domain-alias-package",
+			Message:           m.AliasFileName + ` package name must match domain root "` + e.Name() + `"`,
+			Fix:               `set "package ` + e.Name() + `" in ` + m.AliasFileName,
+			DefaultSeverity:   cfg.Sev,
+			EffectiveSeverity: cfg.Sev,
 		})
 	}
 	return violations
@@ -185,11 +189,12 @@ func checkDomainRootAliasOnly(domainDir string, m Model, cfg Config) []Violation
 				continue
 			}
 			violations = append(violations, Violation{
-				File:     relPath,
-				Rule:     "structure.domain-alias-exclusive",
-				Message:  `domain root "` + e.Name() + `" must expose its public API from ` + m.AliasFileName + ` only`,
-				Fix:      `move "` + name + `" into a sub-package or merge the public API into ` + m.AliasFileName,
-				Severity: cfg.Sev,
+				File:              relPath,
+				Rule:              "structure.domain-alias-exclusive",
+				Message:           `domain root "` + e.Name() + `" must expose its public API from ` + m.AliasFileName + ` only`,
+				Fix:               `move "` + name + `" into a sub-package or merge the public API into ` + m.AliasFileName,
+				DefaultSeverity:   cfg.Sev,
+				EffectiveSeverity: cfg.Sev,
 			})
 		}
 	}
@@ -223,22 +228,24 @@ func checkDomainAliasNoInterface(domainDir string, m Model, cfg Config) []Violat
 		for _, info := range inspectTypeSpecs(file, fset) {
 			if info.IsIface {
 				violations = append(violations, Violation{
-					File:     aliasFile,
-					Line:     info.Pos.Line,
-					Rule:     "structure.domain-alias-no-interface",
-					Message:  m.AliasFileName + ` re-exports interface "` + info.Name + `" — suspected cross-domain dependency; use ` + m.OrchestrationDir + `/ instead`,
-					Fix:      "move cross-domain coordination to " + m.OrchestrationDir + "/handler/ or " + m.OrchestrationDir + "/",
-					Severity: cfg.Sev,
+					File:              aliasFile,
+					Line:              info.Pos.Line,
+					Rule:              "structure.domain-alias-no-interface",
+					Message:           m.AliasFileName + ` re-exports interface "` + info.Name + `" — suspected cross-domain dependency; use ` + m.OrchestrationDir + `/ instead`,
+					Fix:               "move cross-domain coordination to " + m.OrchestrationDir + "/handler/ or " + m.OrchestrationDir + "/",
+					DefaultSeverity:   cfg.Sev,
+					EffectiveSeverity: cfg.Sev,
 				})
 			}
 			if src := matchContractSublayer(m, info.AliasFrom); src != "" {
 				violations = append(violations, Violation{
-					File:     aliasFile,
-					Line:     info.Pos.Line,
-					Rule:     "structure.domain-alias-contract-reexport",
-					Message:  m.AliasFileName + ` re-exports "` + info.Name + `" from ` + src + ` — suspected cross-domain dependency; use ` + m.OrchestrationDir + `/ instead`,
-					Fix:      "move cross-domain coordination to " + m.OrchestrationDir + "/handler/ or " + m.OrchestrationDir + "/",
-					Severity: cfg.Sev,
+					File:              aliasFile,
+					Line:              info.Pos.Line,
+					Rule:              "structure.domain-alias-contract-reexport",
+					Message:           m.AliasFileName + ` re-exports "` + info.Name + `" from ` + src + ` — suspected cross-domain dependency; use ` + m.OrchestrationDir + `/ instead`,
+					Fix:               "move cross-domain coordination to " + m.OrchestrationDir + "/handler/ or " + m.OrchestrationDir + "/",
+					DefaultSeverity:   cfg.Sev,
+					EffectiveSeverity: cfg.Sev,
 				})
 			}
 		}
@@ -271,11 +278,12 @@ func checkPackageNames(internalDir string, m Model, cfg Config) []Violation {
 		for _, banned := range m.BannedPkgNames {
 			if name == banned {
 				violations = append(violations, Violation{
-					File:     rel + "/",
-					Rule:     "structure.banned-package",
-					Message:  `package "` + name + `" is banned`,
-					Fix:      fmt.Sprintf("move to specific domain or %s/", m.SharedDir),
-					Severity: cfg.Sev,
+					File:              rel + "/",
+					Rule:              "structure.banned-package",
+					Message:           `package "` + name + `" is banned`,
+					Fix:               fmt.Sprintf("move to specific domain or %s/", m.SharedDir),
+					DefaultSeverity:   cfg.Sev,
+					EffectiveSeverity: cfg.Sev,
 				})
 			}
 		}
@@ -283,22 +291,24 @@ func checkPackageNames(internalDir string, m Model, cfg Config) []Violation {
 		for _, legacy := range m.LegacyPkgNames {
 			if name == legacy {
 				violations = append(violations, Violation{
-					File:     rel + "/",
-					Rule:     "structure.legacy-package",
-					Message:  `legacy package "` + name + `" should be migrated`,
-					Fix:      fmt.Sprintf("move app-specific wiring to cmd/ and shared helpers to internal/%s/", m.SharedDir),
-					Severity: cfg.Sev,
+					File:              rel + "/",
+					Rule:              "structure.legacy-package",
+					Message:           `legacy package "` + name + `" should be migrated`,
+					Fix:               fmt.Sprintf("move app-specific wiring to cmd/ and shared helpers to internal/%s/", m.SharedDir),
+					DefaultSeverity:   cfg.Sev,
+					EffectiveSeverity: cfg.Sev,
 				})
 			}
 		}
 
 		if isMisplacedLayerDirWith(m, rel, name) {
 			violations = append(violations, Violation{
-				File:     rel + "/",
-				Rule:     "structure.misplaced-layer",
-				Message:  `layer package "` + name + `" is misplaced`,
-				Fix:      fmt.Sprintf("place app/handler/infra only in domain slices or %s handler", m.OrchestrationDir),
-				Severity: cfg.Sev,
+				File:              rel + "/",
+				Rule:              "structure.misplaced-layer",
+				Message:           `layer package "` + name + `" is misplaced`,
+				Fix:               fmt.Sprintf("place app/handler/infra only in domain slices or %s handler", m.OrchestrationDir),
+				DefaultSeverity:   cfg.Sev,
+				EffectiveSeverity: cfg.Sev,
 			})
 		}
 		return nil
@@ -328,11 +338,12 @@ func checkMiddlewarePlacement(internalDir string, m Model, cfg Config) []Violati
 			return nil
 		}
 		violations = append(violations, Violation{
-			File:     rel + "/",
-			Rule:     "structure.middleware-placement",
-			Message:  `middleware found at "` + rel + `"`,
-			Fix:      "move middleware to " + allowedPath + "/",
-			Severity: cfg.Sev,
+			File:              rel + "/",
+			Rule:              "structure.middleware-placement",
+			Message:           `middleware found at "` + rel + `"`,
+			Fix:               "move middleware to " + allowedPath + "/",
+			DefaultSeverity:   cfg.Sev,
+			EffectiveSeverity: cfg.Sev,
 		})
 		return nil
 	})
@@ -358,11 +369,12 @@ func checkDomainModelRequired(domainDir string, m Model, cfg Config) []Violation
 			continue
 		}
 		violations = append(violations, Violation{
-			File:     relPath + "/",
-			Rule:     "structure.domain-model-required",
-			Message:  `domain "` + e.Name() + `" missing a direct non-test Go file in ` + m.ModelPath + `/`,
-			Fix:      "add at least one non-test Go file directly under " + m.ModelPath + "/",
-			Severity: cfg.Sev,
+			File:              relPath + "/",
+			Rule:              "structure.domain-model-required",
+			Message:           `domain "` + e.Name() + `" missing a direct non-test Go file in ` + m.ModelPath + `/`,
+			Fix:               "add at least one non-test Go file directly under " + m.ModelPath + "/",
+			DefaultSeverity:   cfg.Sev,
+			EffectiveSeverity: cfg.Sev,
 		})
 	}
 	return violations
@@ -392,11 +404,12 @@ func checkDTOPlacement(internalDir string, m Model, cfg Config) []Violation {
 				return nil
 			}
 			violations = append(violations, Violation{
-				File:     rel,
-				Rule:     "structure.dto-placement",
-				Message:  `"` + name + `" found in forbidden layer`,
-				Fix:      fmt.Sprintf("DTOs belong in %v", m.DTOAllowedLayers),
-				Severity: cfg.Sev,
+				File:              rel,
+				Rule:              "structure.dto-placement",
+				Message:           `"` + name + `" found in forbidden layer`,
+				Fix:               fmt.Sprintf("DTOs belong in %v", m.DTOAllowedLayers),
+				DefaultSeverity:   cfg.Sev,
+				EffectiveSeverity: cfg.Sev,
 			})
 		}
 		return nil

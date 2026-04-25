@@ -3,17 +3,17 @@ package report
 import (
 	"testing"
 
-	"github.com/NamhaeSusan/go-arch-guard/rules"
+	"github.com/NamhaeSusan/go-arch-guard/core"
 )
 
 // AssertNoViolations prints all violations.
 // Fails the test only if any ERROR-level violations exist.
-func AssertNoViolations(t testing.TB, violations []rules.Violation) {
+func AssertNoViolations(t testing.TB, violations []core.Violation) {
 	t.Helper()
 	hasErrors := false
 	for _, v := range violations {
 		t.Log(v.String())
-		if v.Severity == rules.Error {
+		if v.EffectiveSeverity == core.Error {
 			hasErrors = true
 		}
 	}
@@ -22,10 +22,10 @@ func AssertNoViolations(t testing.TB, violations []rules.Violation) {
 	}
 }
 
-func countErrors(violations []rules.Violation) int {
+func countErrors(violations []core.Violation) int {
 	n := 0
 	for _, v := range violations {
-		if v.Severity == rules.Error {
+		if v.EffectiveSeverity == core.Error {
 			n++
 		}
 	}

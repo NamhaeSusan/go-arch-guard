@@ -44,7 +44,7 @@ func Run(pkgs []*packages.Package, module, root string) error {
 	errCount, warnCount := 0, 0
 	for _, viols := range violations {
 		for _, v := range viols {
-			if v.Severity == rules.Error {
+			if v.EffectiveSeverity == rules.Error {
 				errCount++
 			} else {
 				warnCount++

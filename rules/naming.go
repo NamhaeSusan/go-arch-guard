@@ -54,12 +54,13 @@ func checkStutter(pkg *packages.Package, cfg Config) []Violation {
 					suggested := string([]rune(name)[pkgNameLen:])
 					pos := pkg.Fset.Position(ts.Name.Pos())
 					violations = append(violations, Violation{
-						File:     relativePathForPackage(pkg, pos.Filename),
-						Line:     pos.Line,
-						Rule:     "naming.no-stutter",
-						Message:  `type "` + name + `" stutters with package "` + pkgName + `"`,
-						Fix:      `rename to "` + suggested + `"`,
-						Severity: cfg.Sev,
+						File:              relativePathForPackage(pkg, pos.Filename),
+						Line:              pos.Line,
+						Rule:              "naming.no-stutter",
+						Message:           `type "` + name + `" stutters with package "` + pkgName + `"`,
+						Fix:               `rename to "` + suggested + `"`,
+						DefaultSeverity:   cfg.Sev,
+						EffectiveSeverity: cfg.Sev,
 					})
 				}
 			}
@@ -101,12 +102,13 @@ func checkImplSuffix(pkg *packages.Package, cfg Config) []Violation {
 				if strings.HasSuffix(ts.Name.Name, "Impl") {
 					pos := pkg.Fset.Position(ts.Name.Pos())
 					violations = append(violations, Violation{
-						File:     relativePathForPackage(pkg, pos.Filename),
-						Line:     pos.Line,
-						Rule:     "naming.no-impl-suffix",
-						Message:  `type "` + ts.Name.Name + `" uses banned suffix "Impl"`,
-						Fix:      "rename without Impl suffix",
-						Severity: cfg.Sev,
+						File:              relativePathForPackage(pkg, pos.Filename),
+						Line:              pos.Line,
+						Rule:              "naming.no-impl-suffix",
+						Message:           `type "` + ts.Name.Name + `" uses banned suffix "Impl"`,
+						Fix:               "rename without Impl suffix",
+						DefaultSeverity:   cfg.Sev,
+						EffectiveSeverity: cfg.Sev,
 					})
 				}
 			}
@@ -130,11 +132,12 @@ func checkSnakeCaseFiles(pkg *packages.Package, cfg Config) []Violation {
 		base := filepath.Base(f)
 		if !isSnakeCase(base) {
 			violations = append(violations, Violation{
-				File:     relPath,
-				Rule:     "naming.snake-case-file",
-				Message:  `filename "` + base + `" must be snake_case`,
-				Fix:      `rename to "` + toSnakeCase(base) + `"`,
-				Severity: cfg.Sev,
+				File:              relPath,
+				Rule:              "naming.snake-case-file",
+				Message:           `filename "` + base + `" must be snake_case`,
+				Fix:               `rename to "` + toSnakeCase(base) + `"`,
+				DefaultSeverity:   cfg.Sev,
+				EffectiveSeverity: cfg.Sev,
 			})
 		}
 	}
@@ -199,11 +202,12 @@ func checkRepoFileInterfaceWith(m Model, pkg *packages.Package, cfg Config) []Vi
 		// Check: expected interface must exist
 		if _, ok := ifaces[expected]; !ok {
 			violations = append(violations, Violation{
-				File:     relPath,
-				Rule:     "structure.repo-file-interface",
-				Message:  `file "` + base + `" in repo/ must contain interface "` + expected + `"`,
-				Fix:      `add "type ` + expected + ` interface { ... }" or rename the file`,
-				Severity: cfg.Sev,
+				File:              relPath,
+				Rule:              "structure.repo-file-interface",
+				Message:           `file "` + base + `" in repo/ must contain interface "` + expected + `"`,
+				Fix:               `add "type ` + expected + ` interface { ... }" or rename the file`,
+				DefaultSeverity:   cfg.Sev,
+				EffectiveSeverity: cfg.Sev,
 			})
 		}
 
@@ -217,11 +221,12 @@ func checkRepoFileInterfaceWith(m Model, pkg *packages.Package, cfg Config) []Vi
 			}
 			sort.Strings(extra)
 			violations = append(violations, Violation{
-				File:     relPath,
-				Rule:     "structure.repo-file-extra-interface",
-				Message:  `file "` + base + `" in repo/ must define only "` + expected + `", found extra: ` + strings.Join(extra, ", "),
-				Fix:      "move each extra interface to its own file (e.g. " + strings.ToLower(extra[0]) + ".go)",
-				Severity: cfg.Sev,
+				File:              relPath,
+				Rule:              "structure.repo-file-extra-interface",
+				Message:           `file "` + base + `" in repo/ must define only "` + expected + `", found extra: ` + strings.Join(extra, ", "),
+				Fix:               "move each extra interface to its own file (e.g. " + strings.ToLower(extra[0]) + ".go)",
+				DefaultSeverity:   cfg.Sev,
+				EffectiveSeverity: cfg.Sev,
 			})
 		}
 
@@ -231,11 +236,12 @@ func checkRepoFileInterfaceWith(m Model, pkg *packages.Package, cfg Config) []Vi
 				methodCount := len(iface.Methods.List)
 				if methodCount > cfg.MaxRepoInterfaceMethods {
 					violations = append(violations, Violation{
-						File:     relPath,
-						Rule:     "interface.too-many-methods",
-						Message:  fmt.Sprintf(`interface "%s" has %d methods (max %d)`, name, methodCount, cfg.MaxRepoInterfaceMethods),
-						Fix:      "split into smaller, focused interfaces",
-						Severity: cfg.Sev,
+						File:              relPath,
+						Rule:              "interface.too-many-methods",
+						Message:           fmt.Sprintf(`interface "%s" has %d methods (max %d)`, name, methodCount, cfg.MaxRepoInterfaceMethods),
+						Fix:               "split into smaller, focused interfaces",
+						DefaultSeverity:   cfg.Sev,
+						EffectiveSeverity: cfg.Sev,
 					})
 				}
 			}
@@ -335,11 +341,12 @@ func checkNoLayerSuffixWith(m Model, pkg *packages.Package, cfg Config) []Violat
 			if trimmed, ok := strings.CutSuffix(name, suffix); ok {
 				suggested := trimmed + ".go"
 				violations = append(violations, Violation{
-					File:     relPath,
-					Rule:     "naming.no-layer-suffix",
-					Message:  `filename "` + base + `" has redundant layer suffix "` + suffix + `"`,
-					Fix:      `rename to "` + suggested + `"`,
-					Severity: cfg.Sev,
+					File:              relPath,
+					Rule:              "naming.no-layer-suffix",
+					Message:           `filename "` + base + `" has redundant layer suffix "` + suffix + `"`,
+					Fix:               `rename to "` + suggested + `"`,
+					DefaultSeverity:   cfg.Sev,
+					EffectiveSeverity: cfg.Sev,
 				})
 				break
 			}
@@ -387,22 +394,24 @@ func checkDomainInterfaceRepoOnlyWith(m Model, pkg *packages.Package, cfg Config
 			relFile := relativePathForPackage(pkg, info.Pos.Filename)
 			if info.IsIface && isRepoPortName(info.Name) {
 				violations = append(violations, Violation{
-					File:     relFile,
-					Line:     info.Pos.Line,
-					Rule:     "structure.interface-placement",
-					Message:  `interface "` + info.Name + `" matches repository-port naming and must be defined in ` + repoName + `/, not in ` + path.Base(path.Dir(pkg.PkgPath)) + `/`,
-					Fix:      "move to " + repoName + "/, or rename if it's a consumer-defined interface",
-					Severity: cfg.Sev,
+					File:              relFile,
+					Line:              info.Pos.Line,
+					Rule:              "structure.interface-placement",
+					Message:           `interface "` + info.Name + `" matches repository-port naming and must be defined in ` + repoName + `/, not in ` + path.Base(path.Dir(pkg.PkgPath)) + `/`,
+					Fix:               "move to " + repoName + "/, or rename if it's a consumer-defined interface",
+					DefaultSeverity:   cfg.Sev,
+					EffectiveSeverity: cfg.Sev,
 				})
 			}
 			if info.AliasFrom != "" && isRepoPackageWith(m, info.AliasFrom) {
 				violations = append(violations, Violation{
-					File:     relFile,
-					Line:     info.Pos.Line,
-					Rule:     "structure.interface-placement",
-					Message:  `type alias "` + info.Name + `" re-exports interface from ` + repoName + ` — suspected cross-domain dependency; use ` + m.OrchestrationDir + `/ instead`,
-					Fix:      "remove alias and move cross-domain coordination to " + m.OrchestrationDir + "/",
-					Severity: cfg.Sev,
+					File:              relFile,
+					Line:              info.Pos.Line,
+					Rule:              "structure.interface-placement",
+					Message:           `type alias "` + info.Name + `" re-exports interface from ` + repoName + ` — suspected cross-domain dependency; use ` + m.OrchestrationDir + `/ instead`,
+					Fix:               "remove alias and move cross-domain coordination to " + m.OrchestrationDir + "/",
+					DefaultSeverity:   cfg.Sev,
+					EffectiveSeverity: cfg.Sev,
 				})
 			}
 		}
@@ -455,12 +464,13 @@ func checkNoHandMock(pkg *packages.Package, cfg Config) []Violation {
 			recvName := receiverTypeName(fd.Recv.List[0].Type)
 			if line, ok := structs[recvName]; ok {
 				violations = append(violations, Violation{
-					File:     relPath,
-					Line:     line,
-					Rule:     "testing.no-handmock",
-					Message:  `test file "` + baseName + `" defines hand-rolled mock "` + recvName + `" with methods — use mockery instead`,
-					Fix:      "generate mock with mockery and import from mocks/ package",
-					Severity: cfg.Sev,
+					File:              relPath,
+					Line:              line,
+					Rule:              "testing.no-handmock",
+					Message:           `test file "` + baseName + `" defines hand-rolled mock "` + recvName + `" with methods — use mockery instead`,
+					Fix:               "generate mock with mockery and import from mocks/ package",
+					DefaultSeverity:   cfg.Sev,
+					EffectiveSeverity: cfg.Sev,
 				})
 				delete(structs, recvName)
 			}

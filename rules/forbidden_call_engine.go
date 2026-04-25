@@ -100,12 +100,13 @@ func checkForbiddenCallsByLayer(
 						continue
 					}
 					violations = append(violations, Violation{
-						File:     relFile,
-						Line:     pos.Line,
-						Rule:     cr.ruleName,
-						Message:  cr.message(layer, cr.allowedSlice),
-						Fix:      cr.fix(layer, cr.allowedSlice),
-						Severity: cfg.Sev,
+						File:              relFile,
+						Line:              pos.Line,
+						Rule:              cr.ruleName,
+						Message:           cr.message(layer, cr.allowedSlice),
+						Fix:               cr.fix(layer, cr.allowedSlice),
+						DefaultSeverity:   cfg.Sev,
+						EffectiveSeverity: cfg.Sev,
 					})
 				}
 				return true

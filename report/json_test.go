@@ -5,14 +5,29 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/NamhaeSusan/go-arch-guard/core"
 	"github.com/NamhaeSusan/go-arch-guard/report"
-	"github.com/NamhaeSusan/go-arch-guard/rules"
 )
 
 func TestBuildJSONReport(t *testing.T) {
-	violations := []rules.Violation{
-		{File: "internal/domain/order/app/service.go", Line: 12, Rule: "isolation.cross-domain", Message: "bad import", Fix: "move orchestration", Severity: rules.Error},
-		{File: "internal/domain/order/app/service.go", Rule: "blast.high-coupling", Message: "too central", Fix: "extract boundary", Severity: rules.Warning},
+	violations := []core.Violation{
+		{
+			File:              "internal/domain/order/app/service.go",
+			Line:              12,
+			Rule:              "isolation.cross-domain",
+			Message:           "bad import",
+			Fix:               "move orchestration",
+			DefaultSeverity:   core.Error,
+			EffectiveSeverity: core.Error,
+		},
+		{
+			File:              "internal/domain/order/app/service.go",
+			Rule:              "blast.high-coupling",
+			Message:           "too central",
+			Fix:               "extract boundary",
+			DefaultSeverity:   core.Error,
+			EffectiveSeverity: core.Warning,
+		},
 	}
 
 	got := report.BuildJSONReport(violations)
@@ -28,13 +43,21 @@ func TestBuildJSONReport(t *testing.T) {
 	if len(got.Summary.Rules) != 2 || got.Summary.Rules[0] != "blast.high-coupling" || got.Summary.Rules[1] != "isolation.cross-domain" {
 		t.Fatalf("unexpected rules summary: %+v", got.Summary.Rules)
 	}
-	if got.Violations[0].Severity != "error" || got.Violations[1].Severity != "warning" {
+	if got.Violations[0].EffectiveSeverity != "error" || got.Violations[1].EffectiveSeverity != "warning" {
+		t.Fatalf("unexpected effective severities: %+v", got.Violations)
+	}
+	if got.Violations[0].DefaultSeverity != "error" || got.Violations[1].DefaultSeverity != "error" {
 		t.Fatalf("unexpected severities: %+v", got.Violations)
 	}
 }
 
 func TestMarshalJSONReport(t *testing.T) {
-	violations := []rules.Violation{{Rule: "test.rule", Message: "bad", Severity: rules.Error}}
+	violations := []core.Violation{{
+		Rule:              "test.rule",
+		Message:           "bad",
+		DefaultSeverity:   core.Error,
+		EffectiveSeverity: core.Error,
+	}}
 	data, err := report.MarshalJSONReport(violations)
 	if err != nil {
 		t.Fatalf("MarshalJSONReport() error = %v", err)
@@ -44,7 +67,7 @@ func TestMarshalJSONReport(t *testing.T) {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("json output must decode: %v\n%s", err, data)
 	}
-	if decoded.Schema != "go-arch-guard.report.v1" || decoded.Summary.Total != 1 || decoded.Violations[0].Severity != "error" {
+	if decoded.Schema != "go-arch-guard.report.v1" || decoded.Summary.Total != 1 || decoded.Violations[0].EffectiveSeverity != "error" || decoded.Violations[0].DefaultSeverity != "error" {
 		t.Fatalf("unexpected decoded report: %+v", decoded)
 	}
 }
@@ -65,7 +88,12 @@ func TestBuildJSONReport_NilViolations(t *testing.T) {
 
 func TestWriteJSONReport(t *testing.T) {
 	var buf bytes.Buffer
-	violations := []rules.Violation{{Rule: "test.rule", Message: "warn", Severity: rules.Warning}}
+	violations := []core.Violation{{
+		Rule:              "test.rule",
+		Message:           "warn",
+		DefaultSeverity:   core.Error,
+		EffectiveSeverity: core.Warning,
+	}}
 	if err := report.WriteJSONReport(&buf, violations); err != nil {
 		t.Fatalf("WriteJSONReport() error = %v", err)
 	}
@@ -77,7 +105,7 @@ func TestWriteJSONReport(t *testing.T) {
 	if err := json.Unmarshal(buf.Bytes(), &decoded); err != nil {
 		t.Fatalf("written JSON must decode: %v\n%s", err, buf.String())
 	}
-	if decoded.Summary.Warnings != 1 || decoded.Violations[0].Severity != "warning" {
+	if decoded.Summary.Warnings != 1 || decoded.Violations[0].EffectiveSeverity != "warning" || decoded.Violations[0].DefaultSeverity != "error" {
 		t.Fatalf("unexpected written report: %+v", decoded)
 	}
 }

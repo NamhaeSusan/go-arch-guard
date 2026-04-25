@@ -43,11 +43,12 @@ func CheckLayerDirection(pkgs []*packages.Package, projectModule string, project
 		srcSublayer := src.Sublayer
 		if srcSublayer != "" && !isKnownSublayerIn(m, srcSublayer) {
 			violations = append(violations, Violation{
-				File:     relativePackageFile(pkg),
-				Rule:     "layer.unknown-sublayer",
-				Message:  fmt.Sprintf("unknown sublayer %q in domain %q", srcSublayer, srcDomain),
-				Fix:      fmt.Sprintf("use one of the supported sublayers: %v", m.Sublayers),
-				Severity: cfg.Sev,
+				File:              relativePackageFile(pkg),
+				Rule:              "layer.unknown-sublayer",
+				Message:           fmt.Sprintf("unknown sublayer %q in domain %q", srcSublayer, srcDomain),
+				Fix:               fmt.Sprintf("use one of the supported sublayers: %v", m.Sublayers),
+				DefaultSeverity:   cfg.Sev,
+				EffectiveSeverity: cfg.Sev,
 			})
 			continue
 		}
@@ -64,12 +65,13 @@ func CheckLayerDirection(pkgs []*packages.Package, projectModule string, project
 				if m.PkgRestricted[srcSublayer] {
 					file, line := findImportPosition(pkg, impPath, projectRoot)
 					violations = append(violations, Violation{
-						File:     file,
-						Line:     line,
-						Rule:     "layer.inner-imports-pkg",
-						Message:  fmt.Sprintf("inner sublayer %q must not import internal/%s in domain %q", srcSublayer, m.SharedDir, srcDomain),
-						Fix:      "keep core and event layers self-contained; move shared concerns outward to app, handler, or infra",
-						Severity: cfg.Sev,
+						File:              file,
+						Line:              line,
+						Rule:              "layer.inner-imports-pkg",
+						Message:           fmt.Sprintf("inner sublayer %q must not import internal/%s in domain %q", srcSublayer, m.SharedDir, srcDomain),
+						Fix:               "keep core and event layers self-contained; move shared concerns outward to app, handler, or infra",
+						DefaultSeverity:   cfg.Sev,
+						EffectiveSeverity: cfg.Sev,
 					})
 				}
 				continue
@@ -90,12 +92,13 @@ func CheckLayerDirection(pkgs []*packages.Package, projectModule string, project
 			if impSublayer != "" && !isKnownSublayerIn(m, impSublayer) {
 				file, line := findImportPosition(pkg, impPath, projectRoot)
 				violations = append(violations, Violation{
-					File:     file,
-					Line:     line,
-					Rule:     "layer.unknown-sublayer",
-					Message:  fmt.Sprintf("unknown sublayer %q in domain %q", impSublayer, srcDomain),
-					Fix:      fmt.Sprintf("use one of the supported sublayers: %v", m.Sublayers),
-					Severity: cfg.Sev,
+					File:              file,
+					Line:              line,
+					Rule:              "layer.unknown-sublayer",
+					Message:           fmt.Sprintf("unknown sublayer %q in domain %q", impSublayer, srcDomain),
+					Fix:               fmt.Sprintf("use one of the supported sublayers: %v", m.Sublayers),
+					DefaultSeverity:   cfg.Sev,
+					EffectiveSeverity: cfg.Sev,
 				})
 				continue
 			}
@@ -118,12 +121,13 @@ func CheckLayerDirection(pkgs []*packages.Package, projectModule string, project
 
 			file, line := findImportPosition(pkg, impPath, projectRoot)
 			violations = append(violations, Violation{
-				File:     file,
-				Line:     line,
-				Rule:     "layer.direction",
-				Message:  fmt.Sprintf("sublayer %q must not import sublayer %q in domain %q", srcSublayer, impSublayer, srcDomain),
-				Fix:      fmt.Sprintf("allowed imports for %q: %v", srcSublayer, allowed),
-				Severity: cfg.Sev,
+				File:              file,
+				Line:              line,
+				Rule:              "layer.direction",
+				Message:           fmt.Sprintf("sublayer %q must not import sublayer %q in domain %q", srcSublayer, impSublayer, srcDomain),
+				Fix:               fmt.Sprintf("allowed imports for %q: %v", srcSublayer, allowed),
+				DefaultSeverity:   cfg.Sev,
+				EffectiveSeverity: cfg.Sev,
 			})
 		}
 	}
@@ -213,12 +217,13 @@ func checkFlatLayerDirection(pkgs []*packages.Package, m Model, cfg Config, proj
 				if m.PkgRestricted[srcSublayer] {
 					file, line := findImportPosition(pkg, impPath, projectRoot)
 					violations = append(violations, Violation{
-						File:     file,
-						Line:     line,
-						Rule:     "layer.inner-imports-pkg",
-						Message:  fmt.Sprintf("inner sublayer %q must not import internal/%s", srcSublayer, m.SharedDir),
-						Fix:      "keep inner layers self-contained; move shared concerns to an outer layer",
-						Severity: cfg.Sev,
+						File:              file,
+						Line:              line,
+						Rule:              "layer.inner-imports-pkg",
+						Message:           fmt.Sprintf("inner sublayer %q must not import internal/%s", srcSublayer, m.SharedDir),
+						Fix:               "keep inner layers self-contained; move shared concerns to an outer layer",
+						DefaultSeverity:   cfg.Sev,
+						EffectiveSeverity: cfg.Sev,
 					})
 				}
 				continue
@@ -242,12 +247,13 @@ func checkFlatLayerDirection(pkgs []*packages.Package, m Model, cfg Config, proj
 
 			file, line := findImportPosition(pkg, impPath, projectRoot)
 			violations = append(violations, Violation{
-				File:     file,
-				Line:     line,
-				Rule:     "layer.direction",
-				Message:  fmt.Sprintf("sublayer %q must not import sublayer %q", srcSublayer, impSublayer),
-				Fix:      fmt.Sprintf("allowed imports for %q: %v", srcSublayer, allowed),
-				Severity: cfg.Sev,
+				File:              file,
+				Line:              line,
+				Rule:              "layer.direction",
+				Message:           fmt.Sprintf("sublayer %q must not import sublayer %q", srcSublayer, impSublayer),
+				Fix:               fmt.Sprintf("allowed imports for %q: %v", srcSublayer, allowed),
+				DefaultSeverity:   cfg.Sev,
+				EffectiveSeverity: cfg.Sev,
 			})
 		}
 	}

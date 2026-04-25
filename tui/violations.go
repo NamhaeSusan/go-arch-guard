@@ -36,11 +36,11 @@ func (vi ViolationIndex) Severity(relPath string) severity {
 	worst := sevNone
 	vi.walkPath(relPath, func(viols []rules.Violation) {
 		for _, v := range viols {
-			if v.Severity == rules.Error {
+			if v.EffectiveSeverity == rules.Error {
 				worst = sevError
 				return
 			}
-			if v.Severity == rules.Warning && worst < sevWarning {
+			if v.EffectiveSeverity == rules.Warning && worst < sevWarning {
 				worst = sevWarning
 			}
 		}

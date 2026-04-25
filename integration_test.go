@@ -100,8 +100,8 @@ func TestIntegration_WarningMode(t *testing.T) {
 		t.Error("expected violations even in warning mode")
 	}
 	for _, v := range violations {
-		if v.Severity != rules.Warning {
-			t.Errorf("expected Warning severity, got %v", v.Severity)
+		if v.EffectiveSeverity != rules.Warning {
+			t.Errorf("expected Warning severity, got %v", v.EffectiveSeverity)
 		}
 	}
 	report.AssertNoViolations(t, violations)

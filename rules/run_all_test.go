@@ -167,7 +167,7 @@ func TestRunAll_NoSetters_IncludedByDefault(t *testing.T) {
 	violations := rules.RunAll(pkgs, module, root)
 	found := false
 	for _, v := range violations {
-		if v.Rule == "setter.forbidden" && v.Severity == rules.Warning {
+		if v.Rule == "setter.forbidden" && v.EffectiveSeverity == rules.Warning {
 			found = true
 		}
 	}

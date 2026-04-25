@@ -229,8 +229,8 @@ type UserStore interface {
 	for _, v := range violations {
 		if v.Rule == "interface.single-per-package" {
 			found = true
-			if v.Severity != rules.Error {
-				t.Errorf("expected Error severity (default), got %v", v.Severity)
+			if v.EffectiveSeverity != rules.Error {
+				t.Errorf("expected Error severity (default), got %v", v.EffectiveSeverity)
 			}
 		}
 	}

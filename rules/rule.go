@@ -1,43 +1,20 @@
 package rules
 
 import (
-	"fmt"
 	"path/filepath"
 	"strings"
+
+	"github.com/NamhaeSusan/go-arch-guard/core"
 )
 
-type Severity int
+type Severity = core.Severity
 
 const (
-	Error Severity = iota
-	Warning
+	Error   = core.Error
+	Warning = core.Warning
 )
 
-type Violation struct {
-	File     string
-	Line     int
-	Rule     string
-	Message  string
-	Fix      string
-	Severity Severity
-}
-
-func (s Severity) String() string {
-	if s == Warning {
-		return "WARNING"
-	}
-	return "ERROR"
-}
-
-func (v Violation) String() string {
-	sev := v.Severity.String()
-	fileStr := v.File
-	if v.Line > 0 {
-		fileStr = fmt.Sprintf("%s:%d", v.File, v.Line)
-	}
-	return fmt.Sprintf("[%s] violation: %s (file: %s, rule: %s, fix: %s)",
-		sev, v.Message, fileStr, v.Rule, v.Fix)
-}
+type Violation = core.Violation
 
 type Option func(*Config)
 

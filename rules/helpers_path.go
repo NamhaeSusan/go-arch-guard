@@ -77,10 +77,11 @@ func resolveRoot(pkgs []*packages.Package, explicit string) string {
 func validateModule(pkgs []*packages.Package, projectModule string) []Violation {
 	if projectModule == "" {
 		return []Violation{{
-			Rule:     "meta.no-matching-packages",
-			Message:  "project module could not be determined — all import checks will be skipped",
-			Fix:      "pass a non-empty module path or ensure packages are loaded with NeedModule",
-			Severity: Warning,
+			Rule:              "meta.no-matching-packages",
+			Message:           "project module could not be determined — all import checks will be skipped",
+			Fix:               "pass a non-empty module path or ensure packages are loaded with NeedModule",
+			DefaultSeverity:   Warning,
+			EffectiveSeverity: Warning,
 		}}
 	}
 	prefix := projectModule + "/"
@@ -90,10 +91,11 @@ func validateModule(pkgs []*packages.Package, projectModule string) []Violation 
 		}
 	}
 	return []Violation{{
-		Rule:     "meta.no-matching-packages",
-		Message:  fmt.Sprintf("module %q does not match any loaded package — all import checks will be skipped", projectModule),
-		Fix:      "verify the module argument matches go.mod (e.g. pass the value from pkgs[0].Module.Path)",
-		Severity: Warning,
+		Rule:              "meta.no-matching-packages",
+		Message:           fmt.Sprintf("module %q does not match any loaded package — all import checks will be skipped", projectModule),
+		Fix:               "verify the module argument matches go.mod (e.g. pass the value from pkgs[0].Module.Path)",
+		DefaultSeverity:   Warning,
+		EffectiveSeverity: Warning,
 	}}
 }
 

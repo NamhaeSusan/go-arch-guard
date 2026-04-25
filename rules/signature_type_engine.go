@@ -95,12 +95,13 @@ func checkFieldList(
 		pos := pkg.Fset.Position(f.Pos())
 		relFile := relPathFromRoot(projectRoot, pos.Filename)
 		*out = append(*out, Violation{
-			File:     relFile,
-			Line:     pos.Line,
-			Rule:     ruleName,
-			Message:  message(id, allowedLayers),
-			Fix:      fix(id, allowedLayers),
-			Severity: cfg.Sev,
+			File:              relFile,
+			Line:              pos.Line,
+			Rule:              ruleName,
+			Message:           message(id, allowedLayers),
+			Fix:               fix(id, allowedLayers),
+			DefaultSeverity:   cfg.Sev,
+			EffectiveSeverity: cfg.Sev,
 		})
 	}
 }

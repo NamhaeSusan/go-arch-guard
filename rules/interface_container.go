@@ -106,12 +106,13 @@ func checkContainerInterfacesInPkg(pkg *packages.Package, sev Severity) []Violat
 			file = rel
 		}
 		violations = append(violations, Violation{
-			File:     file,
-			Line:     pos.Line,
-			Rule:     "interface.container-only",
-			Message:  fmt.Sprintf("interface %q is only used as a struct field type, never as a function parameter or return type — likely a value container rather than a real abstraction", name),
-			Fix:      "either use the concrete type if available (re-export it from alias.go if blocked by isolation rules), or pass this interface as a constructor parameter so it serves as a real abstraction",
-			Severity: sev,
+			File:              file,
+			Line:              pos.Line,
+			Rule:              "interface.container-only",
+			Message:           fmt.Sprintf("interface %q is only used as a struct field type, never as a function parameter or return type — likely a value container rather than a real abstraction", name),
+			Fix:               "either use the concrete type if available (re-export it from alias.go if blocked by isolation rules), or pass this interface as a constructor parameter so it serves as a real abstraction",
+			DefaultSeverity:   sev,
+			EffectiveSeverity: sev,
 		})
 	}
 	return violations

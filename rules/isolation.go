@@ -49,12 +49,13 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 				}
 				file, line := findImportPosition(pkg, impPath, projectRoot)
 				violations = append(violations, Violation{
-					File:     file,
-					Line:     line,
-					Rule:     "isolation.cmd-deep-import",
-					Message:  fmt.Sprintf("cmd/ must only import domain alias, not sub-package %q", impPath),
-					Fix:      fmt.Sprintf("import the domain alias package instead: %s%s/%s", internalPrefix, m.DomainDir, imp.Domain),
-					Severity: cfg.Sev,
+					File:              file,
+					Line:              line,
+					Rule:              "isolation.cmd-deep-import",
+					Message:           fmt.Sprintf("cmd/ must only import domain alias, not sub-package %q", impPath),
+					Fix:               fmt.Sprintf("import the domain alias package instead: %s%s/%s", internalPrefix, m.DomainDir, imp.Domain),
+					DefaultSeverity:   cfg.Sev,
+					EffectiveSeverity: cfg.Sev,
 				})
 			}
 			continue
@@ -97,34 +98,37 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 				case kindDomain, kindDomainRoot:
 					file, line := findImportPosition(pkg, impPath, projectRoot)
 					violations = append(violations, Violation{
-						File:     file,
-						Line:     line,
-						Rule:     "isolation.transport-imports-domain",
-						Message:  fmt.Sprintf("transport package %q must not import domain %q directly", pkg.PkgPath, imp.Domain),
-						Fix:      fmt.Sprintf("import %s/ (the app/composition root) instead of domain sub-packages directly", m.AppDir),
-						Severity: cfg.Sev,
+						File:              file,
+						Line:              line,
+						Rule:              "isolation.transport-imports-domain",
+						Message:           fmt.Sprintf("transport package %q must not import domain %q directly", pkg.PkgPath, imp.Domain),
+						Fix:               fmt.Sprintf("import %s/ (the app/composition root) instead of domain sub-packages directly", m.AppDir),
+						DefaultSeverity:   cfg.Sev,
+						EffectiveSeverity: cfg.Sev,
 					})
 					continue
 				case kindOrchestration:
 					file, line := findImportPosition(pkg, impPath, projectRoot)
 					violations = append(violations, Violation{
-						File:     file,
-						Line:     line,
-						Rule:     "isolation.transport-imports-orchestration",
-						Message:  fmt.Sprintf("transport package %q must not import %s directly", pkg.PkgPath, m.OrchestrationDir),
-						Fix:      fmt.Sprintf("transport layers should only import %s/ (composition root) and %s/ (shared utilities)", m.AppDir, m.SharedDir),
-						Severity: cfg.Sev,
+						File:              file,
+						Line:              line,
+						Rule:              "isolation.transport-imports-orchestration",
+						Message:           fmt.Sprintf("transport package %q must not import %s directly", pkg.PkgPath, m.OrchestrationDir),
+						Fix:               fmt.Sprintf("transport layers should only import %s/ (composition root) and %s/ (shared utilities)", m.AppDir, m.SharedDir),
+						DefaultSeverity:   cfg.Sev,
+						EffectiveSeverity: cfg.Sev,
 					})
 					continue
 				case kindUnclassified:
 					file, line := findImportPosition(pkg, impPath, projectRoot)
 					violations = append(violations, Violation{
-						File:     file,
-						Line:     line,
-						Rule:     "isolation.transport-imports-unclassified",
-						Message:  fmt.Sprintf("transport package %q must not import unclassified internal package %q", pkg.PkgPath, impPath),
-						Fix:      fmt.Sprintf("move the dependency into internal/%s (expose via Container), internal/%s, or another transport package", m.AppDir, m.SharedDir),
-						Severity: cfg.Sev,
+						File:              file,
+						Line:              line,
+						Rule:              "isolation.transport-imports-unclassified",
+						Message:           fmt.Sprintf("transport package %q must not import unclassified internal package %q", pkg.PkgPath, impPath),
+						Fix:               fmt.Sprintf("move the dependency into internal/%s (expose via Container), internal/%s, or another transport package", m.AppDir, m.SharedDir),
+						DefaultSeverity:   cfg.Sev,
+						EffectiveSeverity: cfg.Sev,
 					})
 					continue
 				case kindCmd:
@@ -162,12 +166,13 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 				}
 				file, line := findImportPosition(pkg, impPath, projectRoot)
 				violations = append(violations, Violation{
-					File:     file,
-					Line:     line,
-					Rule:     "isolation.orchestration-deep-import",
-					Message:  fmt.Sprintf("%s must only import domain alias, not sub-package %q", label, impPath),
-					Fix:      fmt.Sprintf("import the domain alias package instead: %s%s/%s", internalPrefix, m.DomainDir, imp.Domain),
-					Severity: cfg.Sev,
+					File:              file,
+					Line:              line,
+					Rule:              "isolation.orchestration-deep-import",
+					Message:           fmt.Sprintf("%s must only import domain alias, not sub-package %q", label, impPath),
+					Fix:               fmt.Sprintf("import the domain alias package instead: %s%s/%s", internalPrefix, m.DomainDir, imp.Domain),
+					DefaultSeverity:   cfg.Sev,
+					EffectiveSeverity: cfg.Sev,
 				})
 				continue
 			}
@@ -177,24 +182,26 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 				if imp.Kind == kindDomain || imp.Kind == kindDomainRoot {
 					file, line := findImportPosition(pkg, impPath, projectRoot)
 					violations = append(violations, Violation{
-						File:     file,
-						Line:     line,
-						Rule:     "isolation.pkg-imports-domain",
-						Message:  fmt.Sprintf("%s/ must not import domain %q", m.SharedDir, imp.Domain),
-						Fix:      fmt.Sprintf("%s/ should only contain shared utilities with no domain or orchestration dependencies", m.SharedDir),
-						Severity: cfg.Sev,
+						File:              file,
+						Line:              line,
+						Rule:              "isolation.pkg-imports-domain",
+						Message:           fmt.Sprintf("%s/ must not import domain %q", m.SharedDir, imp.Domain),
+						Fix:               fmt.Sprintf("%s/ should only contain shared utilities with no domain or orchestration dependencies", m.SharedDir),
+						DefaultSeverity:   cfg.Sev,
+						EffectiveSeverity: cfg.Sev,
 					})
 					continue
 				}
 				if imp.Kind == kindOrchestration {
 					file, line := findImportPosition(pkg, impPath, projectRoot)
 					violations = append(violations, Violation{
-						File:     file,
-						Line:     line,
-						Rule:     "isolation.pkg-imports-orchestration",
-						Message:  fmt.Sprintf("%s/ must not import %s", m.SharedDir, m.OrchestrationDir),
-						Fix:      fmt.Sprintf("move %s-aware code to internal/%s or cmd/", m.OrchestrationDir, m.OrchestrationDir),
-						Severity: cfg.Sev,
+						File:              file,
+						Line:              line,
+						Rule:              "isolation.pkg-imports-orchestration",
+						Message:           fmt.Sprintf("%s/ must not import %s", m.SharedDir, m.OrchestrationDir),
+						Fix:               fmt.Sprintf("move %s-aware code to internal/%s or cmd/", m.OrchestrationDir, m.OrchestrationDir),
+						DefaultSeverity:   cfg.Sev,
+						EffectiveSeverity: cfg.Sev,
 					})
 					continue
 				}
@@ -204,23 +211,25 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 				if src.Kind == kindDomain || src.Kind == kindDomainRoot {
 					file, line := findImportPosition(pkg, impPath, projectRoot)
 					violations = append(violations, Violation{
-						File:     file,
-						Line:     line,
-						Rule:     "isolation.domain-imports-orchestration",
-						Message:  fmt.Sprintf("domain %q must not import %s", src.Domain, m.OrchestrationDir),
-						Fix:      fmt.Sprintf("move cross-domain coordination to internal/%s callers instead of domain internals", m.OrchestrationDir),
-						Severity: cfg.Sev,
+						File:              file,
+						Line:              line,
+						Rule:              "isolation.domain-imports-orchestration",
+						Message:           fmt.Sprintf("domain %q must not import %s", src.Domain, m.OrchestrationDir),
+						Fix:               fmt.Sprintf("move cross-domain coordination to internal/%s callers instead of domain internals", m.OrchestrationDir),
+						DefaultSeverity:   cfg.Sev,
+						EffectiveSeverity: cfg.Sev,
 					})
 					continue
 				}
 				file, line := findImportPosition(pkg, impPath, projectRoot)
 				violations = append(violations, Violation{
-					File:     file,
-					Line:     line,
-					Rule:     "isolation.stray-imports-orchestration",
-					Message:  fmt.Sprintf("package %q must not import %s", pkg.PkgPath, m.OrchestrationDir),
-					Fix:      fmt.Sprintf("only cmd/ and internal/%s may depend on %s", m.OrchestrationDir, m.OrchestrationDir),
-					Severity: cfg.Sev,
+					File:              file,
+					Line:              line,
+					Rule:              "isolation.stray-imports-orchestration",
+					Message:           fmt.Sprintf("package %q must not import %s", pkg.PkgPath, m.OrchestrationDir),
+					Fix:               fmt.Sprintf("only cmd/ and internal/%s may depend on %s", m.OrchestrationDir, m.OrchestrationDir),
+					DefaultSeverity:   cfg.Sev,
+					EffectiveSeverity: cfg.Sev,
 				})
 				continue
 			}
@@ -231,12 +240,13 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 				src.Domain != "" && imp.Domain != "" && src.Domain != imp.Domain {
 				file, line := findImportPosition(pkg, impPath, projectRoot)
 				violations = append(violations, Violation{
-					File:     file,
-					Line:     line,
-					Rule:     "isolation.cross-domain",
-					Message:  fmt.Sprintf("domain %q must not import domain %q", src.Domain, imp.Domain),
-					Fix:      fmt.Sprintf("use %s/ for cross-domain orchestration or move shared types to %s/", m.OrchestrationDir, m.SharedDir),
-					Severity: cfg.Sev,
+					File:              file,
+					Line:              line,
+					Rule:              "isolation.cross-domain",
+					Message:           fmt.Sprintf("domain %q must not import domain %q", src.Domain, imp.Domain),
+					Fix:               fmt.Sprintf("use %s/ for cross-domain orchestration or move shared types to %s/", m.OrchestrationDir, m.SharedDir),
+					DefaultSeverity:   cfg.Sev,
+					EffectiveSeverity: cfg.Sev,
 				})
 				continue
 			}
@@ -247,12 +257,13 @@ func CheckDomainIsolation(pkgs []*packages.Package, projectModule string, projec
 				(imp.Kind == kindDomain || imp.Kind == kindDomainRoot) {
 				file, line := findImportPosition(pkg, impPath, projectRoot)
 				violations = append(violations, Violation{
-					File:     file,
-					Line:     line,
-					Rule:     "isolation.stray-imports-domain",
-					Message:  fmt.Sprintf("package %q must not import domain %q", pkg.PkgPath, imp.Domain),
-					Fix:      fmt.Sprintf("move domain orchestration to internal/%s or app wiring to cmd/", m.OrchestrationDir),
-					Severity: cfg.Sev,
+					File:              file,
+					Line:              line,
+					Rule:              "isolation.stray-imports-domain",
+					Message:           fmt.Sprintf("package %q must not import domain %q", pkg.PkgPath, imp.Domain),
+					Fix:               fmt.Sprintf("move domain orchestration to internal/%s or app wiring to cmd/", m.OrchestrationDir),
+					DefaultSeverity:   cfg.Sev,
+					EffectiveSeverity: cfg.Sev,
 				})
 				continue
 			}

@@ -52,8 +52,8 @@ func (a *adapter) Use(ctx context.Context) {
 	for _, v := range vs {
 		if v.Rule == "interface.cross-domain-anonymous" {
 			found = true
-			if v.Severity != rules.Error {
-				t.Errorf("expected Error severity, got %v", v.Severity)
+			if v.EffectiveSeverity != rules.Error {
+				t.Errorf("expected Error severity, got %v", v.EffectiveSeverity)
 			}
 			break
 		}

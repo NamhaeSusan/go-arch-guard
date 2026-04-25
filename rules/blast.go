@@ -146,8 +146,9 @@ func AnalyzeBlastRadius(pkgs []*packages.Package, projectModule string, projectR
 					"package %q has %d transitive dependents (Ca:%d Ce:%d Instability:%.2f, threshold:%.0f)",
 					relPath, m.transitiveDependents, m.ca, m.ce, m.instability, threshold,
 				),
-				Fix:      "consider breaking this package into smaller units or introducing an interface boundary",
-				Severity: cfg.Sev,
+				Fix:               "consider breaking this package into smaller units or introducing an interface boundary",
+				DefaultSeverity:   cfg.Sev,
+				EffectiveSeverity: cfg.Sev,
 			})
 		}
 	}

@@ -254,8 +254,8 @@ import _ "` + mod + `/internal/domain/user/app"
 		t.Fatal("expected violations in warning mode too")
 	}
 	for _, v := range warnViolations {
-		if v.Severity != rules.Warning {
-			t.Errorf("expected Warning severity, got %v", v.Severity)
+		if v.EffectiveSeverity != rules.Warning {
+			t.Errorf("expected Warning severity, got %v", v.EffectiveSeverity)
 		}
 	}
 	report.AssertNoViolations(t, warnViolations) // must pass
