@@ -56,10 +56,15 @@ type LayerModel struct {
 	LayerDirNames map[string]bool
 }
 
-// LayoutModel describes the internal/ directory topology. Empty fields
+// LayoutModel describes the package-root directory topology. Empty fields
 // disable the corresponding classification (e.g. flat layouts leave
 // DomainDir == "").
 type LayoutModel struct {
+	// InternalRoot is the project-relative directory under which all
+	// rule-managed packages live. Defaults to "internal" when empty;
+	// cloneArchitecture normalizes the empty value at construction so
+	// rules read this field directly without a per-call default check.
+	InternalRoot     string
 	DomainDir        string
 	OrchestrationDir string
 	SharedDir        string
@@ -94,8 +99,14 @@ type TypePattern struct {
 }
 
 // cloneArchitecture deep-copies every slice and map in an Architecture so
-// callers handling the result cannot influence the original.
+// callers handling the result cannot influence the original. It also
+// normalizes Layout.InternalRoot to "internal" when empty, which is the
+// single source of truth for that default — every consumer reads the
+// normalized value, so no per-call conditional is needed.
 func cloneArchitecture(a Architecture) Architecture {
+	if a.Layout.InternalRoot == "" {
+		a.Layout.InternalRoot = "internal"
+	}
 	return Architecture{
 		Layers: LayerModel{
 			Sublayers:        cloneStringSlice(a.Layers.Sublayers),

@@ -39,10 +39,11 @@ func (r *BannedPackage) Check(ctx *core.Context) []core.Violation {
 	if ctx == nil {
 		return nil
 	}
-	if !hasInternalDir(ctx.Root()) {
+	arch := ctx.Arch()
+	if !hasInternalDir(ctx.Root(), arch.Layout.InternalRoot) {
 		return []core.Violation{metaLayoutNotSupported(ruleBannedPackage)}
 	}
-	internalDir := filepath.Join(ctx.Root(), "internal")
+	internalDir := filepath.Join(ctx.Root(), arch.Layout.InternalRoot)
 	var violations []core.Violation
 	_ = filepath.WalkDir(internalDir, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil || !entry.IsDir() {
@@ -53,7 +54,7 @@ func (r *BannedPackage) Check(ctx *core.Context) []core.Violation {
 			return nil
 		}
 		rel = filepath.ToSlash(rel)
-		if rel == "internal" {
+		if rel == arch.Layout.InternalRoot {
 			return nil
 		}
 		if ctx.IsExcluded(rel + "/") {
@@ -63,7 +64,6 @@ func (r *BannedPackage) Check(ctx *core.Context) []core.Violation {
 			return nil
 		}
 		name := entry.Name()
-		arch := ctx.Arch()
 		for _, banned := range arch.Naming.BannedPkgNames {
 			if name == banned {
 				violations = append(violations, violation(r.severity, bannedPackage, rel+"/",

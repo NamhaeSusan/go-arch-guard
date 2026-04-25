@@ -9,14 +9,15 @@ import (
 )
 
 // hasInternalPackages reports whether any loaded package lives under
-// <module>/internal/. Pattern and CrossDomainAnonymous classify packages by
-// their internal/<DomainDir>/<sublayer> position, so flat-layout projects
-// produce no useful violations and should be signaled via metaLayoutNotSupported.
-func hasInternalPackages(pkgs []*packages.Package, projectModule string) bool {
+// <module>/<internalRoot>/. Pattern and CrossDomainAnonymous classify
+// packages by their <internalRoot>/<DomainDir>/<sublayer> position, so
+// flat-layout projects produce no useful violations and should be
+// signaled via metaLayoutNotSupported.
+func hasInternalPackages(pkgs []*packages.Package, projectModule, internalRoot string) bool {
 	if projectModule == "" {
 		return false
 	}
-	prefix := projectModule + "/internal/"
+	prefix := projectModule + "/" + internalRoot + "/"
 	for _, pkg := range pkgs {
 		if strings.HasPrefix(pkg.PkgPath, prefix) {
 			return true

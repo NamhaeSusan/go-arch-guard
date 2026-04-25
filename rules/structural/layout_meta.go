@@ -8,14 +8,15 @@ import (
 	"github.com/NamhaeSusan/go-arch-guard/core"
 )
 
-// hasInternalDir reports whether <root>/internal exists as a directory. The
-// structural rules walk the filesystem rather than ctx.Pkgs(), so this is a
-// pre-flight check used to decide whether the rule applies at all.
-func hasInternalDir(root string) bool {
+// hasInternalDir reports whether <root>/<internalRoot> exists as a
+// directory. The structural rules walk the filesystem rather than
+// ctx.Pkgs(), so this is a pre-flight check used to decide whether the
+// rule applies at all.
+func hasInternalDir(root, internalRoot string) bool {
 	if root == "" {
 		return false
 	}
-	info, err := os.Stat(filepath.Join(root, "internal"))
+	info, err := os.Stat(filepath.Join(root, internalRoot))
 	return err == nil && info.IsDir()
 }
 

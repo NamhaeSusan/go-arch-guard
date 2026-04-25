@@ -180,7 +180,7 @@ func (r *Boundary) walkInternalPackages(ctx *core.Context, visit func(*packages.
 	if module == "" {
 		return
 	}
-	internalPrefix := module + "/internal/"
+	internalPrefix := module + "/" + ctx.Arch().Layout.InternalRoot + "/"
 	for _, pkg := range ctx.Pkgs() {
 		if !strings.HasPrefix(pkg.PkgPath, internalPrefix) {
 			continue

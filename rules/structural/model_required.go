@@ -36,15 +36,15 @@ func (r *ModelRequired) Check(ctx *core.Context) []core.Violation {
 	if ctx == nil {
 		return nil
 	}
-	if !hasInternalDir(ctx.Root()) {
+	arch := ctx.Arch()
+	if !hasInternalDir(ctx.Root(), arch.Layout.InternalRoot) {
 		return []core.Violation{metaLayoutNotSupported(ruleModelRequired)}
 	}
-	arch := ctx.Arch()
 	if arch.Layout.DomainDir == "" || !arch.Structure.RequireModel {
 		return nil
 	}
 
-	domainDir := filepath.Join(ctx.Root(), "internal", filepath.FromSlash(arch.Layout.DomainDir))
+	domainDir := filepath.Join(ctx.Root(), arch.Layout.InternalRoot, filepath.FromSlash(arch.Layout.DomainDir))
 	entries, err := os.ReadDir(domainDir)
 	if err != nil {
 		return nil
@@ -54,7 +54,7 @@ func (r *ModelRequired) Check(ctx *core.Context) []core.Violation {
 		if !entry.IsDir() {
 			continue
 		}
-		relPath := filepath.ToSlash(filepath.Join("internal", arch.Layout.DomainDir, entry.Name()))
+		relPath := filepath.ToSlash(filepath.Join(arch.Layout.InternalRoot, arch.Layout.DomainDir, entry.Name()))
 		if ctx.IsExcluded(relPath + "/") {
 			continue
 		}

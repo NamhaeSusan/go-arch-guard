@@ -48,15 +48,15 @@ func (r *Alias) Check(ctx *core.Context) []core.Violation {
 	if ctx == nil {
 		return nil
 	}
-	if !hasInternalDir(ctx.Root()) {
+	arch := ctx.Arch()
+	if !hasInternalDir(ctx.Root(), arch.Layout.InternalRoot) {
 		return []core.Violation{metaLayoutNotSupported(ruleAlias)}
 	}
-	arch := ctx.Arch()
 	if arch.Layout.DomainDir == "" || !arch.Structure.RequireAlias {
 		return nil
 	}
 
-	domainDir := filepath.Join(ctx.Root(), "internal", filepath.FromSlash(arch.Layout.DomainDir))
+	domainDir := filepath.Join(ctx.Root(), arch.Layout.InternalRoot, filepath.FromSlash(arch.Layout.DomainDir))
 	entries, err := os.ReadDir(domainDir)
 	if err != nil {
 		return nil
@@ -68,7 +68,7 @@ func (r *Alias) Check(ctx *core.Context) []core.Violation {
 			continue
 		}
 		domainName := entry.Name()
-		relPath := filepath.ToSlash(filepath.Join("internal", arch.Layout.DomainDir, domainName))
+		relPath := filepath.ToSlash(filepath.Join(arch.Layout.InternalRoot, arch.Layout.DomainDir, domainName))
 		if ctx.IsExcluded(relPath + "/") {
 			continue
 		}

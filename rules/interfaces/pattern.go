@@ -41,13 +41,14 @@ func (r *Pattern) Check(ctx *core.Context) []core.Violation {
 	}
 	pkgs := ctx.Pkgs()
 	projectModule := analysisutil.ResolveModuleFromContext(ctx, "")
-	if !hasInternalPackages(pkgs, projectModule) {
+	arch := ctx.Arch()
+	if !hasInternalPackages(pkgs, projectModule, arch.Layout.InternalRoot) {
 		return []core.Violation{metaLayoutNotSupported("interfaces.pattern", projectModule)}
 	}
 
 	var violations []core.Violation
 	for _, pkg := range pkgs {
-		if isExcludedInterfacePatternPkg(ctx.Arch(), pkg) {
+		if isExcludedInterfacePatternPkg(arch, pkg) {
 			continue
 		}
 
@@ -70,7 +71,7 @@ func isExcludedInterfacePatternPkg(arch core.Architecture, pkg *packages.Package
 	parts := strings.Split(pkg.PkgPath, "/")
 	internalIdx := -1
 	for i, p := range parts {
-		if p == "internal" {
+		if p == arch.Layout.InternalRoot {
 			internalIdx = i
 			break
 		}

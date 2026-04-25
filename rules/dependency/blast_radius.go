@@ -31,11 +31,12 @@ func (r *BlastRadius) Check(ctx *core.Context) []core.Violation {
 	if warns := validateModule(pkgs, projectModule); len(warns) > 0 {
 		return warns
 	}
-	if !hasInternalPackages(pkgs, projectModule) {
+	internalRoot := ctx.Arch().Layout.InternalRoot
+	if !hasInternalPackages(pkgs, projectModule, internalRoot) {
 		return []core.Violation{metaLayoutNotSupported("dependency.blast-radius", projectModule)}
 	}
 
-	internalPrefix := projectModule + "/internal/"
+	internalPrefix := projectModule + "/" + internalRoot + "/"
 	internalPkgs := make(map[string]bool)
 	for _, pkg := range pkgs {
 		if strings.HasPrefix(pkg.PkgPath, internalPrefix) &&

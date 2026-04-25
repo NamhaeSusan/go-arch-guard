@@ -51,11 +51,11 @@ func (r *Isolation) Check(ctx *core.Context) []core.Violation {
 	if warns := validateModule(pkgs, projectModule); len(warns) > 0 {
 		return warns
 	}
-	if !hasInternalPackages(pkgs, projectModule) {
+	if !hasInternalPackages(pkgs, projectModule, layout.InternalRoot) {
 		return []core.Violation{metaLayoutNotSupported("dependency.isolation", projectModule)}
 	}
 
-	internalPrefix := projectModule + "/internal/"
+	internalPrefix := projectModule + "/" + layout.InternalRoot + "/"
 	cmdPrefix := projectModule + "/cmd"
 	var violations []core.Violation
 
@@ -171,7 +171,7 @@ func (r *Isolation) checkSharedImport(pkg *packages.Package, imp classified, imp
 		return []core.Violation{r.violation(file, line,
 			"isolation.pkg-imports-orchestration",
 			fmt.Sprintf("%s/ must not import %s", layout.SharedDir, layout.OrchestrationDir),
-			fmt.Sprintf("move %s-aware code to internal/%s or cmd/", layout.OrchestrationDir, layout.OrchestrationDir),
+			fmt.Sprintf("move %s-aware code to %s/%s or cmd/", layout.OrchestrationDir, layout.InternalRoot, layout.OrchestrationDir),
 		)}
 	}
 	return nil
@@ -183,13 +183,13 @@ func (r *Isolation) checkOrchestrationDependent(pkg *packages.Package, src class
 		return []core.Violation{r.violation(file, line,
 			"isolation.domain-imports-orchestration",
 			fmt.Sprintf("domain %q must not import %s", src.Domain, layout.OrchestrationDir),
-			fmt.Sprintf("move cross-domain coordination to internal/%s callers instead of domain internals", layout.OrchestrationDir),
+			fmt.Sprintf("move cross-domain coordination to %s/%s callers instead of domain internals", layout.InternalRoot, layout.OrchestrationDir),
 		)}
 	}
 	return []core.Violation{r.violation(file, line,
 		"isolation.stray-imports-orchestration",
 		fmt.Sprintf("package %q must not import %s", pkg.PkgPath, layout.OrchestrationDir),
-		fmt.Sprintf("only cmd/ and internal/%s may depend on %s", layout.OrchestrationDir, layout.OrchestrationDir),
+		fmt.Sprintf("only cmd/ and %s/%s may depend on %s", layout.InternalRoot, layout.OrchestrationDir, layout.OrchestrationDir),
 	)}
 }
 
@@ -207,7 +207,7 @@ func (r *Isolation) strayDomainViolation(pkg *packages.Package, imp classified, 
 	return []core.Violation{r.violation(file, line,
 		"isolation.stray-imports-domain",
 		fmt.Sprintf("package %q must not import domain %q", pkg.PkgPath, imp.Domain),
-		fmt.Sprintf("move domain orchestration to internal/%s or app wiring to cmd/", layout.OrchestrationDir),
+		fmt.Sprintf("move domain orchestration to %s/%s or app wiring to cmd/", layout.InternalRoot, layout.OrchestrationDir),
 	)}
 }
 
@@ -247,7 +247,7 @@ func (r *Isolation) checkTransportImport(pkg *packages.Package, projectRoot, imp
 		return []core.Violation{r.violation(file, line,
 			"isolation.transport-imports-unclassified",
 			fmt.Sprintf("transport package %q must not import unclassified internal package %q", pkg.PkgPath, impPath),
-			fmt.Sprintf("move the dependency into internal/%s (expose via Container), internal/%s, or another transport package", layout.AppDir, layout.SharedDir),
+			fmt.Sprintf("move the dependency into %s/%s (expose via Container), %s/%s, or another transport package", layout.InternalRoot, layout.AppDir, layout.InternalRoot, layout.SharedDir),
 		)}
 	default:
 		return nil
@@ -410,11 +410,11 @@ func metaNoMatchingPackages(message string) core.Violation {
 }
 
 // hasInternalPackages reports whether any loaded package lives under
-// <module>/internal/. The dependency rules in this package operate only on
-// internal/-based layouts; flat-layout projects are signaled via
-// metaLayoutNotSupported instead of silently producing zero violations.
-func hasInternalPackages(pkgs []*packages.Package, projectModule string) bool {
-	prefix := projectModule + "/internal/"
+// <module>/<internalRoot>/. The dependency rules in this package operate
+// only on internal-root-based layouts; flat-layout projects are signaled
+// via metaLayoutNotSupported instead of silently producing zero violations.
+func hasInternalPackages(pkgs []*packages.Package, projectModule, internalRoot string) bool {
+	prefix := projectModule + "/" + internalRoot + "/"
 	for _, pkg := range pkgs {
 		if strings.HasPrefix(pkg.PkgPath, prefix) {
 			return true

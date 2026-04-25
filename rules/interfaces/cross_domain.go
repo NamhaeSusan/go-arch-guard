@@ -36,16 +36,17 @@ func (r *CrossDomainAnonymous) Check(ctx *core.Context) []core.Violation {
 	}
 	pkgs := ctx.Pkgs()
 	projectModule := analysisutil.ResolveModuleFromContext(ctx, "")
-	if !hasInternalPackages(pkgs, projectModule) {
+	arch := ctx.Arch()
+	if !hasInternalPackages(pkgs, projectModule, arch.Layout.InternalRoot) {
 		return []core.Violation{metaLayoutNotSupported("interfaces.cross-domain-anonymous", projectModule)}
 	}
-	if ctx.Arch().Layout.DomainDir == "" {
+	if arch.Layout.DomainDir == "" {
 		return nil
 	}
 
 	var violations []core.Violation
 	for _, pkg := range pkgs {
-		violations = append(violations, r.checkPackage(pkg, ctx.Arch())...)
+		violations = append(violations, r.checkPackage(pkg, arch)...)
 	}
 	return violations
 }
@@ -144,7 +145,7 @@ func (r *CrossDomainAnonymous) checkAnonymousInterface(iface *ast.InterfaceType,
 		Line:              pos.Line,
 		Rule:              "interface.cross-domain-anonymous",
 		Message:           fmt.Sprintf("anonymous interface declared in package %q references types from domain(s) %v", pkg.PkgPath, domains),
-		Fix:               "move this adapter/abstraction into internal/" + arch.Layout.OrchestrationDir + "/",
+		Fix:               "move this adapter/abstraction into " + arch.Layout.InternalRoot + "/" + arch.Layout.OrchestrationDir + "/",
 		DefaultSeverity:   r.cfg.severity,
 		EffectiveSeverity: r.cfg.severity,
 	}}
@@ -194,7 +195,7 @@ func owningDomainForPath(pkgPath string, arch core.Architecture) string {
 	}
 	parts := strings.Split(pkgPath, "/")
 	for i := 0; i+2 < len(parts); i++ {
-		if parts[i] == "internal" && parts[i+1] == arch.Layout.DomainDir {
+		if parts[i] == arch.Layout.InternalRoot && parts[i+1] == arch.Layout.DomainDir {
 			return parts[i+2]
 		}
 	}
@@ -207,7 +208,7 @@ func isOrchestrationPath(pkgPath string, arch core.Architecture) bool {
 	}
 	parts := strings.Split(pkgPath, "/")
 	for i := 0; i+1 < len(parts); i++ {
-		if parts[i] == "internal" && parts[i+1] == arch.Layout.OrchestrationDir {
+		if parts[i] == arch.Layout.InternalRoot && parts[i+1] == arch.Layout.OrchestrationDir {
 			return true
 		}
 	}

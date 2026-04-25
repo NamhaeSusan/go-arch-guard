@@ -163,7 +163,7 @@ func collectInterfacesFromFile(file *ast.File) map[string]*ast.InterfaceType {
 }
 
 func isDomainPackage(arch core.Architecture, pkgPath string) bool {
-	return arch.Layout.DomainDir != "" && strings.Contains(pkgPath, "/internal/"+arch.Layout.DomainDir+"/")
+	return arch.Layout.DomainDir != "" && strings.Contains(pkgPath, "/"+arch.Layout.InternalRoot+"/"+arch.Layout.DomainDir+"/")
 }
 
 func isRepoPortName(name string) bool {

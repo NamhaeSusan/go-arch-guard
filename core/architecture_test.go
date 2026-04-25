@@ -46,6 +46,22 @@ func TestArchitectureCarriesAllSubModels(t *testing.T) {
 	}
 }
 
+func TestCloneArchitectureNormalizesEmptyInternalRoot(t *testing.T) {
+	var arch Architecture
+	got := cloneArchitecture(arch)
+	if got.Layout.InternalRoot != "internal" {
+		t.Fatalf("empty InternalRoot must normalize to %q, got %q", "internal", got.Layout.InternalRoot)
+	}
+}
+
+func TestCloneArchitectureRespectsExplicitInternalRoot(t *testing.T) {
+	arch := Architecture{Layout: LayoutModel{InternalRoot: "packages"}}
+	got := cloneArchitecture(arch)
+	if got.Layout.InternalRoot != "packages" {
+		t.Fatalf("explicit InternalRoot must be preserved, got %q", got.Layout.InternalRoot)
+	}
+}
+
 // TestCloneArchitectureCoversAllMutableFields is a deliberate regression
 // guard: it builds an Architecture where every map and slice field has
 // content, clones it, mutates the clone in every field, and asserts that
