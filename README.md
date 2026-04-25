@@ -13,16 +13,8 @@ Define isolation, layer-direction, structure, naming, and blast radius rules, th
 AI-agent-friendly by default:
 
 - `scaffold.ArchitectureTest(...)` generates a ready-to-copy `architecture_test.go`
-- `rules.RunAll(...)` runs the recommended rule bundle in one call
+- `core.Run(ctx, presets.RecommendedDDD())` runs the recommended rule bundle in one call
 - `report.MarshalJSONReport(...)` emits machine-readable violations for bots and remediation loops
-
-> **Refactor in progress.** A new `core/` package has landed as a skeleton
-> (`Rule` interface, `RuleSpec` catalog, immutable `Context`, validated
-> `Architecture`, `RuleSet`, deterministic `Run`). No rules have been
-> migrated yet — the public API documented below (`rules.RunAll`,
-> `rules.Check*`, `rules.NewModel`, presets) is unchanged and remains the
-> supported integration path. The refactor is in-place (no `/v2` module
-> path); subsequent rule migrations will replace v1 surface incrementally.
 
 ## Why
 
@@ -69,15 +61,19 @@ Available presets: `PresetDDD`, `PresetCleanArch`, `PresetLayered`,
 If you want the recommended rule bundle without manually appending each check:
 
 ```go
-violations := rules.RunAll(pkgs, "", "")
+arch := presets.DDD()
+ctx := core.NewContext(pkgs, "", "", arch, nil)
+violations := core.Run(ctx, presets.RecommendedDDD())
+
 report.AssertNoViolations(t, violations)
 ```
 
-Pass `opts...` only when you need a non-default model or severity/exclude options.
+Use the matching architecture and recommended ruleset for other presets, for example
+`presets.Hexagonal()` with `presets.RecommendedHexagonal()`.
 
 ### Per-rule control (DDD example)
 
-For finer control over individual checks, compose them manually:
+For finer control over individual checks, compose a `core.RuleSet` manually:
 
 ```go
 func TestArchitecture(t *testing.T) {
@@ -89,49 +85,51 @@ func TestArchitecture(t *testing.T) {
         t.Fatalf("no packages loaded: %v", err)
     }
 
-    t.Run("domain isolation", func(t *testing.T) {
-        report.AssertNoViolations(t, rules.CheckDomainIsolation(pkgs, "", ""))
-    })
-    t.Run("layer direction", func(t *testing.T) {
-        report.AssertNoViolations(t, rules.CheckLayerDirection(pkgs, "", ""))
-    })
-    t.Run("naming", func(t *testing.T) {
-        report.AssertNoViolations(t, rules.CheckNaming(pkgs))
-    })
-    t.Run("structure", func(t *testing.T) {
-        report.AssertNoViolations(t, rules.CheckStructure("."))
-    })
-    t.Run("blast radius", func(t *testing.T) {
-        report.AssertNoViolations(t, rules.AnalyzeBlastRadius(pkgs, "", ""))
-    })
+    arch := presets.DDD()
+    ctx := core.NewContext(pkgs, "", "", arch, nil)
+    ruleset := core.NewRuleSet(
+        dependency.NewIsolation(),
+        dependency.NewLayerDirection(),
+        naming.NewNoStutter(),
+        structural.NewAlias(),
+    )
+
+    report.AssertNoViolations(t, core.Run(ctx, ruleset))
 }
 ```
 
-For other presets, add `opts` with the model function:
+### Custom Architecture
 
 ```go
-m := rules.CleanArch() // or Layered(), Hexagonal(), ModularMonolith(), ConsumerWorker(), Batch(), EventPipeline()
-opts := []rules.Option{rules.WithModel(m)}
-
-rules.CheckDomainIsolation(pkgs, "", "", opts...)
-rules.CheckLayerDirection(pkgs, "", "", opts...)
-// ... same pattern for all Check* functions
-```
-
-### Custom Model
-
-```go
-m := rules.NewModel(
-    rules.WithDomainDir("module"),
-    rules.WithSharedDir("lib"),
-    rules.WithSublayers([]string{"api", "logic", "data"}),
-    rules.WithDirection(map[string][]string{
-        "api":   {"logic"},
-        "logic": {"data"},
-        "data":  {},
-    }),
-)
-opts := []rules.Option{rules.WithModel(m)}
+arch := core.Architecture{
+    Layers: core.LayerModel{
+        Sublayers: []string{"api", "logic", "data"},
+        Direction: map[string][]string{
+            "api":   {"logic"},
+            "logic": {"data"},
+            "data":  {},
+        },
+        InternalTopLevel: map[string]bool{
+            "module": true,
+            "lib":    true,
+        },
+    },
+    Layout: core.LayoutModel{
+        DomainDir: "module",
+        SharedDir: "lib",
+    },
+    Naming: core.NamingPolicy{
+        BannedPkgNames: []string{"util", "common", "misc", "helper", "shared", "services"},
+        LegacyPkgNames: []string{"router", "bootstrap"},
+        AliasFileName:  "alias.go",
+    },
+    Structure: core.StructurePolicy{
+        DTOAllowedLayers: []string{"api"},
+    },
+}
+if err := arch.Validate(); err != nil {
+    t.Fatal(err)
+}
 ```
 
 Run:
@@ -171,57 +169,82 @@ Flat presets use `internal/{layer}/` layout (no domain directory).
 
 See [preset details](docs/presets.md) for full layout diagrams and direction tables.
 
-### Custom Model Options
+### Architecture Fields
 
-Start from DDD defaults and override what you need:
+Build a custom architecture directly with a `core.Architecture` literal:
 
 ```go
-m := rules.NewModel(
-    rules.WithDomainDir("module"),          // internal/module/ instead of internal/domain/
-    rules.WithOrchestrationDir("workflow"), // internal/workflow/
-    rules.WithSharedDir("lib"),             // internal/lib/
-    rules.WithSublayers([]string{"api", "logic", "data"}),
-    rules.WithDirection(map[string][]string{
+arch := core.Architecture{
+    Layers: core.LayerModel{
+        Sublayers: []string{"api", "logic", "data"},
+        Direction: map[string][]string{
+            "api":   {"logic"},
+            "logic": {"data"},
+            "data":  {},
+        },
+        InternalTopLevel: map[string]bool{"module": true, "workflow": true, "lib": true},
+    },
+    Layout: core.LayoutModel{
+        DomainDir:        "module",
+        OrchestrationDir: "workflow",
+        SharedDir:        "lib",
+    },
+    Structure: core.StructurePolicy{
+        RequireAlias: false,
+        RequireModel: false,
+    },
+}
+```
+
+For conceptual explanations of each field — what it means, why it exists, and
+when to set it — see [Model Concepts](docs/model-concepts.md).
+
+Architecture fields:
+
+| Field | Description |
+|-------|-------------|
+| `LayerModel.Sublayers` | authoritative layer vocabulary |
+| `LayerModel.Direction` | allowed import direction matrix |
+| `LayerModel.PortLayers` | pure interface layers such as repo or gateway |
+| `LayerModel.ContractLayers` | contract layers; must include every port layer |
+| `LayerModel.PkgRestricted` | sublayers that must not import shared packages |
+| `LayerModel.InternalTopLevel` | allowed top-level directories under `internal/` |
+| `LayerModel.LayerDirNames` | directory names considered layer-like for placement checks |
+| `LayoutModel.DomainDir` | top-level directory name for domains; empty for flat layouts |
+| `LayoutModel.OrchestrationDir` | top-level directory name for orchestration |
+| `LayoutModel.SharedDir` | top-level directory name for shared packages |
+| `LayoutModel.AppDir` | top-level composition-root directory |
+| `LayoutModel.ServerDir` | top-level transport directory |
+| `NamingPolicy.BannedPkgNames` | package names banned under `internal/` |
+| `NamingPolicy.LegacyPkgNames` | package names that trigger migration warnings |
+| `NamingPolicy.AliasFileName` | domain alias filename |
+| `StructurePolicy.RequireAlias` | whether domain roots must define an alias file |
+| `StructurePolicy.RequireModel` | whether domains must have a model directory |
+| `StructurePolicy.ModelPath` | path to the domain model directory |
+| `StructurePolicy.DTOAllowedLayers` | sublayers where DTOs are allowed |
+| `StructurePolicy.TypePatterns` | AST naming/structure patterns for flat layouts |
+| `StructurePolicy.InterfacePatternExclude` | layers skipped by interface pattern checks |
+
+`core.Validate(arch)` and `arch.Validate()` enforce direction completeness,
+layer references, and `PortLayers ⊆ ContractLayers`.
+
+```go
+arch := presets.DDD()
+arch.Layout.DomainDir = "module"
+arch.Layout.SharedDir = "lib"
+arch.Layers.Sublayers = []string{"api", "logic", "data"}
+arch.Layers.Direction = map[string][]string{
         "api":   {"logic"},
         "logic": {"data"},
         "data":  {},
-    }),
-    rules.WithRequireAlias(false),
-    rules.WithRequireModel(false),
-)
+}
+arch.Structure.RequireAlias = false
+arch.Structure.RequireModel = false
 ```
-
-For conceptual explanations of each option — what it means, why it exists, and when to set it — see [Model Concepts](docs/model-concepts.md).
-
-All model options:
-
-| Option | Description |
-|--------|-------------|
-| `WithSublayers([]string{...})` | recognized sublayer names |
-| `WithDirection(map[string][]string{...})` | allowed import direction matrix |
-| `WithPkgRestricted(map[string]bool{...})` | sublayers that must not import shared pkg |
-| `WithDomainDir("domain")` | top-level directory name for domains |
-| `WithOrchestrationDir("orchestration")` | top-level directory name for orchestration |
-| `WithSharedDir("pkg")` | top-level directory name for shared packages |
-| `WithAppDir("app")` | top-level composition-root directory (e.g. `internal/app/`). Packages here may import anything. Empty to disable. |
-| `WithServerDir("server")` | top-level transport directory (e.g. `internal/server/`). Any subdirectory is a protocol transport. Restricted to app+pkg imports. Empty to disable. |
-| `WithRequireAlias(bool)` | whether domain roots must define alias.go |
-| `WithAliasFileName("alias.go")` | name of the alias file |
-| `WithRequireModel(bool)` | whether domains must have a model directory |
-| `WithModelPath("core/model")` | path to domain model directory |
-| `WithDTOAllowedLayers([]string{...})` | sublayers where DTOs are allowed |
-| `WithBannedPkgNames([]string{...})` | package names banned under internal/ |
-| `WithLegacyPkgNames([]string{...})` | package names that trigger migration warnings |
-| `WithLayerDirNames(map[string]bool{...})` | directory names considered "layer-like" for naming checks |
-| `WithInterfacePatternExclude(map[string]bool{...})` | layers to skip for interface pattern checks |
-| `WithPortLayers([]string{...})` | sublayers classified as port layers (pure interface definitions). Authoritative when non-empty (exact match only). |
-| `WithContractLayers([]string{...})` | sublayers classified as contract layers (ports + svc-like). `ContractLayers ⊇ PortLayers`; helpers union the two lists at check time. |
-
-`NewModel` starts from `DDD()` defaults, so custom models inherit `PortLayers=["core/repo"]` and `ContractLayers=["core/repo","core/svc"]` unless overridden. To restore the basename fallback (`repo`/`gateway`/`svc`), clear BOTH lists explicitly: `WithPortLayers(nil), WithContractLayers(nil)`. Clearing only one keeps the authoritative exact-match path active (see the `NewModel` godoc).
 
 ## Isolation Rules
 
-`rules.CheckDomainIsolation(pkgs, module, root, opts...)`
+`dependency.NewIsolation()`
 
 Prevents domains from leaking into each other. Without isolation, a change in domain A
 can silently break domain B --- the most common source of unintended coupling in DDD projects.
@@ -336,7 +359,7 @@ import _ "myapp/internal/config"  // violation: transport imports unclassified p
 
 ## Layer Direction Rules
 
-`rules.CheckLayerDirection(pkgs, module, root, opts...)`
+`dependency.NewLayerDirection()`
 
 Prevents reverse dependencies between layers. Without direction enforcement,
 inner layers (model, entity) gradually accumulate imports from outer layers,
@@ -379,7 +402,9 @@ internal/domain/order/utils/   "utils" is not a recognized sublayer
 
 ## Structure Rules
 
-`rules.CheckStructure(root, opts...)`
+`structural.NewInternalTopLevel()`, `structural.NewBannedPackage()`,
+`structural.NewPlacement()`, `structural.NewAlias()`, and
+`structural.NewModelRequired()`
 
 Enforces filesystem layout conventions that prevent structural drift during vibe coding.
 
@@ -449,7 +474,9 @@ DTO files (`dto.go`, `*_dto.go`) may only exist in allowed layers (handler, app)
 
 ## Naming Rules
 
-`rules.CheckNaming(pkgs, opts...)`
+`naming.NewNoStutter()`, `naming.NewImplSuffix()`,
+`naming.NewSnakeCaseFiles()`, `naming.NewNoLayerSuffix()`,
+`naming.NewNoHandMock()`, and `naming.NewRepoFileInterface()`
 
 Enforces Go naming conventions that keep the codebase consistent and grep-friendly.
 
@@ -503,10 +530,11 @@ type Helper interface { Assist() } // violation: move to helper.go
 
 ### `interface.too-many-methods`
 
-Repo interfaces must not exceed the method limit set by `WithMaxRepoInterfaceMethods`. Disabled by default.
+Repo interfaces must not exceed the method limit set by `interfaces.WithMaxMethods`. Disabled by default.
 
 ```go
-rules.CheckNaming(pkgs, rules.WithMaxRepoInterfaceMethods(10))
+ruleset := presets.RecommendedDDD().With(interfaces.NewPattern(interfaces.WithMaxMethods(10)))
+report.AssertNoViolations(t, core.Run(ctx, ruleset))
 ```
 
 ```go
@@ -565,7 +593,8 @@ func (w *OrderWorker) Process(ctx context.Context) error { ... }  // correct
 
 ## Interface Pattern Rules
 
-`rules.CheckInterfacePattern(pkgs, opts...)`
+`interfaces.NewPattern()`, `interfaces.NewContainer()`, and
+`interfaces.NewCrossDomainAnonymous()`
 
 Enforces Go interface best practices: private implementation, `New()`-only constructor,
 interface return type, and single interface per package.
@@ -692,12 +721,12 @@ The rule does **not** prescribe a fix. It only points at the smell. Two common r
 1. Re-export the concrete type from `alias.go` so the field can hold it directly.
 2. Rewrite the wiring so the value is a local variable inside one function instead of a struct field shared between functions.
 
-Severity can be upgraded to Error via `WithSeverity(Error)` if a project wants to enforce
+Severity can be upgraded to Error via `interfaces.WithSeverity(core.Error)` if a project wants to enforce
 the smell as a hard rule.
 
 ## Blast Radius
 
-`rules.AnalyzeBlastRadius(pkgs, module, root, opts...)`
+`dependency.NewBlastRadius()`
 
 Surfaces internal packages with abnormally high coupling via IQR-based statistical outlier detection. Default severity is Warning. Skips projects with fewer than 5 internal packages.
 
@@ -714,31 +743,29 @@ Surfaces internal packages with abnormally high coupling via IQR-based statistic
 
 ## Tx Boundary
 
-### `CheckTxBoundary` (opt-in)
+### `tx.New` (opt-in)
 
 Gates where transactions may **start** and prevents transaction types from
 **leaking** into function signatures outside an allowed layer. Fully opt-in —
-does nothing unless you configure it. Included in `RunAll` automatically
-(no-op until configured).
+does nothing unless you configure it. Add it to a `core.RuleSet` only when
+your project has known transaction start symbols or transaction types.
 
 ```go
-violations := rules.CheckTxBoundary(pkgs, module, root,
-    rules.WithTxBoundary(rules.TxBoundaryConfig{
-        StartSymbols: []string{
-            "database/sql.(*DB).BeginTx",
-            "database/sql.(*DB).Begin",
-        },
-        Types:         []string{"database/sql.Tx"},
-        AllowedLayers: []string{"app"}, // default when empty
-    }),
-)
+ruleset := presets.RecommendedDDD().With(tx.New(tx.Config{
+    StartSymbols: []string{
+        "database/sql.(*DB).BeginTx",
+        "database/sql.(*DB).Begin",
+    },
+    Types:         []string{"database/sql.Tx"},
+    AllowedLayers: []string{"app"}, // default when empty
+}))
 ```
 
 Emitted rule IDs: `tx.start-outside-allowed-layer`, `tx.type-in-signature`.
 
 ## Setter Pattern
 
-### `CheckNoSetters`
+### `types.NewNoSetter`
 
 Flags exported setter methods (`Set*` on pointer receivers with at least one parameter) to steer custom types toward explicit constructor parameters.
 
@@ -746,14 +773,14 @@ Flags exported setter methods (`Set*` on pointer receivers with at least one par
 
 - Fluent builders (methods returning the receiver type) are exempt.
 - Test files and packages under `testdata/` or `mocks/` are auto-excluded.
-- Default severity: Warning. Use `WithSeverity(rules.Error)` for strict enforcement.
+- Default severity: Warning. Use `types.WithSeverity(core.Error)` for strict enforcement.
 
 ```go
 // Default: Warning severity
-report.AssertNoViolations(t, rules.CheckNoSetters(pkgs))
+report.AssertNoViolations(t, core.Run(ctx, core.NewRuleSet(types.NewNoSetter())))
 
 // Strict: Error severity
-report.AssertNoViolations(t, rules.CheckNoSetters(pkgs, rules.WithSeverity(rules.Error)))
+report.AssertNoViolations(t, core.Run(ctx, core.NewRuleSet(types.NewNoSetter(types.WithSeverity(core.Error)))))
 ```
 
 Emitted rule ID: `setter.forbidden`.
@@ -763,17 +790,17 @@ Emitted rule ID: `setter.forbidden`.
 ### Severity
 
 ```go
-// Log violations without failing the test
-rules.CheckDomainIsolation(pkgs, "", "", rules.WithSeverity(rules.Warning))
+// Log a specific violation without failing the test
+core.Run(ctx, presets.RecommendedDDD(),
+    core.WithSeverityOverride("isolation.cross-domain", core.Warning))
 ```
 
 ### Exclude Paths
 
 ```go
 // Skip subtrees during migration
-rules.CheckDomainIsolation(pkgs, "", "",
-    rules.WithExclude("internal/legacy/..."),
-)
+ctx := core.NewContext(pkgs, "", "", presets.DDD(), []string{"internal/legacy/..."})
+violations := core.Run(ctx, presets.RecommendedDDD())
 ```
 
 Patterns are project-relative paths with forward slashes. `...` matches the root and all descendants.
@@ -793,35 +820,31 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | Function | Description |
 |----------|-------------|
 | `analyzer.Load(dir, patterns...)` | load Go packages for analysis |
-| `rules.CheckDomainIsolation(pkgs, module, root, opts...)` | cross-domain boundary checks |
-| `rules.CheckLayerDirection(pkgs, module, root, opts...)` | intra-domain direction checks |
-| `rules.CheckNaming(pkgs, opts...)` | naming convention checks |
-| `rules.CheckStructure(root, opts...)` | filesystem structure checks |
-| `rules.AnalyzeBlastRadius(pkgs, module, root, opts...)` | coupling outlier detection |
-| `rules.CheckInterfacePattern(pkgs, opts...)` | interface pattern best practices |
-| `rules.CheckTxBoundary(pkgs, module, root, opts...)` | transaction boundary enforcement (opt-in) |
-| `rules.CheckNoSetters(pkgs, opts...)` | exported setter detection (Warning by default) |
-| `rules.RunAll(pkgs, module, root, opts...)` | run the recommended built-in rule bundle |
+| `core.NewContext(pkgs, module, root, arch, exclude)` | build the immutable analysis context |
+| `core.Run(ctx, ruleset, opts...)` | execute a ruleset and return `[]core.Violation` |
+| `core.RuleSet` | immutable collection of rules plus violation filters |
+| `core.NewRuleSet(ruleValues...)` | create an immutable ruleset |
+| `(rs).With(ruleValues...)` / `(rs).Without(ids...)` | append rules or filter violation IDs |
+| `core.WithSeverityOverride(violationID, sev)` | override effective severity for one violation ID |
 | `report.AssertNoViolations(t, violations)` | fail test on Error violations |
 | `report.BuildJSONReport(violations)` | build a machine-readable JSON-friendly report |
 | `report.MarshalJSONReport(violations)` | marshal a machine-readable JSON report |
 | `report.WriteJSONReport(w, violations)` | write a machine-readable JSON report |
 | `scaffold.ArchitectureTest(preset, opts)` | generate a preset-specific `architecture_test.go` template |
-| `rules.DDD()` | DDD architecture model (default) |
-| `rules.CleanArch()` | Clean Architecture model |
-| `rules.Layered()` | Spring-style layered model |
-| `rules.Hexagonal()` | Ports & Adapters model |
-| `rules.ModularMonolith()` | Module-based layered model |
-| `rules.ConsumerWorker()` | Consumer/Worker flat-layout model |
-| `rules.Batch()` | Batch flat-layout model |
-| `rules.EventPipeline()` | Event-sourcing / CQRS flat-layout model |
-| `rules.CheckTypePatterns(pkgs, opts...)` | AST-based type pattern enforcement |
-| `rules.NewModel(opts...)` | custom model builder |
-| `rules.WithModel(m)` | apply custom model to checks |
-| `rules.WithSeverity(rules.Warning)` | downgrade to warnings |
-| `rules.WithExclude("path/...")` | skip a subtree |
-| `rules.WithMaxRepoInterfaceMethods(10)` | limit repo interface method count |
-| `rules.WithTxBoundary(cfg)` | configure transaction boundary checks |
+| `presets.DDD()` / `presets.RecommendedDDD()` | DDD architecture and recommended ruleset |
+| `presets.CleanArch()` / `presets.RecommendedCleanArch()` | Clean Architecture architecture and ruleset |
+| `presets.Layered()` / `presets.RecommendedLayered()` | layered architecture and ruleset |
+| `presets.Hexagonal()` / `presets.RecommendedHexagonal()` | Ports & Adapters architecture and ruleset |
+| `presets.ModularMonolith()` / `presets.RecommendedModularMonolith()` | modular monolith architecture and ruleset |
+| `presets.ConsumerWorker()` / `presets.RecommendedConsumerWorker()` | Consumer/Worker flat-layout architecture and ruleset |
+| `presets.Batch()` / `presets.RecommendedBatch()` | Batch flat-layout architecture and ruleset |
+| `presets.EventPipeline()` / `presets.RecommendedEventPipeline()` | event-sourcing / CQRS architecture and ruleset |
+| `dependency.NewIsolation()` / `NewLayerDirection()` / `NewBlastRadius()` | dependency rules |
+| `naming.NewNoStutter()` / `NewImplSuffix()` / `NewSnakeCaseFiles()` / `NewNoLayerSuffix()` / `NewNoHandMock()` / `NewRepoFileInterface()` | naming rules |
+| `structural.NewAlias()` / `NewPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` | structure rules |
+| `interfaces.NewPattern()` / `NewContainer()` / `NewCrossDomainAnonymous()` | interface rules |
+| `tx.New(tx.Config{...})` | transaction boundary enforcement (opt-in) |
+| `types.NewTypePattern()` / `types.NewNoSetter()` | type pattern and setter rules |
 
 ## Machine-readable JSON Output
 

@@ -5,26 +5,9 @@
 Go 프로젝트의 아키텍처 규칙(의존성, 네이밍, 구조)을 정적 분석으로 검증하는 라이브러리. 팀이 커밋한 컨벤션을 vibe coding 중에 깨지지 않게 지켜주는 **중립 인프라**이며, AI 코딩 에이전트가 쉽게 스캐폴딩하고 유지할 수 있는 표면을 제공한다.
 
 AI 에이전트 친화적인 기본 surface:
-- `scaffold.ArchitectureTest(...)` — 프리셋별 `architecture_test.go` 생성
-- `report.BuildJSONReport(...)` / `report.MarshalJSONReport(...)` — machine-readable violation 출력
-- `rules.RunAll(...)` — 권장 기본 rule 묶음 실행
-
----
-
-### Refactor Status (in-place rewrite in progress)
-
-A large in-place refactor is underway. The new `core/` package has landed as
-a skeleton: `Rule` interface, `RuleSpec` + `ViolationSpec` catalog,
-immutable `Context`, validated `Architecture` (LayerModel / LayoutModel /
-NamingPolicy / StructurePolicy), `RuleSet` struct, and `Run` with
-deterministic ordering, severity precedence, and unknown-ID rejection.
-**No rules have been migrated yet** — `rules/` and the v1 surface listed
-above are unchanged and remain the supported integration path. v1 will be
-replaced in-place over subsequent plans (no `/v2` module path; this is
-treated as a single-user library refactor, not a coexistence project).
-
-Design spec and plan documents live under `docs/superpowers/` (gitignored,
-local-only). Subsequent plans will migrate rule families one at a time.
+- `scaffold.ArchitectureTest(...)` — 프리셋별 `core` + `presets` 기반 `architecture_test.go` 생성
+- `report.BuildJSONReport(...)` / `report.MarshalJSONReport(...)` — `core.Violation` 기반 machine-readable violation 출력
+- `core.Run(ctx, presets.RecommendedDDD())` — 권장 rule 묶음 실행
 
 ---
 
@@ -33,9 +16,6 @@ local-only). Subsequent plans will migrate rule families one at a time.
 After any code change, update related documentation (README.md, docs/).
 CLAUDE.md and README.md must be kept in sync.
 SKILL.md (`plugins/go-arch-guard/skills/go-arch-guard/SKILL.md`) must also be updated when rules or API surface changes.
-While the v2 refactor is in flight, also keep this file's "Refactor Status"
-section current — bump it as each plan lands (rule migrations, presets/,
-scaffold/TUI cutover, etc.).
 Skill changes on `main` also auto-bump `plugins/go-arch-guard/.claude-plugin/plugin.json` via GitHub Actions. Keep the versioning rule and workflow in sync with the script tests.
 
 ---
@@ -87,8 +67,8 @@ should be able to express it.
   be pure" or "alias.go is the only exposed surface" are legitimate team
   choices; the library provides rules for those if they are mechanically
   detectable.
-- Severity per rule — `Error` (blocks builds) or `Warning` (advisory). Override
-  via `WithSeverity`.
+- Severity per violation — `Error` (blocks builds) or `Warning` (advisory).
+  Override via `core.WithSeverityOverride`.
 - False-positive tolerance. A rule that's noisy in one project may be a clean
   win in another.
 
@@ -99,7 +79,7 @@ should be able to express it.
   than no rule. This is the firmest gate; "micro" scope is fine, "noisy" is
   not.
 - **Static analysis only** — no runtime dependencies.
-- **Independent** — no hidden ordering or state sharing between rules.
+- **Independent** — no hidden ordering or state sharing between rule implementations.
 
 #### When to add a rule to the recommended bundle
 
