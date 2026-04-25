@@ -85,6 +85,17 @@ func (a Architecture) Validate() error {
 		}
 	}
 
+	// TypePatterns: each pattern's Dir must be a declared sublayer.
+	for _, tp := range a.Structure.TypePatterns {
+		if tp.Dir == "" {
+			errs = append(errs, "TypePatterns entry has empty Dir")
+			continue
+		}
+		if !known[tp.Dir] {
+			errs = append(errs, fmt.Sprintf("TypePatterns references unknown layer %q", tp.Dir))
+		}
+	}
+
 	if len(errs) == 0 {
 		return nil
 	}
