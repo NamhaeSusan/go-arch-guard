@@ -504,19 +504,19 @@ type Helper interface { Assist() } // 위반: helper.go로 이동
 
 ### `interface.too-many-methods`
 
-repo 인터페이스의 메서드 수가 `interfaces.WithMaxMethods`로 설정한 상한을 초과하면 위반입니다. 기본 비활성.
-
-```go
-ruleset := presets.RecommendedDDD().With(interfaces.NewPattern(interfaces.WithMaxMethods(10)))
-report.AssertNoViolations(t, core.Run(ctx, ruleset))
-```
+repo 인터페이스의 메서드 수가 `interfaces.WithMaxMethods`로 설정한 상한을 초과하면 위반입니다. DDD, CleanArch, Hexagonal 권장 번들은 기본 상한 10을 활성화합니다. 다른 프리셋은 비활성 상태입니다.
 
 ```go
 // repo/review.go
 type Review interface {
-    // 메서드 11개 --- 위반 (max 10)
+    // 메서드 11개 --- RecommendedDDD/CleanArch/Hexagonal에서 위반 (max 10)
 }
 ```
+
+기본값을 바꾸려면 권장 번들을 그대로 쓰지 말고
+`interfaces.NewPattern(interfaces.WithMaxMethods(N))`로 직접 RuleSet을
+구성하세요. 권장 번들 위에 `interfaces.NewPattern`을 또 붙이면 두 인스턴스가
+모두 실행돼 중복 위반이 발생합니다.
 
 ### `naming.no-layer-suffix`
 

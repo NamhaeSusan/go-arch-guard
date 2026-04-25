@@ -530,19 +530,19 @@ type Helper interface { Assist() } // violation: move to helper.go
 
 ### `interface.too-many-methods`
 
-Repo interfaces must not exceed the method limit set by `interfaces.WithMaxMethods`. Disabled by default.
-
-```go
-ruleset := presets.RecommendedDDD().With(interfaces.NewPattern(interfaces.WithMaxMethods(10)))
-report.AssertNoViolations(t, core.Run(ctx, ruleset))
-```
+Repo interfaces must not exceed the method limit set by `interfaces.WithMaxMethods`. The DDD, CleanArch, and Hexagonal recommended bundles enable a default limit of 10. Other presets leave it disabled.
 
 ```go
 // repo/review.go
 type Review interface {
-    // 11 methods --- violation (max 10)
+    // 11 methods --- violation (max 10) under RecommendedDDD/CleanArch/Hexagonal
 }
 ```
+
+To override the bundled default, build a custom RuleSet with your own
+`interfaces.NewPattern(interfaces.WithMaxMethods(N))` instead of using the
+recommended bundle. Don't append a second `interfaces.NewPattern` on top of
+a recommended bundle — both instances run, producing duplicate violations.
 
 ### `naming.no-layer-suffix`
 
