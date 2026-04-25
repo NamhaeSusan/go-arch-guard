@@ -191,13 +191,14 @@ arch := core.Architecture{
 
 | 필드 | 설명 |
 |------|------|
-| `LayerModel.Sublayers` | authoritative 서브레이어 이름 목록 |
-| `LayerModel.Direction` | 허용 import 방향 매트릭스 |
-| `LayerModel.PortLayers` | repo/gateway 같은 순수 인터페이스 레이어 |
-| `LayerModel.ContractLayers` | 계약 레이어. 모든 port layer를 포함해야 함 |
+| `LayerModel.Sublayers` | authoritative 서브레이어 경로 목록 (`"core/repo"`); direction/port/contract 룰의 권위 |
+| `LayerModel.Direction` | 허용 import 방향 매트릭스 (key는 `Sublayers`에 있어야 함) |
+| `LayerModel.PortLayers` | repo/gateway 같은 순수 인터페이스 레이어 (`Sublayers`에 있어야 함) |
+| `LayerModel.ContractLayers` | 계약 레이어; `PortLayers`의 superset이어야 함 |
 | `LayerModel.PkgRestricted` | 공유 패키지 import 금지 서브레이어 |
-| `LayerModel.InternalTopLevel` | `internal/` 아래 허용 최상위 디렉토리 |
-| `LayerModel.LayerDirNames` | 배치 검사에서 layer-like로 취급할 디렉토리명 |
+| `LayerModel.InternalTopLevel` | 패키지 루트 아래 허용 최상위 디렉토리 |
+| `LayerModel.LayerDirNames` | 파일/디렉토리 배치 룰이 인식하는 레이어 **basename** (`"repo"`); 의도적으로 `Sublayers`에 있을 필요 없음 |
+| `LayoutModel.InternalRoot` | 프로젝트 상대 패키지 루트 디렉토리; 빈 값은 `"internal"`로 정규화됨 (`"packages"`, `"src"` 등 비표준 레이아웃 지원) |
 | `LayoutModel.DomainDir` | 도메인 최상위 디렉토리명. 플랫 레이아웃은 빈 값 |
 | `LayoutModel.OrchestrationDir` | 오케스트레이션 최상위 디렉토리명 |
 | `LayoutModel.SharedDir` | 공유 패키지 최상위 디렉토리명 |
@@ -229,6 +230,19 @@ arch.Layers.Direction = map[string][]string{
 arch.Structure.RequireAlias = false
 arch.Structure.RequireModel = false
 ```
+
+### 비표준 패키지 루트 (`internal/` 외 레이아웃)
+
+표준 `internal/` 대신 `packages/`, `src/` 같은 다른 디렉토리에 패키지를 두는 프로젝트는 `Layout.InternalRoot`를 설정하면 됩니다:
+
+```go
+arch := presets.DDD()
+arch.Layout.InternalRoot = "packages" // packages/domain/order/...
+```
+
+빈 `InternalRoot`는 생성 시점에 `"internal"`로 정규화되므로 기존 설정은 그대로 동작합니다. 레이아웃 의존 룰은 `<root>/<InternalRoot>/` 디렉토리가 없을 때 violation을 묵묵히 0개로 반환하지 않고 `meta.layout-not-supported` (Warning)를 emit합니다.
+
+`scaffold.ArchitectureTest`도 `ArchitectureTestOptions.InternalRoot`로 같은 필드를 인식해 생성된 `architecture_test.go`가 실제 레이아웃과 매칭됩니다.
 
 ## 격리 규칙
 
@@ -772,6 +786,21 @@ ctx := core.NewContext(pkgs, "", "", presets.DDD(), []string{"internal/legacy/..
 ctx := core.NewContext(pkgs, "", "", presets.CleanArch(), nil)
 ```
 
+Exclude 패턴은 정규화 후 매칭됩니다: `/internal/foo`, `internal/foo`, `internal/foo/`, `./internal/foo`는 모두 같은 경로를 가리킵니다.
+
+### Meta Violations
+
+런타임이 환경/설정 이슈를 알리는 `meta.*` violation 집합. 빌드를 자동 차단하지 않으며 `(Rule, Message)` pair로 dedup되어 서로 다른 메시지는 모두 보존됩니다.
+
+| ID | Severity | 발생 시점 |
+|---|---|---|
+| `meta.no-matching-packages` | Warning | 설정한 모듈 path가 로드된 패키지와 매칭 안 됨 |
+| `meta.layout-not-supported` | Warning | 레이아웃 의존 룰을 `<root>/<InternalRoot>/` 디렉토리 없는 프로젝트에 실행 |
+| `meta.rule-panic` | Error | 룰의 `Check`가 panic; panic은 캡처되고 다른 룰은 계속 실행됨 |
+| `meta.unknown-violation-id` | per rule | 룰이 `Spec().Violations`에 선언하지 않은 violation ID emit |
+
+`core.WithSeverityOverride(...)`로 강제 실패시키거나 `RuleSet.Without(...)`로 필터링 가능.
+
 ## TUI 뷰어
 
 ```bash
@@ -795,13 +824,13 @@ go run github.com/NamhaeSusan/go-arch-guard/cmd/tui --preset hexagonal .
 | `core.Run(ctx, ruleset, opts...)` | ruleset 실행 후 `[]core.Violation` 반환; rule panic은 `meta.rule-panic` Error violation으로 변환 |
 | `core.RuleSet` | rule과 violation 필터를 담는 불변 컬렉션 |
 | `core.NewRuleSet(ruleValues...)` | 불변 ruleset 생성 |
-| `(rs).With(ruleValues...)` / `(rs).Without(ids...)` | rule 추가 또는 violation ID 필터링 |
+| `(rs).With(ruleValues...)` / `(rs).Without(ids...)` | rule 추가 (nil은 자동 무시) 또는 violation ID 필터링 |
 | `core.WithSeverityOverride(violationID, sev)` | 특정 violation ID의 effective severity override |
 | `report.AssertNoViolations(t, violations)` | Error 위반 시 테스트 실패 |
 | `report.BuildJSONReport(violations)` | 기계가 읽기 쉬운 JSON 리포트 구성 |
 | `report.MarshalJSONReport(violations)` | JSON 리포트 직렬화 |
 | `report.WriteJSONReport(w, violations)` | JSON 리포트 쓰기 |
-| `scaffold.ArchitectureTest(preset, opts)` | 프리셋별 `architecture_test.go` 템플릿 생성 |
+| `scaffold.ArchitectureTest(preset, opts)` | 프리셋별 `architecture_test.go` 템플릿 생성 (`opts.InternalRoot`로 비표준 패키지 루트 지원) |
 | `presets.DDD()` / `presets.RecommendedDDD()` | DDD 아키텍처와 권장 ruleset |
 | `presets.CleanArch()` / `presets.RecommendedCleanArch()` | Clean Architecture 아키텍처와 ruleset |
 | `presets.Layered()` / `presets.RecommendedLayered()` | Layered 아키텍처와 ruleset |
