@@ -96,3 +96,33 @@ func TestValidateRejectsPkgRestrictedUnknown(t *testing.T) {
 		t.Errorf("expected PkgRestricted error, got %v", err)
 	}
 }
+
+func TestValidateRejectsDirectionUnknownSourceLayer(t *testing.T) {
+	a := validArchitecture()
+	a.Layers.Direction["ghost"] = []string{"core/model"}
+	err := a.Validate()
+	if err == nil || !strings.Contains(err.Error(), "ghost") || !strings.Contains(err.Error(), "Direction") {
+		t.Errorf("expected Direction unknown-source error, got %v", err)
+	}
+}
+
+func TestValidateRejectsContractLayersUnknown(t *testing.T) {
+	a := validArchitecture()
+	a.Layers.ContractLayers = []string{"core/repo", "core/svc", "ghost"}
+	err := a.Validate()
+	if err == nil || !strings.Contains(err.Error(), "ContractLayers") || !strings.Contains(err.Error(), "ghost") {
+		t.Errorf("expected ContractLayers unknown-layer error, got %v", err)
+	}
+}
+
+func TestPackageLevelValidateMatchesMethod(t *testing.T) {
+	a := validArchitecture()
+	if Validate(a) != nil {
+		t.Errorf("Validate(valid) should be nil")
+	}
+	a.Layers.PortLayers = []string{"ghost"}
+	a.Layers.ContractLayers = []string{"ghost"}
+	if Validate(a) == nil {
+		t.Errorf("Validate(invalid) should return error")
+	}
+}

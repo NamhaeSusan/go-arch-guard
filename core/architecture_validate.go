@@ -12,6 +12,12 @@ import (
 //
 // Validate is called by Run before any rule executes; presets MAY call it
 // at construction time to fail fast.
+//
+// Layout-level non-empty checks (e.g. "AppDir must be set when an
+// app-aware rule is enabled") are NOT performed here because Architecture
+// does not know which rules will run. Presets that bundle layout-aware
+// rules are responsible for refusing to construct an Architecture whose
+// Layout is missing required directories.
 func (a Architecture) Validate() error {
 	known := make(map[string]bool, len(a.Layers.Sublayers))
 	for _, l := range a.Layers.Sublayers {
@@ -29,7 +35,7 @@ func (a Architecture) Validate() error {
 	// Direction values must be known sublayers.
 	for src, targets := range a.Layers.Direction {
 		if !known[src] {
-			errs = append(errs, fmt.Sprintf("Direction has unknown source layer %q", src))
+			errs = append(errs, fmt.Sprintf("Direction[%q] has unknown source layer (key not in Sublayers)", src))
 		}
 		for _, t := range targets {
 			if !known[t] {
@@ -85,3 +91,7 @@ func (a Architecture) Validate() error {
 	sort.Strings(errs)
 	return fmt.Errorf("invalid Architecture: %s", strings.Join(errs, "; "))
 }
+
+// Validate is the package-level form of Architecture.Validate. Presets that
+// prefer the functional form (e.g. `core.Validate(arch)`) can call this.
+func Validate(a Architecture) error { return a.Validate() }
