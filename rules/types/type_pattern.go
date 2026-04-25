@@ -16,14 +16,20 @@ const (
 	typePatternMissingMethodID = "naming.type-pattern-missing-method"
 )
 
-var TypePatternDefaultSpec = core.RuleSpec{
-	ID:              "types.type-pattern",
-	Description:     "files matching configured type patterns must define expected types and methods",
-	DefaultSeverity: core.Error,
-	Violations: []core.ViolationSpec{
-		{ID: typePatternMismatchID, Description: "file does not define the expected exported type", DefaultSeverity: core.Error},
-		{ID: typePatternMissingMethodID, Description: "type does not define the required method", DefaultSeverity: core.Error},
-	},
+// TypePatternDefaultSpec returns a fresh copy of the rule's static metadata
+// (with the hard-coded default severity, before any construction-time
+// override). The returned value is independent — mutating it has no effect
+// on subsequent calls.
+func TypePatternDefaultSpec() core.RuleSpec {
+	return core.RuleSpec{
+		ID:              "types.type-pattern",
+		Description:     "files matching configured type patterns must define expected types and methods",
+		DefaultSeverity: core.Error,
+		Violations: []core.ViolationSpec{
+			{ID: typePatternMismatchID, Description: "file does not define the expected exported type", DefaultSeverity: core.Error},
+			{ID: typePatternMissingMethodID, Description: "type does not define the required method", DefaultSeverity: core.Error},
+		},
+	}
 }
 
 type TypePattern struct {
@@ -60,7 +66,7 @@ func NewTypePattern(opts ...Option) *TypePattern {
 }
 
 func (r *TypePattern) Spec() core.RuleSpec {
-	return specWithSeverity(TypePatternDefaultSpec, r.severity)
+	return specWithSeverity(TypePatternDefaultSpec(), r.severity)
 }
 
 func (r *TypePattern) Check(ctx *core.Context) []core.Violation {

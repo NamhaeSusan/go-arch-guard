@@ -13,13 +13,20 @@ import (
 
 const setterForbiddenID = "setter.forbidden"
 
-var NoSetterDefaultSpec = core.RuleSpec{
-	ID:              "types.no-setter",
-	Description:     "exported setter methods on pointer receivers are forbidden",
-	DefaultSeverity: core.Warning,
-	Violations: []core.ViolationSpec{
-		{ID: setterForbiddenID, Description: "exported setter method on pointer receiver", DefaultSeverity: core.Warning},
-	},
+// NoSetterDefaultSpec returns a fresh copy of the rule's static metadata
+// (with the hard-coded default severity, before any construction-time
+// override). The returned value is independent — mutating it has no effect
+// on subsequent calls. Tooling (--list-rules, doc generators, plugin
+// catalogs) should call this rather than reading a package-level variable.
+func NoSetterDefaultSpec() core.RuleSpec {
+	return core.RuleSpec{
+		ID:              "types.no-setter",
+		Description:     "exported setter methods on pointer receivers are forbidden",
+		DefaultSeverity: core.Warning,
+		Violations: []core.ViolationSpec{
+			{ID: setterForbiddenID, Description: "exported setter method on pointer receiver", DefaultSeverity: core.Warning},
+		},
+	}
 }
 
 type NoSetter struct {
@@ -35,7 +42,7 @@ func NewNoSetter(opts ...Option) *NoSetter {
 }
 
 func (r *NoSetter) Spec() core.RuleSpec {
-	return specWithSeverity(NoSetterDefaultSpec, r.severity)
+	return specWithSeverity(NoSetterDefaultSpec(), r.severity)
 }
 
 func (r *NoSetter) Check(ctx *core.Context) []core.Violation {
