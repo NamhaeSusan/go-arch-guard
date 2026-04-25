@@ -119,6 +119,44 @@ func TestArchitectureTest_ConsumerWorker(t *testing.T) {
 	}
 }
 
+func TestArchitectureTestDefaultsInternalRoot(t *testing.T) {
+	src, err := scaffold.ArchitectureTest(scaffold.PresetDDD, scaffold.ArchitectureTestOptions{PackageName: "myapp_test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `analyzer.Load(".", "internal/...", "cmd/...")`
+	if !strings.Contains(src, want) {
+		t.Fatalf("default scaffold must emit %q\n%s", want, src)
+	}
+}
+
+func TestArchitectureTestCustomInternalRoot(t *testing.T) {
+	src, err := scaffold.ArchitectureTest(scaffold.PresetDDD, scaffold.ArchitectureTestOptions{
+		PackageName:  "myapp_test",
+		InternalRoot: "packages",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `analyzer.Load(".", "packages/...", "cmd/...")`
+	if !strings.Contains(src, want) {
+		t.Fatalf("custom InternalRoot must emit %q\n%s", want, src)
+	}
+	if strings.Contains(src, `"internal/..."`) {
+		t.Fatalf("custom InternalRoot must NOT emit \"internal/...\"\n%s", src)
+	}
+}
+
+func TestArchitectureTestRejectsInternalRootWithSeparator(t *testing.T) {
+	_, err := scaffold.ArchitectureTest(scaffold.PresetDDD, scaffold.ArchitectureTestOptions{
+		PackageName:  "myapp_test",
+		InternalRoot: "foo/bar",
+	})
+	if err == nil {
+		t.Fatal("expected error for InternalRoot containing slash")
+	}
+}
+
 func TestArchitectureTestErrors(t *testing.T) {
 	if _, err := scaffold.ArchitectureTest(scaffold.PresetDDD, scaffold.ArchitectureTestOptions{}); err == nil {
 		t.Fatal("expected empty package name error")
