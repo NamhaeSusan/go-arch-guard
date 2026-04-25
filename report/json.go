@@ -23,13 +23,17 @@ type JSONSummary struct {
 	Rules    []string `json:"rules"`
 }
 
-// JSONViolation is a JSON-friendly view of a core.Violation.
+// JSONViolation is a JSON-friendly view of a core.Violation. Every field is
+// always emitted (no `omitempty`) so consumers see one stable shape per
+// violation regardless of severity or violation source — meta.* violations
+// without a file or line still emit `"file": ""` and `"line": 0` rather than
+// dropping the keys, which would force parsers to handle two object shapes.
 type JSONViolation struct {
-	File              string `json:"file,omitempty"`
-	Line              int    `json:"line,omitempty"`
+	File              string `json:"file"`
+	Line              int    `json:"line"`
 	Rule              string `json:"rule"`
 	Message           string `json:"message"`
-	Fix               string `json:"fix,omitempty"`
+	Fix               string `json:"fix"`
 	EffectiveSeverity string `json:"effectiveSeverity"`
 	DefaultSeverity   string `json:"defaultSeverity"`
 }
@@ -41,16 +45,37 @@ type JSONReport struct {
 	Violations []JSONViolation `json:"violations"`
 }
 
-// BuildJSONReport converts violations into a machine-readable report.
+// BuildJSONReport converts violations into a machine-readable report. The
+// violations slice is sorted by (File, Line, Rule, Message) on a defensive
+// copy before serialization so the JSON output is byte-stable regardless of
+// the caller's input order. core.Run already sorts the same way, but direct
+// callers (custom runners, third-party rule pipelines) cannot be assumed to
+// sort, and unstable JSON breaks every downstream comparison and snapshot.
 func BuildJSONReport(violations []core.Violation) JSONReport {
 	report := JSONReport{
 		Schema:     jsonReportSchema,
 		Violations: make([]JSONViolation, 0, len(violations)),
 	}
+
+	sorted := make([]core.Violation, len(violations))
+	copy(sorted, violations)
+	sort.SliceStable(sorted, func(i, j int) bool {
+		if sorted[i].File != sorted[j].File {
+			return sorted[i].File < sorted[j].File
+		}
+		if sorted[i].Line != sorted[j].Line {
+			return sorted[i].Line < sorted[j].Line
+		}
+		if sorted[i].Rule != sorted[j].Rule {
+			return sorted[i].Rule < sorted[j].Rule
+		}
+		return sorted[i].Message < sorted[j].Message
+	})
+
 	files := make(map[string]struct{})
 	ruleSet := make(map[string]struct{})
 
-	for _, v := range violations {
+	for _, v := range sorted {
 		report.Violations = append(report.Violations, JSONViolation{
 			File:              v.File,
 			Line:              v.Line,

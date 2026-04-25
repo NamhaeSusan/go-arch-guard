@@ -34,8 +34,11 @@ func ExampleMarshalJSONReport() {
 	//   },
 	//   "violations": [
 	//     {
+	//       "file": "",
+	//       "line": 0,
 	//       "rule": "test.rule",
 	//       "message": "bad import",
+	//       "fix": "",
 	//       "effectiveSeverity": "error",
 	//       "defaultSeverity": "error"
 	//     }
