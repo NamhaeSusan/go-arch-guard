@@ -423,7 +423,7 @@ internal/domain/order/utils/   "utils" is not a recognized sublayer
 ## Structure Rules
 
 `structural.NewInternalTopLevel()`, `structural.NewBannedPackage()`,
-`structural.NewPlacement()`, `structural.NewAlias()`, and
+`structural.NewLayerPlacement()`, `structural.NewMiddlewarePlacement()`, `structural.NewDTOPlacement()`, `structural.NewAlias()`, and
 `structural.NewModelRequired()`
 
 Enforces filesystem layout conventions that prevent structural drift during vibe coding.
@@ -891,7 +891,7 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `presets.EventPipeline()` / `presets.RecommendedEventPipeline()` | event-sourcing / CQRS architecture and ruleset |
 | `dependency.NewIsolation()` / `NewLayerDirection()` / `NewBlastRadius()` | dependency rules |
 | `naming.NewNoStutter()` / `NewImplSuffix()` / `NewSnakeCaseFiles()` / `NewNoLayerSuffix()` / `NewTypePattern()` | naming rules |
-| `structural.NewAlias()` / `NewPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` / `NewRepoFileInterface()` | structure rules |
+| `structural.NewAlias()` / `NewLayerPlacement()` / `NewMiddlewarePlacement()` / `NewDTOPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` / `NewRepoFileInterface()` | structure rules |
 | `interfaces.NewPattern()` / `NewContainer()` / `NewCrossDomainAnonymous()` | interface rules |
 | `testpolicy.NewNoHandMock()` | test policy rules |
 | `interfaces.WithMaxMethods(n)` | option for `interfaces.NewPattern` setting the per-interface method cap (default 0 = disabled; DDD/CleanArch/Hexagonal recommended bundles bake in 10) |

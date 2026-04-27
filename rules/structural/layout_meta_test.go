@@ -14,7 +14,9 @@ func TestStructuralRulesEmitMetaOnFlatLayout(t *testing.T) {
 		rule   core.Rule
 	}{
 		{"structural.alias", structural.NewAlias()},
-		{"structural.placement", structural.NewPlacement()},
+		{"structural.layer-placement", structural.NewLayerPlacement()},
+		{"structural.middleware-placement", structural.NewMiddlewarePlacement()},
+		{"structural.dto-placement", structural.NewDTOPlacement()},
 		{"structural.banned-package", structural.NewBannedPackage()},
 		{"structural.model-required", structural.NewModelRequired()},
 		{"structural.internal-top-level", structural.NewInternalTopLevel()},
@@ -41,7 +43,9 @@ func TestStructuralRulesEmitMetaOnFlatLayout(t *testing.T) {
 func TestStructuralRulesNoMetaOnDDDLayout(t *testing.T) {
 	cases := []core.Rule{
 		structural.NewAlias(),
-		structural.NewPlacement(),
+		structural.NewLayerPlacement(),
+		structural.NewMiddlewarePlacement(),
+		structural.NewDTOPlacement(),
 		structural.NewBannedPackage(),
 		structural.NewModelRequired(),
 		structural.NewInternalTopLevel(),

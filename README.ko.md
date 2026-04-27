@@ -393,7 +393,7 @@ internal/domain/order/utils/   "utils"는 인식된 서브레이어가 아님
 ## 구조 규칙
 
 `structural.NewInternalTopLevel()`, `structural.NewBannedPackage()`,
-`structural.NewPlacement()`, `structural.NewAlias()`,
+`structural.NewLayerPlacement()`, `structural.NewMiddlewarePlacement()`, `structural.NewDTOPlacement()`, `structural.NewAlias()`,
 `structural.NewModelRequired()`, `structural.NewRepoFileInterface()`
 
 바이브 코딩 중 구조적 드리프트를 방지하는 파일시스템 레이아웃 규칙을 강제합니다.
@@ -849,7 +849,7 @@ go run github.com/NamhaeSusan/go-arch-guard/cmd/tui --preset hexagonal .
 | `dependency.NewIsolation()` / `NewLayerDirection()` / `NewBlastRadius()` | 의존성 규칙 |
 | `naming.NewNoStutter()` / `NewImplSuffix()` / `NewSnakeCaseFiles()` / `NewNoLayerSuffix()` / `NewTypePattern()` | 네이밍 규칙 |
 | `testpolicy.NewNoHandMock()` | 테스트 정책 규칙 |
-| `structural.NewAlias()` / `NewPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` / `NewRepoFileInterface()` | 구조 규칙 |
+| `structural.NewAlias()` / `NewLayerPlacement()` / `NewMiddlewarePlacement()` / `NewDTOPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` / `NewRepoFileInterface()` | 구조 규칙 |
 | `interfaces.NewPattern()` / `NewContainer()` / `NewCrossDomainAnonymous()` | 인터페이스 규칙 |
 | `interfaces.WithMaxMethods(n)` | `interfaces.NewPattern`의 인터페이스 메서드 상한 옵션 (기본 0 = 비활성; DDD/CleanArch/Hexagonal 권장 번들은 10으로 활성화) |
 | `tx.New(tx.Config{...})` | 트랜잭션 경계 검사 (옵트인) |
