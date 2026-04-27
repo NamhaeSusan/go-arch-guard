@@ -394,7 +394,7 @@ internal/domain/order/utils/   "utils"는 인식된 서브레이어가 아님
 
 `structural.NewInternalTopLevel()`, `structural.NewBannedPackage()`,
 `structural.NewPlacement()`, `structural.NewAlias()`,
-`structural.NewModelRequired()`
+`structural.NewModelRequired()`, `structural.NewRepoFileInterface()`
 
 바이브 코딩 중 구조적 드리프트를 방지하는 파일시스템 레이아웃 규칙을 강제합니다.
 
@@ -466,7 +466,7 @@ DTO 파일(`dto.go`, `*_dto.go`)은 허용된 레이어(handler, app)에만 존�
 
 `naming.NewNoStutter()`, `naming.NewImplSuffix()`,
 `naming.NewSnakeCaseFiles()`, `naming.NewNoLayerSuffix()`,
-`naming.NewNoHandMock()`, `naming.NewRepoFileInterface()`
+`naming.NewNoHandMock()`
 
 코드베이스를 일관되고 grep 친화적으로 유지하는 Go 네이밍 규칙을 강제합니다.
 
@@ -840,8 +840,8 @@ go run github.com/NamhaeSusan/go-arch-guard/cmd/tui --preset hexagonal .
 | `presets.Batch()` / `presets.RecommendedBatch()` | Batch 플랫 레이아웃 아키텍처와 ruleset |
 | `presets.EventPipeline()` / `presets.RecommendedEventPipeline()` | 이벤트 소싱 / CQRS 아키텍처와 ruleset |
 | `dependency.NewIsolation()` / `NewLayerDirection()` / `NewBlastRadius()` | 의존성 규칙 |
-| `naming.NewNoStutter()` / `NewImplSuffix()` / `NewSnakeCaseFiles()` / `NewNoLayerSuffix()` / `NewNoHandMock()` / `NewRepoFileInterface()` | 네이밍 규칙 |
-| `structural.NewAlias()` / `NewPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` | 구조 규칙 |
+| `naming.NewNoStutter()` / `NewImplSuffix()` / `NewSnakeCaseFiles()` / `NewNoLayerSuffix()` / `NewNoHandMock()` | 네이밍 규칙 |
+| `structural.NewAlias()` / `NewPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` / `NewRepoFileInterface()` | 구조 규칙 |
 | `interfaces.NewPattern()` / `NewContainer()` / `NewCrossDomainAnonymous()` | 인터페이스 규칙 |
 | `interfaces.WithMaxMethods(n)` | `interfaces.NewPattern`의 인터페이스 메서드 상한 옵션 (기본 0 = 비활성; DDD/CleanArch/Hexagonal 권장 번들은 10으로 활성화) |
 | `tx.New(tx.Config{...})` | 트랜잭션 경계 검사 (옵트인) |

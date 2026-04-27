@@ -62,7 +62,7 @@ func RecommendedLayered() core.RuleSet {
 		naming.NewSnakeCaseFiles(),
 		naming.NewNoLayerSuffix(),
 		naming.NewNoHandMock(),
-		naming.NewRepoFileInterface(),
+		structural.NewRepoFileInterface(),
 		structural.NewPlacement(),
 		structural.NewBannedPackage(),
 		structural.NewInternalTopLevel(),
