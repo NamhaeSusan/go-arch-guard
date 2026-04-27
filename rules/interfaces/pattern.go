@@ -47,6 +47,11 @@ func (r *Pattern) Check(ctx *core.Context) []core.Violation {
 	}
 
 	var violations []core.Violation
+	if r.cfg.maxMethods <= 0 {
+		violations = append(violations, metaRuleDisabledByConfig("interfaces.pattern",
+			"WithMaxMethods option not provided; interfaces.too-many-methods sub-check will not fire",
+			"pass interfaces.WithMaxMethods(n) to NewPattern to enable the method-count cap"))
+	}
 	for _, pkg := range pkgs {
 		if isExcludedInterfacePatternPkg(arch, pkg) {
 			continue

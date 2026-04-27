@@ -802,6 +802,7 @@ Exclude 패턴은 정규화 후 매칭됩니다: `/internal/foo`, `internal/foo`
 |---|---|---|
 | `meta.no-matching-packages` | Warning | 설정한 모듈 path가 로드된 패키지와 매칭 안 됨 |
 | `meta.layout-not-supported` | Warning | 레이아웃 의존 룰을 `<root>/<InternalRoot>/` 디렉토리 없는 프로젝트에 실행 |
+| `meta.rule-disabled-by-config` | Warning | 룰(또는 sub-check)이 RuleSet에 등록됐으나 Architecture 설정으로 인해 동작 안 함 — 예: `structural.alias`인데 `Structure.RequireAlias=false`, `dependency.isolation`인데 `Layout.DomainDir=""`, `interfaces.NewPattern`에 `WithMaxMethods` 미지정, `tx.boundary`인데 `tx.Config`가 비어있음 |
 | `meta.rule-panic` | Error | 룰의 `Check`가 panic; panic은 캡처되고 다른 룰은 계속 실행됨 |
 | `meta.unknown-violation-id` | per rule | 룰이 `Spec().Violations`에 선언하지 않은 violation ID emit |
 

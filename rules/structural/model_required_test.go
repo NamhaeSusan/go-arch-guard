@@ -1,6 +1,7 @@
 package structural_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/NamhaeSusan/go-arch-guard/core"
@@ -18,13 +19,31 @@ func TestModelRequired(t *testing.T) {
 		assertViolation(t, violations, "structural.domain-model-required", "internal/domain/ghost/")
 	})
 
-	t.Run("skips non-DDD architecture", func(t *testing.T) {
+	t.Run("emits meta.rule-disabled-by-config when DomainDir is empty (flat layout)", func(t *testing.T) {
 		arch := dddArch()
 		arch.Layout.DomainDir = ""
 		ctx := core.NewContext(nil, "github.com/example/app", "../../testdata/invalid", arch, nil)
 
-		if got := structural.NewModelRequired().Check(ctx); len(got) != 0 {
-			t.Fatalf("len = %d, want 0 for non-DDD architecture", len(got))
+		got := structural.NewModelRequired().Check(ctx)
+		if len(got) != 1 || got[0].Rule != "meta.rule-disabled-by-config" {
+			t.Fatalf("expected exactly 1 meta.rule-disabled-by-config violation, got %+v", got)
+		}
+		if !strings.Contains(got[0].Message, "Layout.DomainDir is empty") {
+			t.Fatalf("meta message should mention DomainDir, got %q", got[0].Message)
+		}
+	})
+
+	t.Run("emits meta.rule-disabled-by-config when RequireModel is false", func(t *testing.T) {
+		arch := dddArch()
+		arch.Structure.RequireModel = false
+		ctx := core.NewContext(nil, "github.com/example/app", "../../testdata/invalid", arch, nil)
+
+		got := structural.NewModelRequired().Check(ctx)
+		if len(got) != 1 || got[0].Rule != "meta.rule-disabled-by-config" {
+			t.Fatalf("expected exactly 1 meta.rule-disabled-by-config violation, got %+v", got)
+		}
+		if !strings.Contains(got[0].Message, "RequireModel is false") {
+			t.Fatalf("meta message should mention RequireModel, got %q", got[0].Message)
 		}
 	})
 }

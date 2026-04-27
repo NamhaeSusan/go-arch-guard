@@ -40,8 +40,15 @@ func (r *ModelRequired) Check(ctx *core.Context) []core.Violation {
 	if !hasInternalDir(ctx.Root(), arch.Layout.InternalRoot) {
 		return []core.Violation{metaLayoutNotSupported(ruleModelRequired)}
 	}
-	if arch.Layout.DomainDir == "" || !arch.Structure.RequireModel {
-		return nil
+	if arch.Layout.DomainDir == "" {
+		return []core.Violation{metaRuleDisabledByConfig(ruleModelRequired,
+			"Layout.DomainDir is empty (flat layout); model enforcement requires a domain directory",
+			"set Layout.DomainDir to your domain root, or remove structural.NewModelRequired() from your RuleSet")}
+	}
+	if !arch.Structure.RequireModel {
+		return []core.Violation{metaRuleDisabledByConfig(ruleModelRequired,
+			"Structure.RequireModel is false; model enforcement skipped",
+			"set Structure.RequireModel = true, or remove structural.NewModelRequired() from your RuleSet")}
 	}
 
 	domainDir := filepath.Join(ctx.Root(), arch.Layout.InternalRoot, filepath.FromSlash(arch.Layout.DomainDir))

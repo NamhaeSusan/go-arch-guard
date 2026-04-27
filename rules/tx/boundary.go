@@ -74,8 +74,13 @@ func (r *Boundary) Spec() core.RuleSpec {
 }
 
 func (r *Boundary) Check(ctx *core.Context) []core.Violation {
-	if ctx == nil || (len(r.cfg.StartSymbols) == 0 && len(r.cfg.Types) == 0) {
+	if ctx == nil {
 		return nil
+	}
+	if len(r.cfg.StartSymbols) == 0 && len(r.cfg.Types) == 0 {
+		return []core.Violation{metaRuleDisabledByConfig(ruleID,
+			"tx.Config.StartSymbols and tx.Config.Types are both empty; boundary enforcement skipped",
+			"populate tx.Config with at least one start symbol (e.g. \"database/sql.(*DB).BeginTx\") or one tx type, or remove tx.New() from your RuleSet")}
 	}
 
 	allowed := r.allowedLayers()
@@ -205,6 +210,19 @@ func (r *Boundary) violation(rule, file string, line int, message, fix string) c
 		Fix:               fix,
 		DefaultSeverity:   r.severity,
 		EffectiveSeverity: r.severity,
+	}
+}
+
+// metaRuleDisabledByConfig signals that the rule is registered in the RuleSet
+// but the supplied core.Architecture configuration prevents it from running.
+// Severity defaults to Warning via the runner's meta.* prefix handling.
+func metaRuleDisabledByConfig(ruleID, reason, fix string) core.Violation {
+	return core.Violation{
+		Rule:              "meta.rule-disabled-by-config",
+		Message:           fmt.Sprintf("%s: %s", ruleID, reason),
+		Fix:               fix,
+		DefaultSeverity:   core.Warning,
+		EffectiveSeverity: core.Warning,
 	}
 }
 

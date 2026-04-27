@@ -41,7 +41,9 @@ func (r *CrossDomainAnonymous) Check(ctx *core.Context) []core.Violation {
 		return []core.Violation{metaLayoutNotSupported("interfaces.cross-domain-anonymous", projectModule)}
 	}
 	if arch.Layout.DomainDir == "" {
-		return nil
+		return []core.Violation{metaRuleDisabledByConfig("interfaces.cross-domain-anonymous",
+			"Layout.DomainDir is empty (flat layout); cross-domain anonymous interface detection requires a domain directory",
+			"set Layout.DomainDir to your domain root, or remove interfaces.NewCrossDomainAnonymous() from your RuleSet")}
 	}
 
 	var violations []core.Violation

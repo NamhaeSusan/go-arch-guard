@@ -42,7 +42,9 @@ func (r *Isolation) Check(ctx *core.Context) []core.Violation {
 	arch := ctx.Arch()
 	layout := arch.Layout
 	if layout.DomainDir == "" {
-		return nil
+		return []core.Violation{metaRuleDisabledByConfig("dependency.isolation",
+			"Layout.DomainDir is empty (flat layout); cross-domain isolation requires a domain directory",
+			"set Layout.DomainDir to your domain root, or remove dependency.NewIsolation() from your RuleSet")}
 	}
 
 	projectModule := analysisutil.ResolveModuleFromContext(ctx, "")
@@ -58,6 +60,11 @@ func (r *Isolation) Check(ctx *core.Context) []core.Violation {
 	internalPrefix := projectModule + "/" + layout.InternalRoot + "/"
 	cmdPrefix := projectModule + "/cmd"
 	var violations []core.Violation
+	if !arch.Structure.RequireAlias {
+		violations = append(violations, metaRuleDisabledByConfig("dependency.isolation",
+			"Structure.RequireAlias is false; dependency.cmd-deep-import and dependency.orchestration-deep-import sub-checks will not fire",
+			"set Structure.RequireAlias = true to enforce alias-only imports from cmd/ and orchestration/"))
+	}
 
 	for _, pkg := range pkgs {
 		if isExcludedPackage(ctx, pkg.PkgPath, projectModule) {
@@ -404,6 +411,20 @@ func metaNoMatchingPackages(message string) core.Violation {
 		Rule:              "meta.no-matching-packages",
 		Message:           message,
 		Fix:               "verify the module argument matches go.mod",
+		DefaultSeverity:   core.Warning,
+		EffectiveSeverity: core.Warning,
+	}
+}
+
+// metaRuleDisabledByConfig signals that a rule is registered in the RuleSet
+// but the supplied core.Architecture configuration prevents it from running
+// (whole rule) or makes a sub-check inert (partial). Severity defaults to
+// Warning via the runner's meta.* prefix handling.
+func metaRuleDisabledByConfig(ruleID, reason, fix string) core.Violation {
+	return core.Violation{
+		Rule:              "meta.rule-disabled-by-config",
+		Message:           fmt.Sprintf("%s: %s", ruleID, reason),
+		Fix:               fix,
 		DefaultSeverity:   core.Warning,
 		EffectiveSeverity: core.Warning,
 	}

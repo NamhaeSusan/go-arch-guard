@@ -126,6 +126,23 @@ func TestRepoFileInterfaceExtraInterfaceFixUsesSnakeCase(t *testing.T) {
 	}
 }
 
+func TestRepoFileInterfaceNoPortSublayerEmitsMetaDisabledByConfig(t *testing.T) {
+	arch := dddArch()
+	// Strip every port-shaped sublayer (named "repo"/"gateway" or listed in PortLayers)
+	// so analysisutil.HasPortSublayer returns false.
+	arch.Layers.PortLayers = nil
+	arch.Layers.Sublayers = []string{"handler", "app", "core", "core/model", "core/svc", "event", "infra"}
+	ctx := core.NewContext(nil, "github.com/example/app", "../../testdata/valid", arch, nil)
+
+	got := structural.NewRepoFileInterface().Check(ctx)
+	if len(got) != 1 || got[0].Rule != "meta.rule-disabled-by-config" {
+		t.Fatalf("expected exactly 1 meta.rule-disabled-by-config violation, got %+v", got)
+	}
+	if !strings.Contains(got[0].Message, "PortLayers is empty") {
+		t.Fatalf("meta message should mention PortLayers, got %q", got[0].Message)
+	}
+}
+
 func TestRepoFileInterfaceFlagsRepositoryPortOutsidePortLayer(t *testing.T) {
 	got := structural.NewRepoFileInterface().Check(invalidContextForRepoIface(t))
 

@@ -12,6 +12,60 @@ import (
 	"github.com/NamhaeSusan/go-arch-guard/rules/interfaces"
 )
 
+func TestPatternWithoutMaxMethodsEmitsMetaDisabledByConfig(t *testing.T) {
+	root := writeFixture(t, "example.com/no-max-methods", map[string]string{
+		"internal/store/store.go": `package store
+
+type Store interface {
+	Get(id string) string
+}
+
+type StoreImpl struct{}
+
+func (s *StoreImpl) Get(id string) string { return "" }
+
+func New() Store { return &StoreImpl{} }
+`,
+	})
+	arch := flatArchitecture()
+	got := interfaces.NewPattern().Check(loadContext(t, root, arch, "example.com/no-max-methods"))
+
+	var sawMeta bool
+	for _, v := range got {
+		if v.Rule == "meta.rule-disabled-by-config" && strings.Contains(v.Message, "WithMaxMethods option not provided") {
+			sawMeta = true
+		}
+	}
+	if !sawMeta {
+		t.Fatalf("expected meta.rule-disabled-by-config when WithMaxMethods is omitted, got %+v", got)
+	}
+}
+
+func TestPatternWithMaxMethodsDoesNotEmitMeta(t *testing.T) {
+	root := writeFixture(t, "example.com/with-max-methods", map[string]string{
+		"internal/store/store.go": `package store
+
+type Store interface {
+	Get(id string) string
+}
+
+type StoreImpl struct{}
+
+func (s *StoreImpl) Get(id string) string { return "" }
+
+func New() Store { return &StoreImpl{} }
+`,
+	})
+	arch := flatArchitecture()
+	got := interfaces.NewPattern(interfaces.WithMaxMethods(10)).Check(loadContext(t, root, arch, "example.com/with-max-methods"))
+
+	for _, v := range got {
+		if v.Rule == "meta.rule-disabled-by-config" {
+			t.Fatalf("unexpected meta.rule-disabled-by-config when WithMaxMethods is set: %v", v)
+		}
+	}
+}
+
 func TestPatternDetectsCoreViolations(t *testing.T) {
 	root := writeFixture(t, "example.com/pattern-core", map[string]string{
 		"internal/store/store.go": `package store
@@ -111,8 +165,13 @@ func NewModel() Model { return &ModelImpl{} }
 
 	violations := interfaces.NewPattern().Check(loadContext(t, root, arch, "example.com/pattern-exclude"))
 
-	if len(violations) != 0 {
-		t.Fatalf("violations = %v, want none", violations)
+	// NewPattern() without WithMaxMethods emits meta.rule-disabled-by-config
+	// to signal that the too-many-methods sub-check is inactive. Filter that
+	// out — the test is asserting no actual interfaces.* violations.
+	for _, v := range violations {
+		if v.Rule != "meta.rule-disabled-by-config" {
+			t.Fatalf("unexpected non-meta violation: %v", v)
+		}
 	}
 }
 

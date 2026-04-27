@@ -37,7 +37,9 @@ func (r *RepoFileInterface) Spec() core.RuleSpec {
 func (r *RepoFileInterface) Check(ctx *core.Context) []core.Violation {
 	layers := ctx.Arch().Layers
 	if !analysisutil.HasPortSublayer(layers) {
-		return nil
+		return []core.Violation{metaRuleDisabledByConfig("structural.repo-file-interface",
+			"LayerModel.PortLayers is empty; repo-file interface enforcement requires at least one port sublayer",
+			"declare PortLayers in your LayerModel (e.g. []string{\"core/repo\"}), or remove structural.NewRepoFileInterface() from your RuleSet")}
 	}
 	var violations []core.Violation
 	for _, pkg := range ctx.Pkgs() {

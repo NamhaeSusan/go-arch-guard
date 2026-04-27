@@ -843,6 +843,7 @@ diagnostics survive even when multiple rules emit the same ID.
 |---|---|---|
 | `meta.no-matching-packages` | Warning | the configured project module does not match any loaded package |
 | `meta.layout-not-supported` | Warning | a layout-dependent rule is run against a project without a recognized package root (`<root>/<InternalRoot>/`) |
+| `meta.rule-disabled-by-config` | Warning | a rule (or one of its sub-checks) is registered in the ruleset but Architecture config disables it — e.g. `Structure.RequireAlias=false` for `structural.alias`, `Layout.DomainDir=""` for `dependency.isolation`, `WithMaxMethods` not provided to `interfaces.NewPattern`, empty `tx.Config` for `tx.boundary` |
 | `meta.rule-panic` | Error | a rule's `Check` panicked; the panic is captured and other rules continue to run |
 | `meta.unknown-violation-id` | per rule | a rule emits a violation ID it didn't declare in `Spec().Violations` |
 
