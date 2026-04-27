@@ -453,7 +453,7 @@ internal/domain/order/app/util/   "util" is banned
 
 ### `structure.legacy-package`
 
-Warns about package names that should be migrated: `router`, `bootstrap`
+Flags package names that should be migrated: `router`, `bootstrap`. Default severity is Error; downgrade with `WithSeverityOverride("structure.legacy-package", core.Warning)` during migration windows.
 
 ### `structure.misplaced-layer`
 

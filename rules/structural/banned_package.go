@@ -19,7 +19,7 @@ type BannedPackage struct {
 }
 
 func NewBannedPackage(opts ...Option) *BannedPackage {
-	cfg := newConfig(opts, core.Warning)
+	cfg := newConfig(opts, core.Error)
 	return &BannedPackage{severity: cfg.severity}
 }
 
