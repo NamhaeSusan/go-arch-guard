@@ -32,11 +32,12 @@ func TestBoundarySpec(t *testing.T) {
 	}
 }
 
-func TestBoundaryEmptyConfigNoop(t *testing.T) {
+func TestBoundaryEmptyConfigEmitsMeta(t *testing.T) {
 	rule := tx.New(tx.Config{})
 
-	if got := rule.Check(txBoundaryContext(t, nil)); len(got) != 0 {
-		t.Fatalf("Check() with empty config returned %d violations: %+v", len(got), got)
+	got := rule.Check(txBoundaryContext(t, nil))
+	if len(got) != 1 || got[0].Rule != "meta.rule-disabled-by-config" {
+		t.Fatalf("Check() with empty config: expected 1 meta.rule-disabled-by-config violation, got %+v", got)
 	}
 }
 

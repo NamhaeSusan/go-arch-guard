@@ -35,3 +35,17 @@ func metaLayoutNotSupported(ruleID, projectModule string) core.Violation {
 		EffectiveSeverity: core.Warning,
 	}
 }
+
+// metaRuleDisabledByConfig signals that a rule is registered in the RuleSet
+// but the supplied core.Architecture configuration prevents it from running
+// (whole rule) or makes a sub-check inert (partial). Severity defaults to
+// Warning via the runner's meta.* prefix handling.
+func metaRuleDisabledByConfig(ruleID, reason, fix string) core.Violation {
+	return core.Violation{
+		Rule:              "meta.rule-disabled-by-config",
+		Message:           fmt.Sprintf("%s: %s", ruleID, reason),
+		Fix:               fix,
+		DefaultSeverity:   core.Warning,
+		EffectiveSeverity: core.Warning,
+	}
+}

@@ -1,11 +1,32 @@
 package interfaces_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/NamhaeSusan/go-arch-guard/core"
 	"github.com/NamhaeSusan/go-arch-guard/rules/interfaces"
 )
+
+func TestCrossDomainAnonymousDomainDirEmptyEmitsMetaDisabledByConfig(t *testing.T) {
+	root := writeFixture(t, "example.com/flat-layout", map[string]string{
+		"internal/svc/svc.go": "package svc\n",
+	})
+	arch := flatArchitecture()
+	arch.Layout.DomainDir = ""
+	ctx := loadContext(t, root, arch, "example.com/flat-layout")
+
+	got := interfaces.NewCrossDomainAnonymous().Check(ctx)
+	var sawMeta bool
+	for _, v := range got {
+		if v.Rule == "meta.rule-disabled-by-config" && strings.Contains(v.Message, "Layout.DomainDir is empty") {
+			sawMeta = true
+		}
+	}
+	if !sawMeta {
+		t.Fatalf("expected meta.rule-disabled-by-config when DomainDir is empty, got %+v", got)
+	}
+}
 
 func TestCrossDomainAnonymousDetectsAnonymousInterfaceOutsideDomain(t *testing.T) {
 	root := writeFixture(t, "example.com/cross-domain-anon", map[string]string{

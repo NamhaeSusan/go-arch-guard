@@ -52,8 +52,15 @@ func (r *Alias) Check(ctx *core.Context) []core.Violation {
 	if !hasInternalDir(ctx.Root(), arch.Layout.InternalRoot) {
 		return []core.Violation{metaLayoutNotSupported(ruleAlias)}
 	}
-	if arch.Layout.DomainDir == "" || !arch.Structure.RequireAlias {
-		return nil
+	if arch.Layout.DomainDir == "" {
+		return []core.Violation{metaRuleDisabledByConfig(ruleAlias,
+			"Layout.DomainDir is empty (flat layout); alias enforcement requires a domain directory",
+			"set Layout.DomainDir to your domain root, or remove structural.NewAlias() from your RuleSet")}
+	}
+	if !arch.Structure.RequireAlias {
+		return []core.Violation{metaRuleDisabledByConfig(ruleAlias,
+			"Structure.RequireAlias is false; alias enforcement skipped",
+			"set Structure.RequireAlias = true, or remove structural.NewAlias() from your RuleSet")}
 	}
 
 	domainDir := filepath.Join(ctx.Root(), arch.Layout.InternalRoot, filepath.FromSlash(arch.Layout.DomainDir))

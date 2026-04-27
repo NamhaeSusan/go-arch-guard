@@ -85,6 +85,35 @@ func TestIsolationFlatLayoutEmitsMetaWarning(t *testing.T) {
 	assertExactlyOneMetaLayoutNotSupported(t, violations, "dependency.isolation")
 }
 
+func TestIsolationDomainDirEmptyEmitsMetaDisabledByConfig(t *testing.T) {
+	arch := dddArchitecture()
+	arch.Layout.DomainDir = ""
+	ctx := loadContext(t, "../../testdata/valid", "github.com/kimtaeyun/testproject-dc", arch, "internal/...")
+	got := dependency.NewIsolation().Check(ctx)
+	if len(got) != 1 || got[0].Rule != "meta.rule-disabled-by-config" {
+		t.Fatalf("expected exactly 1 meta.rule-disabled-by-config violation, got %+v", got)
+	}
+	if !strings.Contains(got[0].Message, "Layout.DomainDir is empty") {
+		t.Fatalf("meta message should mention DomainDir, got %q", got[0].Message)
+	}
+}
+
+func TestIsolationRequireAliasFalseEmitsMetaForPartialDisable(t *testing.T) {
+	arch := dddArchitecture()
+	arch.Structure.RequireAlias = false
+	ctx := loadContext(t, "../../testdata/valid", "github.com/kimtaeyun/testproject-dc", arch, "internal/...")
+	got := dependency.NewIsolation().Check(ctx)
+	var sawMeta bool
+	for _, v := range got {
+		if v.Rule == "meta.rule-disabled-by-config" && strings.Contains(v.Message, "RequireAlias is false") {
+			sawMeta = true
+		}
+	}
+	if !sawMeta {
+		t.Fatalf("expected meta.rule-disabled-by-config when RequireAlias=false, got %+v", got)
+	}
+}
+
 func TestIsolationDDDProjectHasNoMetaLayoutWarning(t *testing.T) {
 	ctx := loadContext(t, "../../testdata/valid", "github.com/kimtaeyun/testproject-dc", dddArchitecture(), "internal/...")
 	for _, v := range dependency.NewIsolation().Check(ctx) {
