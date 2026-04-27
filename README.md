@@ -451,6 +451,11 @@ Banned by default: `util`, `common`, `misc`, `helper`, `shared`, `services`
 internal/domain/order/app/util/   "util" is banned
 ```
 
+The configured `Layout.SharedDir` is exempt at its top-level path only. If
+`SharedDir = "shared"`, then `internal/shared/` is allowed but
+`internal/domain/<x>/shared/` is still flagged — the dumping-ground
+anti-pattern stays blocked inside layers.
+
 ### `structure.legacy-package`
 
 Warns about package names that should be migrated: `router`, `bootstrap`

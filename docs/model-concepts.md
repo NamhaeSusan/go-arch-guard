@@ -106,7 +106,7 @@ names; layer-aware rules read from `LayerModel.Sublayers`.
 
 | Field | Meaning |
 |-------|---------|
-| `BannedPkgNames` | Package names that should not appear under `internal/`, such as `util` or `common`. |
+| `BannedPkgNames` | Package names that should not appear under `internal/`, such as `util` or `common`. The exact `internal/<SharedDir>/` path is exempt so a banned-listed name (e.g. `shared`) can still be used as the configured cross-cutting bucket; nested occurrences remain flagged. |
 | `LegacyPkgNames` | Package names that produce migration warnings, such as `router` or `bootstrap`. |
 | `AliasFileName` | Filename for domain root alias files, usually `alias.go`. |
 

@@ -64,12 +64,24 @@ func (r *BannedPackage) Check(ctx *core.Context) []core.Violation {
 			return nil
 		}
 		name := entry.Name()
+		// SharedDir is the architectural cross-cutting bucket. When its
+		// configured name happens to be in BannedPkgNames (e.g. SharedDir
+		// = "shared"), the rule exempts ONLY the exact top-level path
+		// internal/<SharedDir>/ — nested directories with the same name
+		// are still flagged so the dumping-ground anti-pattern cannot
+		// return inside domains or other layers.
+		topLevelSharedRel := arch.Layout.InternalRoot + "/" + arch.Layout.SharedDir
+		isTopLevelShared := arch.Layout.SharedDir != "" && rel == topLevelSharedRel
 		for _, banned := range arch.Naming.BannedPkgNames {
-			if name == banned {
-				violations = append(violations, violation(r.severity, bannedPackage, rel+"/",
-					`package "`+name+`" is banned`,
-					fmt.Sprintf("move to specific domain or %s/", arch.Layout.SharedDir)))
+			if name != banned {
+				continue
 			}
+			if isTopLevelShared {
+				continue
+			}
+			violations = append(violations, violation(r.severity, bannedPackage, rel+"/",
+				`package "`+name+`" is banned`,
+				fmt.Sprintf("move to specific domain or %s/", arch.Layout.SharedDir)))
 		}
 		for _, legacy := range arch.Naming.LegacyPkgNames {
 			if name == legacy {
