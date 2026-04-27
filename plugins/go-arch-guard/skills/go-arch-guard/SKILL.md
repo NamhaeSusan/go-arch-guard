@@ -147,7 +147,7 @@ internal/
 - `core/*`, `event`는 `internal/pkg` import 금지
 - interface는 `core/repo/`에만 정의
 - `internal/app/` (컴포지션 루트): 무제한 import 가능
-- `internal/server/<proto>/` (트랜스포트): `internal/app/`, `internal/pkg/`, 형제 트랜스포트만 import 가능. 위반 규칙: `isolation.transport-imports-domain`, `isolation.transport-imports-orchestration`, `isolation.transport-imports-unclassified`
+- `internal/server/<proto>/` (트랜스포트): `internal/app/`, `internal/pkg/`, 형제 트랜스포트만 import 가능. 위반 규칙: `dependency.transport-imports-domain`, `dependency.transport-imports-orchestration`, `dependency.transport-imports-unclassified`
 
 ### Clean Architecture
 
@@ -319,7 +319,7 @@ arch := core.Architecture{
 ```go
 ctx := core.NewContext(pkgs, "", "", presets.DDD(), []string{"internal/legacy/..."})
 core.Run(ctx, presets.RecommendedDDD(),
-    core.WithSeverityOverride("isolation.cross-domain", core.Warning))
+    core.WithSeverityOverride("dependency.cross-domain", core.Warning))
 ```
 
 Exclude 패턴은 정규화 후 매칭됨: `/internal/foo`, `internal/foo`, `internal/foo/`, `./internal/foo` 모두 동일.
@@ -381,10 +381,10 @@ Repository 포트 interface(이름이 `Repository`/`Repo`로 끝나는 것)는 *
 
 | 우회 시도 | 잡는 규칙 |
 |----------|----------|
-| handler/app/svc에서 `*Repository`/`*Repo` interface 정의 | `structure.interface-placement` |
-| handler/app/svc에서 `type X = otherdomain.Repo` alias | `structure.interface-placement` |
-| alias.go에서 interface 직접 정의 | `structure.domain-alias-no-interface` |
-| alias.go에서 repo/svc 타입 re-export | `structure.domain-alias-contract-reexport` |
+| handler/app/svc에서 `*Repository`/`*Repo` interface 정의 | `structural.interface-placement` |
+| handler/app/svc에서 `type X = otherdomain.Repo` alias | `structural.interface-placement` |
+| alias.go에서 interface 직접 정의 | `structural.domain-alias-no-interface` |
+| alias.go에서 repo/svc 타입 re-export | `structural.domain-alias-contract-reexport` |
 
 ---
 
@@ -394,14 +394,14 @@ Repository 포트 interface(이름이 `Repository`/`Repo`로 끝나는 것)는 *
 
 | 룰 | 잡는 패턴 |
 |----|----------|
-| `interface.container-only` | 패키지에서 선언된 named interface가 struct field 타입으로만 쓰이고 함수 파라미터/반환에 한 번도 안 쓰임. wiring 레이어가 값을 들기 위해 만든 임시 컨테이너 interface 패턴을 잡는다. `interfaces.WithSeverity(core.Error)`로 hard rule 승격 가능. |
-| `setter.forbidden` | 포인터 리시버를 가진 내보내기 세터 메서드(`Set*`, 매개변수 1개 이상)를 검출. **권장 수정**: 의존성을 생성자의 명시적 파라미터로 추가 (`NewService(..., dep)`). `With*` 옵션은 정말로 선택적이고 여러 조합이 필요한 경우에만 사용 — 설정류 옵션에도 setter는 대체로 맞지 않음. 플루언트 빌더(리시버 타입 반환 메서드), 테스트 파일, `testdata/`·`mocks/` 하위 패키지는 자동 제외. `types.NewNoSetter()`. |
+| `interfaces.container-only` | 패키지에서 선언된 named interface가 struct field 타입으로만 쓰이고 함수 파라미터/반환에 한 번도 안 쓰임. wiring 레이어가 값을 들기 위해 만든 임시 컨테이너 interface 패턴을 잡는다. `interfaces.WithSeverity(core.Error)`로 hard rule 승격 가능. |
+| `types.no-setter` | 포인터 리시버를 가진 내보내기 세터 메서드(`Set*`, 매개변수 1개 이상)를 검출. **권장 수정**: 의존성을 생성자의 명시적 파라미터로 추가 (`NewService(..., dep)`). `With*` 옵션은 정말로 선택적이고 여러 조합이 필요한 경우에만 사용 — 설정류 옵션에도 setter는 대체로 맞지 않음. 플루언트 빌더(리시버 타입 반환 메서드), 테스트 파일, `testdata/`·`mocks/` 하위 패키지는 자동 제외. `types.NewNoSetter()`. |
 
 ## Cross-Domain Anonymous Interface (Hard rule, Error)
 
 | 룰 | 잡는 패턴 |
 |----|----------|
-| `interface.cross-domain-anonymous` | 도메인 외부 *그리고 orchestration 외부*에서 선언된 anonymous interface가 method signature에 다른 도메인 타입을 참조하면 위반. cmd/ 또는 internal/pkg/ 같은 wiring 코드가 도메인 타입에 대해 inline ad-hoc 추상화를 선언하는 패턴을 잡는다. **Severity: Error** — cross-domain 추상화는 orchestration 패키지가 소유한다는 컨벤션을 강제. **fix: 어댑터를 `internal/orchestration/`으로 이동하고 wiring 코드는 orchestration 생성자를 호출**. orchestration 패키지(서브패키지 포함)는 by-design exempt. |
+| `interfaces.cross-domain-anonymous` | 도메인 외부 *그리고 orchestration 외부*에서 선언된 anonymous interface가 method signature에 다른 도메인 타입을 참조하면 위반. cmd/ 또는 internal/pkg/ 같은 wiring 코드가 도메인 타입에 대해 inline ad-hoc 추상화를 선언하는 패턴을 잡는다. **Severity: Error** — cross-domain 추상화는 orchestration 패키지가 소유한다는 컨벤션을 강제. **fix: 어댑터를 `internal/orchestration/`으로 이동하고 wiring 코드는 orchestration 생성자를 호출**. orchestration 패키지(서브패키지 포함)는 by-design exempt. |
 
 ---
 

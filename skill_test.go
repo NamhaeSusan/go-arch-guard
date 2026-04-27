@@ -174,7 +174,7 @@ func TestSkill_ExcludeOption(t *testing.T) {
 		"internal/domain/order/handler/http/handler.go":    "package http\n",
 		"internal/domain/order/infra/persistence/store.go": "package persistence\n",
 
-		// legacy — violates structure.internal-top-level
+		// legacy — violates structural.internal-top-level
 		"internal/legacy/old.go": "package legacy\n",
 	}
 
@@ -189,19 +189,19 @@ func TestSkill_ExcludeOption(t *testing.T) {
 	violations := runSkill(pkgs, mod, root, presets.DDD(), presets.RecommendedDDD(), nil)
 	hasTopLevel := false
 	for _, v := range violations {
-		if v.Rule == "structure.internal-top-level" {
+		if v.Rule == "structural.internal-top-level" {
 			hasTopLevel = true
 			break
 		}
 	}
 	if !hasTopLevel {
-		t.Fatal("expected structure.internal-top-level violation without exclude")
+		t.Fatal("expected structural.internal-top-level violation without exclude")
 	}
 
 	// With exclude: structure check on legacy path excluded
 	structExcluded := runSkill(pkgs, mod, root, presets.DDD(), presets.RecommendedDDD(), []string{"internal/legacy/..."})
 	for _, v := range structExcluded {
-		if v.Rule == "structure.internal-top-level" && strings.Contains(v.File, "legacy") {
+		if v.Rule == "structural.internal-top-level" && strings.Contains(v.File, "legacy") {
 			t.Error("expected legacy to be excluded from structure check")
 		}
 	}
@@ -284,13 +284,13 @@ func TestSkill_BannedPatterns(t *testing.T) {
 	violations := runSkill(pkgs, mod, root, presets.DDD(), presets.RecommendedDDD(), nil)
 	hasBanned := false
 	for _, v := range violations {
-		if v.Rule == "structure.banned-package" {
+		if v.Rule == "structural.banned-package-name" {
 			hasBanned = true
 			break
 		}
 	}
 	if !hasBanned {
-		t.Error("expected structure.banned-package violation for 'util' package")
+		t.Error("expected structural.banned-package-name violation for 'util' package")
 	}
 }
 
@@ -326,13 +326,13 @@ import _ "` + mod + `/internal/domain/user"
 	violations := runSkill(pkgs, mod, root, presets.DDD(), presets.RecommendedDDD(), nil)
 	hasCross := false
 	for _, v := range violations {
-		if v.Rule == "isolation.cross-domain" {
+		if v.Rule == "dependency.cross-domain" {
 			hasCross = true
 			break
 		}
 	}
 	if !hasCross {
-		t.Error("expected isolation.cross-domain violation")
+		t.Error("expected dependency.cross-domain violation")
 	}
 }
 
@@ -365,13 +365,13 @@ import _ "` + mod + `/internal/domain/order/app"
 	violations := runSkill(pkgs, mod, root, presets.DDD(), presets.RecommendedDDD(), nil)
 	hasDirection := false
 	for _, v := range violations {
-		if v.Rule == "layer.direction" {
+		if v.Rule == "dependency.invalid-import-direction" {
 			hasDirection = true
 			break
 		}
 	}
 	if !hasDirection {
-		t.Error("expected layer.direction violation for core/svc importing app")
+		t.Error("expected dependency.invalid-import-direction violation for core/svc importing app")
 	}
 }
 

@@ -12,9 +12,9 @@ import (
 
 const (
 	rulePlacement       = "structural.placement"
-	misplacedLayer      = "structure.misplaced-layer"
-	middlewarePlacement = "structure.middleware-placement"
-	dtoPlacement        = "structure.dto-placement"
+	misplacedLayer      = "structural.misplaced-layer"
+	middlewarePlacement = "structural.middleware-placement"
+	dtoPlacement        = "structural.dto-placement"
 )
 
 type Placement struct {

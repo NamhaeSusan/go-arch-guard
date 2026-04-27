@@ -91,19 +91,19 @@ func TestRecommendedRuleSetsContainCoreRules(t *testing.T) {
 		{
 			name:    "ConsumerWorker",
 			build:   presets.RecommendedConsumerWorker,
-			require: []string{"types.type-pattern"},
+			require: []string{"naming.type-pattern"},
 			exclude: []string{"dependency.isolation", "structural.alias"},
 		},
 		{
 			name:    "Batch",
 			build:   presets.RecommendedBatch,
-			require: []string{"types.type-pattern"},
+			require: []string{"naming.type-pattern"},
 			exclude: []string{"dependency.isolation", "structural.alias"},
 		},
 		{
 			name:    "EventPipeline",
 			build:   presets.RecommendedEventPipeline,
-			require: []string{"types.type-pattern"},
+			require: []string{"naming.type-pattern"},
 			exclude: []string{"dependency.isolation", "structural.alias"},
 		},
 	}

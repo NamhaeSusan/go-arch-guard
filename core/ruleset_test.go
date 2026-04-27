@@ -50,12 +50,12 @@ func TestRunDoesNotPanicOnNilOnlyRuleSet(t *testing.T) {
 }
 
 func TestRuleSetWithoutAccumulatesIDs(t *testing.T) {
-	rs := RuleSet{}.Without("isolation.cross-domain").Without("blast.high-coupling")
-	if !rs.IsViolationSkipped("isolation.cross-domain") {
-		t.Errorf("isolation.cross-domain should be skipped")
+	rs := RuleSet{}.Without("dependency.cross-domain").Without("dependency.high-coupling")
+	if !rs.IsViolationSkipped("dependency.cross-domain") {
+		t.Errorf("dependency.cross-domain should be skipped")
 	}
-	if !rs.IsViolationSkipped("blast.high-coupling") {
-		t.Errorf("blast.high-coupling should be skipped")
+	if !rs.IsViolationSkipped("dependency.high-coupling") {
+		t.Errorf("dependency.high-coupling should be skipped")
 	}
 	if rs.IsViolationSkipped("naming.no-stutter") {
 		t.Errorf("naming.no-stutter should NOT be skipped")

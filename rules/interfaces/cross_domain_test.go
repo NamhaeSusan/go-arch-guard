@@ -33,7 +33,7 @@ type adapter struct {
 
 	violations := interfaces.NewCrossDomainAnonymous().Check(loadContext(t, root, domainArchitecture(), "example.com/cross-domain-anon"))
 
-	assertHasRule(t, violations, "interface.cross-domain-anonymous")
+	assertHasRule(t, violations, "interfaces.cross-domain-anonymous")
 	if violations[0].EffectiveSeverity != core.Error {
 		t.Fatalf("EffectiveSeverity = %v, want Error", violations[0].EffectiveSeverity)
 	}
@@ -95,7 +95,7 @@ type adapter struct {
 
 	violations := interfaces.NewCrossDomainAnonymous().Check(loadContext(t, root, domainArchitecture(), "example.com/cross-domain-skip"))
 
-	assertLacksRule(t, violations, "interface.cross-domain-anonymous")
+	assertLacksRule(t, violations, "interfaces.cross-domain-anonymous")
 }
 
 func TestCrossDomainAnonymousWithSeverity(t *testing.T) {

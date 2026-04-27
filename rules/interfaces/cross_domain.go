@@ -25,7 +25,7 @@ func (r *CrossDomainAnonymous) Spec() core.RuleSpec {
 		Description:     "detect inline anonymous interfaces over foreign domain types",
 		DefaultSeverity: r.cfg.severity,
 		Violations: []core.ViolationSpec{
-			{ID: "interface.cross-domain-anonymous", DefaultSeverity: r.cfg.severity},
+			{ID: "interfaces.cross-domain-anonymous", DefaultSeverity: r.cfg.severity},
 		},
 	}
 }
@@ -143,7 +143,7 @@ func (r *CrossDomainAnonymous) checkAnonymousInterface(iface *ast.InterfaceType,
 	return []core.Violation{{
 		File:              analysisutil.RelativePathForPackage(pkg, pos.Filename),
 		Line:              pos.Line,
-		Rule:              "interface.cross-domain-anonymous",
+		Rule:              "interfaces.cross-domain-anonymous",
 		Message:           fmt.Sprintf("anonymous interface declared in package %q references types from domain(s) %v", pkg.PkgPath, domains),
 		Fix:               "move this adapter/abstraction into " + arch.Layout.InternalRoot + "/" + arch.Layout.OrchestrationDir + "/",
 		DefaultSeverity:   r.cfg.severity,

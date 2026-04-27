@@ -68,7 +68,7 @@ func TestRepoFileInterfaceSpec(t *testing.T) {
 	if spec.DefaultSeverity != core.Warning {
 		t.Fatalf("DefaultSeverity = %v, want Warning", spec.DefaultSeverity)
 	}
-	want := []string{"structure.repo-file-interface", "structure.repo-file-extra-interface", "structure.interface-placement"}
+	want := []string{"structural.repo-file-interface-missing", "structural.repo-file-extra-interface", "structural.interface-placement"}
 	got := spec.ViolationIDs()
 	for i := range want {
 		if got[i] != want[i] {
@@ -86,7 +86,7 @@ func TestRepoFileInterfaceFlagsRepoFilenameContract(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("len = %d, want 1: %+v", len(got), got)
 	}
-	if got[0].Rule != "structure.repo-file-interface" || got[0].DefaultSeverity != core.Error {
+	if got[0].Rule != "structural.repo-file-interface-missing" || got[0].DefaultSeverity != core.Error {
 		t.Fatalf("violation = %+v, want repo-file-interface Error", got[0])
 	}
 }
@@ -97,7 +97,7 @@ func TestRepoFileInterfaceFlagsExtraInterfaces(t *testing.T) {
 	}, dddArch())
 
 	got := structural.NewRepoFileInterface().Check(ctx)
-	if len(got) != 1 || got[0].Rule != "structure.repo-file-extra-interface" {
+	if len(got) != 1 || got[0].Rule != "structural.repo-file-extra-interface" {
 		t.Fatalf("got %+v, want one extra-interface violation", got)
 	}
 }
@@ -110,7 +110,7 @@ func TestRepoFileInterfaceExtraInterfaceFixUsesSnakeCase(t *testing.T) {
 	got := structural.NewRepoFileInterface().Check(ctx)
 	var found bool
 	for _, v := range got {
-		if v.Rule != "structure.repo-file-extra-interface" {
+		if v.Rule != "structural.repo-file-extra-interface" {
 			continue
 		}
 		found = true
@@ -131,7 +131,7 @@ func TestRepoFileInterfaceFlagsRepositoryPortOutsidePortLayer(t *testing.T) {
 
 	var direct, alias bool
 	for _, v := range got {
-		if v.Rule != "structure.interface-placement" {
+		if v.Rule != "structural.interface-placement" {
 			continue
 		}
 		if strings.Contains(v.Message, `"OrderRepository"`) {

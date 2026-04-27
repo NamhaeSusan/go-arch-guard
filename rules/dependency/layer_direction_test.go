@@ -19,7 +19,7 @@ func TestLayerDirectionSpec(t *testing.T) {
 	if spec.DefaultSeverity != core.Warning {
 		t.Fatalf("Spec().DefaultSeverity = %v, want %v", spec.DefaultSeverity, core.Warning)
 	}
-	for _, id := range []string{"layer.direction", "layer.inner-imports-pkg", "layer.unknown-sublayer"} {
+	for _, id := range []string{"dependency.invalid-import-direction", "dependency.inner-imports-pkg", "dependency.unknown-sublayer"} {
 		if !slices.Contains(spec.ViolationIDs(), id) {
 			t.Fatalf("Spec().ViolationIDs() missing %q", id)
 		}
@@ -43,13 +43,13 @@ func TestLayerDirectionInvalidProject(t *testing.T) {
 
 	violations := dependency.NewLayerDirection().Check(ctx)
 
-	assertHasRule(t, violations, "layer.direction")
-	assertHasRule(t, violations, "layer.inner-imports-pkg")
-	assertHasRule(t, violations, "layer.unknown-sublayer")
+	assertHasRule(t, violations, "dependency.invalid-import-direction")
+	assertHasRule(t, violations, "dependency.inner-imports-pkg")
+	assertHasRule(t, violations, "dependency.unknown-sublayer")
 
 	foundHandlerEvent := false
 	for _, v := range violations {
-		if v.Rule == "layer.direction" &&
+		if v.Rule == "dependency.invalid-import-direction" &&
 			strings.Contains(v.Message, `"handler"`) &&
 			strings.Contains(v.Message, `"event"`) {
 			foundHandlerEvent = true
@@ -57,7 +57,7 @@ func TestLayerDirectionInvalidProject(t *testing.T) {
 		}
 	}
 	if !foundHandlerEvent {
-		t.Fatalf("expected handler -> event layer.direction violation, got %v", ruleIDs(violations))
+		t.Fatalf("expected handler -> event dependency.invalid-import-direction violation, got %v", ruleIDs(violations))
 	}
 }
 

@@ -16,5 +16,5 @@ func TestIntegration_BlastRadius(t *testing.T) {
 	if len(violations) == 0 {
 		t.Error("expected blast radius violations for hub package")
 	}
-	assertHasRule(t, violations, "blast.high-coupling")
+	assertHasRule(t, violations, "dependency.high-coupling")
 }

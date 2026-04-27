@@ -10,12 +10,12 @@ import (
 func TestInternalTopLevel(t *testing.T) {
 	t.Run("valid fixture has no internal top-level violations", func(t *testing.T) {
 		violations := runRule(t, "../../testdata/valid", structural.NewInternalTopLevel())
-		assertNoRulePrefix(t, violations, "structure.internal-top-level")
+		assertNoRulePrefix(t, violations, "structural.internal-top-level")
 	})
 
 	t.Run("detects invalid fixture unexpected internal top-level package", func(t *testing.T) {
 		violations := runRule(t, "../../testdata/invalid", structural.NewInternalTopLevel())
-		assertViolation(t, violations, "structure.internal-top-level", "internal/config/")
+		assertViolation(t, violations, "structural.internal-top-level", "internal/config/")
 	})
 
 	t.Run("allowedNames hint is deterministic and comma-joined", func(t *testing.T) {
@@ -24,7 +24,7 @@ func TestInternalTopLevel(t *testing.T) {
 			violations := runRule(t, "../../testdata/invalid", structural.NewInternalTopLevel())
 			var msg string
 			for _, v := range violations {
-				if v.Rule == "structure.internal-top-level" {
+				if v.Rule == "structural.internal-top-level" {
 					msg = v.Fix
 					break
 				}

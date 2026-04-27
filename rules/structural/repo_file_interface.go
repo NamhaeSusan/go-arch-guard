@@ -27,9 +27,9 @@ func (r *RepoFileInterface) Spec() core.RuleSpec {
 		Description:     "repository port interface placement and filename conventions",
 		DefaultSeverity: r.severity,
 		Violations: []core.ViolationSpec{
-			{ID: "structure.repo-file-interface", Description: "repo file must contain matching interface", DefaultSeverity: r.severity},
-			{ID: "structure.repo-file-extra-interface", Description: "repo file must define one interface", DefaultSeverity: r.severity},
-			{ID: "structure.interface-placement", Description: "repository-port interfaces must live in the port layer", DefaultSeverity: r.severity},
+			{ID: "structural.repo-file-interface-missing", Description: "repo file must contain matching interface", DefaultSeverity: r.severity},
+			{ID: "structural.repo-file-extra-interface", Description: "repo file must define one interface", DefaultSeverity: r.severity},
+			{ID: "structural.interface-placement", Description: "repository-port interfaces must live in the port layer", DefaultSeverity: r.severity},
 		},
 	}
 }
@@ -68,7 +68,7 @@ func (r *RepoFileInterface) checkPortPackage(ctx *core.Context, pkg *packages.Pa
 			violations = append(violations, r.violation(
 				relPath,
 				0,
-				"structure.repo-file-interface",
+				"structural.repo-file-interface-missing",
 				`file "`+base+`" in repo/ must contain interface "`+expected+`"`,
 				`add "type `+expected+` interface { ... }" or rename the file`,
 			))
@@ -86,7 +86,7 @@ func (r *RepoFileInterface) checkPortPackage(ctx *core.Context, pkg *packages.Pa
 		violations = append(violations, r.violation(
 			relPath,
 			0,
-			"structure.repo-file-extra-interface",
+			"structural.repo-file-extra-interface",
 			`file "`+base+`" in repo/ must define only "`+expected+`", found extra: `+strings.Join(extra, ", "),
 			"move each extra interface to its own file (e.g. "+analysisutil.PascalToSnake(extra[0])+".go)",
 		))
@@ -111,7 +111,7 @@ func (r *RepoFileInterface) checkInterfacePlacement(ctx *core.Context, pkg *pack
 				violations = append(violations, r.violation(
 					filePath,
 					info.Line,
-					"structure.interface-placement",
+					"structural.interface-placement",
 					`interface "`+info.Name+`" matches repository-port naming and must be defined in `+repoName+`/, not in `+path.Base(path.Dir(pkg.PkgPath))+`/`,
 					"move to "+repoName+"/, or rename if it's a consumer-defined interface",
 				))
@@ -120,7 +120,7 @@ func (r *RepoFileInterface) checkInterfacePlacement(ctx *core.Context, pkg *pack
 				violations = append(violations, r.violation(
 					filePath,
 					info.Line,
-					"structure.interface-placement",
+					"structural.interface-placement",
 					`type alias "`+info.Name+`" re-exports interface from `+repoName+` - suspected cross-domain dependency; use `+arch.Layout.OrchestrationDir+`/ instead`,
 					"remove alias and move cross-domain coordination to "+arch.Layout.OrchestrationDir+"/",
 				))

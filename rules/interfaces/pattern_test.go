@@ -36,10 +36,10 @@ func New() *StoreImpl { return &StoreImpl{} }
 
 	violations := interfaces.NewPattern().Check(loadContext(t, root, flatArchitecture(), "example.com/pattern-core"))
 
-	assertHasRule(t, violations, "interface.single-per-package")
-	assertHasRule(t, violations, "interface.exported-impl")
-	assertHasRule(t, violations, "interface.constructor-name")
-	assertHasRule(t, violations, "interface.constructor-returns-interface")
+	assertHasRule(t, violations, "interfaces.single-per-package")
+	assertHasRule(t, violations, "interfaces.exported-impl")
+	assertHasRule(t, violations, "interfaces.constructor-name")
+	assertHasRule(t, violations, "interfaces.constructor-returns-interface")
 }
 
 func TestPatternMaxMethodsDisabledByDefault(t *testing.T) {
@@ -68,7 +68,7 @@ func New() Store { return &store{} }
 
 	violations := interfaces.NewPattern().Check(loadContext(t, root, flatArchitecture(), "example.com/pattern-max-default"))
 
-	assertLacksRule(t, violations, "interface.too-many-methods")
+	assertLacksRule(t, violations, "interfaces.too-many-methods")
 }
 
 func TestPatternMaxMethodsOptIn(t *testing.T) {
@@ -88,7 +88,7 @@ func New() Store { return &store{} }
 
 	violations := interfaces.NewPattern(interfaces.WithMaxMethods(1)).Check(loadContext(t, root, flatArchitecture(), "example.com/pattern-max-opt-in"))
 
-	assertHasRule(t, violations, "interface.too-many-methods")
+	assertHasRule(t, violations, "interfaces.too-many-methods")
 }
 
 func TestPatternHonorsInterfacePatternExclude(t *testing.T) {
@@ -153,7 +153,7 @@ func New() *Cache[Store] { return &Cache[Store]{} }
 
 	var found bool
 	for _, v := range violations {
-		if v.Rule != "interface.constructor-returns-interface" {
+		if v.Rule != "interfaces.constructor-returns-interface" {
 			continue
 		}
 		found = true

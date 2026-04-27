@@ -9,7 +9,7 @@ import (
 
 const (
 	ruleModelRequired = "structural.model-required"
-	modelRequired     = "structure.domain-model-required"
+	modelRequired     = "structural.domain-model-required"
 )
 
 type ModelRequired struct {

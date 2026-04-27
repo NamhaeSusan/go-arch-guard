@@ -44,8 +44,8 @@ func TestNoSetterSpec(t *testing.T) {
 	if spec.DefaultSeverity != core.Error {
 		t.Fatalf("DefaultSeverity = %v, want Error", spec.DefaultSeverity)
 	}
-	if len(spec.Violations) != 1 || spec.Violations[0].ID != "setter.forbidden" {
-		t.Fatalf("Violations = %+v, want setter.forbidden", spec.Violations)
+	if len(spec.Violations) != 1 || spec.Violations[0].ID != "types.no-setter" {
+		t.Fatalf("Violations = %+v, want types.no-setter", spec.Violations)
 	}
 }
 
@@ -55,7 +55,7 @@ func TestNoSetterFlagsClassicSetters(t *testing.T) {
 
 	var setters []core.Violation
 	for _, v := range got {
-		if v.Rule == "setter.forbidden" && strings.Contains(v.File, "internal/model/order.go") {
+		if v.Rule == "types.no-setter" && strings.Contains(v.File, "internal/model/order.go") {
 			setters = append(setters, v)
 		}
 	}

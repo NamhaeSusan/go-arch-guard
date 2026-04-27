@@ -17,11 +17,11 @@ func TestIntegration_Invalid(t *testing.T) {
 
 	t.Run("domain isolation violations found", func(t *testing.T) {
 		violations := runDDD(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", fixturePath("testdata/invalid"))
-		assertHasRule(t, violations, "isolation.cross-domain")
+		assertHasRule(t, violations, "dependency.cross-domain")
 	})
 	t.Run("layer direction violations found", func(t *testing.T) {
 		violations := runDDD(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", fixturePath("testdata/invalid"))
-		assertHasRule(t, violations, "layer.direction")
+		assertHasRule(t, violations, "dependency.invalid-import-direction")
 	})
 	t.Run("naming violations found", func(t *testing.T) {
 		violations := runDDD(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", fixturePath("testdata/invalid"))
@@ -29,7 +29,7 @@ func TestIntegration_Invalid(t *testing.T) {
 	})
 	t.Run("structure violations found", func(t *testing.T) {
 		violations := runDDD(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", fixturePath("testdata/invalid"))
-		assertHasRule(t, violations, "structure.banned-package")
+		assertHasRule(t, violations, "structural.banned-package-name")
 	})
 
 	t.Run("new rule ids are surfaced", func(t *testing.T) {
@@ -37,16 +37,16 @@ func TestIntegration_Invalid(t *testing.T) {
 		layerViolations := runDDD(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", fixturePath("testdata/invalid"))
 		structureViolations := runDDD(pkgs, "github.com/kimtaeyun/testproject-dc-invalid", fixturePath("testdata/invalid"))
 
-		assertHasRule(t, isolationViolations, "isolation.domain-imports-orchestration")
-		assertHasRule(t, isolationViolations, "isolation.stray-imports-orchestration")
-		assertHasRule(t, isolationViolations, "isolation.pkg-imports-domain")
-		assertHasRule(t, layerViolations, "layer.unknown-sublayer")
-		assertHasRule(t, layerViolations, "layer.inner-imports-pkg")
-		assertHasRule(t, structureViolations, "structure.internal-top-level")
-		assertHasRule(t, structureViolations, "structure.domain-alias-exists")
-		assertHasRule(t, structureViolations, "structure.domain-model-required")
-		assertHasRule(t, structureViolations, "structure.dto-placement")
-		assertHasRule(t, structureViolations, "structure.misplaced-layer")
+		assertHasRule(t, isolationViolations, "dependency.domain-imports-orchestration")
+		assertHasRule(t, isolationViolations, "dependency.stray-imports-orchestration")
+		assertHasRule(t, isolationViolations, "dependency.pkg-imports-domain")
+		assertHasRule(t, layerViolations, "dependency.unknown-sublayer")
+		assertHasRule(t, layerViolations, "dependency.inner-imports-pkg")
+		assertHasRule(t, structureViolations, "structural.internal-top-level")
+		assertHasRule(t, structureViolations, "structural.domain-alias-exists")
+		assertHasRule(t, structureViolations, "structural.domain-model-required")
+		assertHasRule(t, structureViolations, "structural.dto-placement")
+		assertHasRule(t, structureViolations, "structural.misplaced-layer")
 	})
 }
 

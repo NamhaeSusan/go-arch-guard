@@ -12,7 +12,7 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-const setterForbiddenID = "setter.forbidden"
+const setterForbiddenID = "types.no-setter"
 
 // NoSetterDefaultSpec returns a fresh copy of the rule's static metadata
 // (with the hard-coded default severity, before any construction-time
@@ -40,7 +40,13 @@ func NewNoSetter(opts ...Option) *NoSetter {
 }
 
 func (r *NoSetter) Spec() core.RuleSpec {
-	return specWithSeverity(NoSetterDefaultSpec(), r.severity)
+	spec := NoSetterDefaultSpec()
+	spec.DefaultSeverity = r.severity
+	spec.Violations = append([]core.ViolationSpec(nil), spec.Violations...)
+	for i := range spec.Violations {
+		spec.Violations[i].DefaultSeverity = r.severity
+	}
+	return spec
 }
 
 func (r *NoSetter) Check(ctx *core.Context) []core.Violation {

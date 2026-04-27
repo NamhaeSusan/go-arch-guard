@@ -23,7 +23,7 @@ type holder struct {
 
 	violations := interfaces.NewContainer().Check(loadContext(t, root, flatArchitecture(), "example.com/container-field-only"))
 
-	assertHasRule(t, violations, "interface.container-only")
+	assertHasRule(t, violations, "interfaces.container-only")
 	if violations[0].EffectiveSeverity != core.Warning {
 		t.Fatalf("EffectiveSeverity = %v, want Warning", violations[0].EffectiveSeverity)
 	}
@@ -59,7 +59,7 @@ func New() Reader { return &reader{} }
 
 	violations := interfaces.NewContainer().Check(loadContext(t, root, flatArchitecture(), "example.com/container-real-abstraction"))
 
-	assertLacksRule(t, violations, "interface.container-only")
+	assertLacksRule(t, violations, "interfaces.container-only")
 }
 
 func TestContainerHandlesGenericTypeArguments(t *testing.T) {
@@ -80,7 +80,7 @@ func New() *Cache[Reader] { return &Cache[Reader]{} }
 
 	violations := interfaces.NewContainer().Check(loadContext(t, root, flatArchitecture(), "example.com/container-generics"))
 
-	assertLacksRule(t, violations, "interface.container-only")
+	assertLacksRule(t, violations, "interfaces.container-only")
 }
 
 func TestContainerWithSeverity(t *testing.T) {

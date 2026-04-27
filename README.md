@@ -144,7 +144,7 @@ Sample output when violations exist:
 === RUN   TestArchitecture/domain_isolation
     [ERROR] violation: domain "order" must not import domain "user"
     (file: internal/domain/order/app/service.go:5,
-     rule: isolation.cross-domain,
+     rule: dependency.cross-domain,
      fix: use orchestration/ for cross-domain orchestration or move shared types to pkg/)
 --- FAIL: TestArchitecture/domain_isolation
 ```
@@ -269,7 +269,7 @@ matches the project's actual layout.
 Prevents domains from leaking into each other. Without isolation, a change in domain A
 can silently break domain B --- the most common source of unintended coupling in DDD projects.
 
-### `isolation.cross-domain`
+### `dependency.cross-domain`
 
 Domains must not import other domains directly.
 
@@ -290,7 +290,7 @@ import (
 )
 ```
 
-### `isolation.cmd-deep-import`
+### `dependency.cmd-deep-import`
 
 `cmd/` must only import domain root packages (alias), not sub-packages.
 
@@ -301,7 +301,7 @@ import _ "myapp/internal/domain/order/app"  // too deep
 import _ "myapp/internal/domain/order"  // domain root only
 ```
 
-### `isolation.orchestration-deep-import`
+### `dependency.orchestration-deep-import`
 
 Orchestration must only import domain roots, keeping the coupling surface minimal.
 
@@ -312,7 +312,7 @@ import _ "myapp/internal/domain/order/app"  // too deep
 import _ "myapp/internal/domain/order"  // domain root only
 ```
 
-### `isolation.pkg-imports-domain`
+### `dependency.pkg-imports-domain`
 
 Shared `pkg/` must not import any domain --- it should be domain-agnostic.
 
@@ -321,23 +321,23 @@ Shared `pkg/` must not import any domain --- it should be domain-agnostic.
 import _ "myapp/internal/domain/order"  // violation: pkg depends on domain
 ```
 
-### `isolation.pkg-imports-orchestration`
+### `dependency.pkg-imports-orchestration`
 
 Shared `pkg/` must not import orchestration.
 
-### `isolation.domain-imports-orchestration`
+### `dependency.domain-imports-orchestration`
 
 Domains must not import orchestration --- orchestration coordinates domains, not the reverse.
 
-### `isolation.stray-imports-orchestration`
+### `dependency.stray-imports-orchestration`
 
 Only `cmd/` and orchestration itself may depend on orchestration.
 
-### `isolation.stray-imports-domain`
+### `dependency.stray-imports-domain`
 
 Non-domain internal packages (other than orchestration/cmd/pkg/app/transport) must not import domains.
 
-### `isolation.transport-imports-domain`
+### `dependency.transport-imports-domain`
 
 Transport packages (`internal/server/<proto>/`) must not import domain sub-packages directly.
 They should go through the composition root (`internal/app/`) instead.
@@ -348,11 +348,11 @@ import _ "myapp/internal/domain/order/core/model"  // violation: transport impor
 import _ "myapp/internal/app"                       // correct: go through composition root
 ```
 
-### `isolation.transport-imports-orchestration`
+### `dependency.transport-imports-orchestration`
 
 Transport packages must not import orchestration directly.
 
-### `isolation.transport-imports-unclassified`
+### `dependency.transport-imports-unclassified`
 
 Transport packages must not import unclassified internal packages (e.g. `internal/config`, `internal/bootstrap`).
 Anything transport depends on must be routed through `internal/app/` (the composition root) or `internal/pkg/`.
@@ -385,7 +385,7 @@ Prevents reverse dependencies between layers. Without direction enforcement,
 inner layers (model, entity) gradually accumulate imports from outer layers,
 making them impossible to extract or test independently.
 
-### `layer.direction`
+### `dependency.invalid-import-direction`
 
 Imports must follow the allowed direction defined by the preset's direction matrix.
 
@@ -398,7 +398,7 @@ import _ "myapp/internal/domain/order/app"  // reverse direction
 import _ "myapp/internal/domain/order/core/model"  // allowed
 ```
 
-### `layer.inner-imports-pkg`
+### `dependency.inner-imports-pkg`
 
 Inner layers marked as `PkgRestricted` must not import shared `pkg/`.
 This keeps core domain logic free of infrastructure concerns.
@@ -410,7 +410,7 @@ package model // internal/domain/order/core/model/
 import _ "myapp/internal/pkg/logger"  // model must be self-contained
 ```
 
-### `layer.unknown-sublayer`
+### `dependency.unknown-sublayer`
 
 Detects directories under a domain that don't match any recognized sublayer name.
 
@@ -428,7 +428,7 @@ internal/domain/order/utils/   "utils" is not a recognized sublayer
 
 Enforces filesystem layout conventions that prevent structural drift during vibe coding.
 
-### `structure.internal-top-level`
+### `structural.internal-top-level`
 
 Only allowed directories may exist at the `internal/` top level.
 
@@ -441,7 +441,7 @@ internal/
   config/          not in allowed list
 ```
 
-### `structure.banned-package`
+### `structural.banned-package-name`
 
 Blocks vague package names that become dumping grounds.
 
@@ -451,52 +451,52 @@ Banned by default: `util`, `common`, `misc`, `helper`, `shared`, `services`
 internal/domain/order/app/util/   "util" is banned
 ```
 
-### `structure.legacy-package`
+### `structural.legacy-package`
 
 Flags package names that should be migrated: `router`, `bootstrap`. Default severity is Error; downgrade with `WithSeverityOverride("structure.legacy-package", core.Warning)` during migration windows.
 
-### `structure.misplaced-layer`
+### `structural.misplaced-layer`
 
 Layer directories (`app`, `handler`, `infra`) must only exist inside domain slices,
 not floating at the internal/ top level.
 
-### `structure.middleware-placement`
+### `structural.middleware-placement`
 
 `middleware/` must live in `internal/pkg/middleware/`, not scattered across domains.
 
-### `structure.domain-alias-exists` (DDD only)
+### `structural.domain-alias-exists` (DDD only)
 
 Each domain root must define an `alias.go` file as its public API surface.
 
-### `structure.domain-alias-package`
+### `structural.domain-alias-package`
 
 The alias file's package name must match the directory name.
 
-### `structure.domain-alias-exclusive`
+### `structural.domain-alias-exclusive`
 
 Domain root directories may only contain `alias.go` --- all other code goes in sublayers.
 
-### `structure.domain-alias-no-interface`
+### `structural.domain-alias-no-interface`
 
 Alias files must not directly define interfaces --- this leaks cross-domain contracts.
 
-### `structure.domain-alias-contract-reexport`
+### `structural.domain-alias-contract-reexport`
 
 Alias files must not re-export types from contract sublayers (repo/svc) --- this creates hidden cross-domain dependencies.
 
-### `structure.domain-model-required` (DDD only)
+### `structural.domain-model-required` (DDD only)
 
 Each domain must have a `core/model/` directory with at least one Go file.
 
-### `structure.dto-placement`
+### `structural.dto-placement`
 
 DTO files (`dto.go`, `*_dto.go`) may only exist in allowed layers (handler, app).
 
 ## Naming Rules
 
 `naming.NewNoStutter()`, `naming.NewImplSuffix()`,
-`naming.NewSnakeCaseFiles()`, `naming.NewNoLayerSuffix()`, and
-`naming.NewNoHandMock()`
+`naming.NewSnakeCaseFiles()`, `naming.NewNoLayerSuffix()`,
+and `naming.NewTypePattern()`
 
 Enforces Go naming conventions that keep the codebase consistent and grep-friendly.
 
@@ -529,7 +529,7 @@ OrderService.go   violation
 order_service.go  correct
 ```
 
-### `structure.repo-file-interface`
+### `structural.repo-file-interface-missing`
 
 Files in `repo/` (or `core/repo/`) must contain an interface matching the filename.
 
@@ -538,7 +538,7 @@ Files in `repo/` (or `core/repo/`) must contain an interface matching the filena
 type Order interface { ... }  // matches filename
 ```
 
-### `structure.repo-file-extra-interface`
+### `structural.repo-file-extra-interface`
 
 Each file in `repo/` must define exactly one interface. Extra interfaces should be split into their own files.
 
@@ -548,7 +548,7 @@ type Review interface { Find() }   // correct
 type Helper interface { Assist() } // violation: move to helper.go
 ```
 
-### `interface.too-many-methods`
+### `interfaces.too-many-methods`
 
 Repo interfaces must not exceed the method limit set by `interfaces.WithMaxMethods`. The DDD, CleanArch, and Hexagonal recommended bundles enable a default limit of 10. Other presets leave it disabled.
 
@@ -574,7 +574,7 @@ order_service.go  "_service" suffix is redundant
 order.go          correct
 ```
 
-### `structure.interface-placement` (DDD only)
+### `structural.interface-placement` (DDD only)
 
 Repository-port interfaces — names ending in `Repository` or `Repo` — must be
 defined in `core/repo/`, not scattered across layers. Consumer-defined
@@ -583,11 +583,6 @@ consumes) are allowed anywhere they are used: `handler/`, `app/`, `svc/`, etc.
 
 Also flags `type X = otherdomain.Repo` aliases that re-export a repository
 interface across domain boundaries — those belong in `orchestration/`.
-
-### `testing.no-handmock`
-
-Test files must not define hand-rolled mock/fake/stub structs with methods.
-Use mockery or other generation tools instead.
 
 ### `naming.type-pattern-mismatch` (flat presets)
 
@@ -611,6 +606,19 @@ type OrderWorker struct{}
 func (w *OrderWorker) Process(ctx context.Context) error { ... }  // correct
 ```
 
+## Test Policy Rules
+
+`testpolicy.NewNoHandMock()`
+
+Constraints on what test files may contain. Lives in its own package because
+testing concerns are orthogonal to naming or structural conventions.
+
+### `testpolicy.no-handmock`
+
+Test files must not define hand-rolled mock/fake/stub structs with methods.
+Use a mock generator (e.g. mockery) and import the generated types from a
+dedicated mocks package instead.
+
 ## Interface Pattern Rules
 
 `interfaces.NewPattern()`, `interfaces.NewContainer()`, and
@@ -619,7 +627,7 @@ func (w *OrderWorker) Process(ctx context.Context) error { ... }  // correct
 Enforces Go interface best practices: private implementation, `New()`-only constructor,
 interface return type, and single interface per package.
 
-### `interface.exported-impl`
+### `interfaces.exported-impl`
 
 Exported structs must not implement interfaces --- make implementation types unexported
 to prevent consumers from depending on the concrete type.
@@ -629,7 +637,7 @@ type RepositoryImpl struct{ db *sql.DB }  // exported struct implements interfac
 type repository struct{ db *sql.DB }      // unexported --- correct
 ```
 
-### `interface.constructor-name`
+### `interfaces.constructor-name`
 
 Constructors must be named `New`, not `NewXxx` variants. This enforces a consistent
 factory pattern across all packages.
@@ -639,7 +647,7 @@ func NewRepository(db *sql.DB) Repository  // NewXxx not allowed
 func New(db *sql.DB) Repository            // correct
 ```
 
-### `interface.constructor-returns-interface`
+### `interfaces.constructor-returns-interface`
 
 `New()` must return an interface, not a concrete type. This ensures callers depend
 on the contract, not the implementation.
@@ -649,14 +657,14 @@ func New(db *sql.DB) *repository  // returns concrete type
 func New(db *sql.DB) Repository   // returns interface --- correct
 ```
 
-### `interface.single-per-package`
+### `interfaces.single-per-package`
 
 At most one exported interface per package (Warning). Multiple interfaces in one package
 typically signal that the package has too many responsibilities.
 
 Excluded layers per preset (entry points, model, event, pkg) are controlled by `InterfacePatternExclude`.
 
-### `interface.cross-domain-anonymous`
+### `interfaces.cross-domain-anonymous`
 
 Detects anonymous interfaces declared outside of their referenced domain — and outside the designated orchestration layer — whose method signatures touch types from another domain. Default severity is **Error**.
 
@@ -699,7 +707,7 @@ Skipped:
 - Packages inside `internal/<OrchestrationDir>/` — orchestration is the designated cross-domain coordination layer
 - Models with no `DomainDir` (flat layouts like ConsumerWorker, Batch, EventPipeline)
 
-### `interface.container-only`
+### `interfaces.container-only`
 
 Detects interfaces declared in a package that are used **only as struct field types** —
 never as a function parameter or return type. Default severity is **Warning**.
@@ -752,7 +760,7 @@ Surfaces internal packages with abnormally high coupling via IQR-based statistic
 
 | Rule | Meaning |
 |------|---------|
-| `blast.high-coupling` | package has statistically outlying transitive dependents |
+| `dependency.high-coupling` | package has statistically outlying transitive dependents |
 
 | Metric | Definition |
 |--------|-----------|
@@ -803,7 +811,7 @@ report.AssertNoViolations(t, core.Run(ctx, core.NewRuleSet(types.NewNoSetter()))
 report.AssertNoViolations(t, core.Run(ctx, core.NewRuleSet(types.NewNoSetter(types.WithSeverity(core.Error)))))
 ```
 
-Emitted rule ID: `setter.forbidden`.
+Emitted rule ID: `types.no-setter`.
 
 ## Options
 
@@ -812,7 +820,7 @@ Emitted rule ID: `setter.forbidden`.
 ```go
 // Log a specific violation without failing the test
 core.Run(ctx, presets.RecommendedDDD(),
-    core.WithSeverityOverride("isolation.cross-domain", core.Warning))
+    core.WithSeverityOverride("dependency.cross-domain", core.Warning))
 ```
 
 ### Exclude Paths
@@ -881,12 +889,13 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `presets.Batch()` / `presets.RecommendedBatch()` | Batch flat-layout architecture and ruleset |
 | `presets.EventPipeline()` / `presets.RecommendedEventPipeline()` | event-sourcing / CQRS architecture and ruleset |
 | `dependency.NewIsolation()` / `NewLayerDirection()` / `NewBlastRadius()` | dependency rules |
-| `naming.NewNoStutter()` / `NewImplSuffix()` / `NewSnakeCaseFiles()` / `NewNoLayerSuffix()` / `NewNoHandMock()` | naming rules |
+| `naming.NewNoStutter()` / `NewImplSuffix()` / `NewSnakeCaseFiles()` / `NewNoLayerSuffix()` / `NewTypePattern()` | naming rules |
 | `structural.NewAlias()` / `NewPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` / `NewRepoFileInterface()` | structure rules |
 | `interfaces.NewPattern()` / `NewContainer()` / `NewCrossDomainAnonymous()` | interface rules |
+| `testpolicy.NewNoHandMock()` | test policy rules |
 | `interfaces.WithMaxMethods(n)` | option for `interfaces.NewPattern` setting the per-interface method cap (default 0 = disabled; DDD/CleanArch/Hexagonal recommended bundles bake in 10) |
 | `tx.New(tx.Config{...})` | transaction boundary enforcement (opt-in) |
-| `types.NewTypePattern()` / `types.NewNoSetter()` | type pattern and setter rules |
+| `types.NewNoSetter()` | setter rule (immutability for value types) |
 
 ## Machine-readable JSON Output
 

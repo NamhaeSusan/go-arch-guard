@@ -23,9 +23,9 @@ func (r *LayerDirection) Spec() core.RuleSpec {
 		Description:     "domain sublayers must import only allowed inner dependencies",
 		DefaultSeverity: r.severity,
 		Violations: violationSpecs(r.severity,
-			"layer.direction",
-			"layer.inner-imports-pkg",
-			"layer.unknown-sublayer",
+			"dependency.invalid-import-direction",
+			"dependency.inner-imports-pkg",
+			"dependency.unknown-sublayer",
 		),
 	}
 }
@@ -63,7 +63,7 @@ func (r *LayerDirection) checkDomain(ctx *core.Context, projectModule, projectRo
 		}
 		if src.Sublayer != "" && !analysisutil.IsKnownSublayer(arch.Layers, src.Sublayer) {
 			violations = append(violations, r.violation(relativePackageFile(pkg), 0,
-				"layer.unknown-sublayer",
+				"dependency.unknown-sublayer",
 				fmt.Sprintf("unknown sublayer %q in domain %q", src.Sublayer, src.Domain),
 				fmt.Sprintf("use one of the supported sublayers: %v", arch.Layers.Sublayers),
 			))
@@ -81,7 +81,7 @@ func (r *LayerDirection) checkDomain(ctx *core.Context, projectModule, projectRo
 				if arch.Layers.PkgRestricted[src.Sublayer] {
 					file, line := analysisutil.FindImportPosition(pkg, impPath, projectRoot)
 					violations = append(violations, r.violation(file, line,
-						"layer.inner-imports-pkg",
+						"dependency.inner-imports-pkg",
 						fmt.Sprintf("inner sublayer %q must not import %s/%s in domain %q", src.Sublayer, arch.Layout.InternalRoot, arch.Layout.SharedDir, src.Domain),
 						"keep core and event layers self-contained; move shared concerns outward to app, handler, or infra",
 					))
@@ -97,7 +97,7 @@ func (r *LayerDirection) checkDomain(ctx *core.Context, projectModule, projectRo
 			if imp.Sublayer != "" && !analysisutil.IsKnownSublayer(arch.Layers, imp.Sublayer) {
 				file, line := analysisutil.FindImportPosition(pkg, impPath, projectRoot)
 				violations = append(violations, r.violation(file, line,
-					"layer.unknown-sublayer",
+					"dependency.unknown-sublayer",
 					fmt.Sprintf("unknown sublayer %q in domain %q", imp.Sublayer, src.Domain),
 					fmt.Sprintf("use one of the supported sublayers: %v", arch.Layers.Sublayers),
 				))
@@ -132,7 +132,7 @@ func (r *LayerDirection) checkFlat(ctx *core.Context, projectModule, projectRoot
 				if arch.Layers.PkgRestricted[src.Sublayer] {
 					file, line := analysisutil.FindImportPosition(pkg, impPath, projectRoot)
 					violations = append(violations, r.violation(file, line,
-						"layer.inner-imports-pkg",
+						"dependency.inner-imports-pkg",
 						fmt.Sprintf("inner sublayer %q must not import %s/%s", src.Sublayer, arch.Layout.InternalRoot, arch.Layout.SharedDir),
 						"keep inner layers self-contained; move shared concerns to an outer layer",
 					))
@@ -162,7 +162,7 @@ func (r *LayerDirection) checkDirection(pkg *packages.Package, projectRoot, impP
 		message = fmt.Sprintf("%s in domain %q", message, domain)
 	}
 	return []core.Violation{r.violation(file, line,
-		"layer.direction",
+		"dependency.invalid-import-direction",
 		message,
 		fmt.Sprintf("allowed imports for %q: %v", srcSublayer, allowed),
 	)}

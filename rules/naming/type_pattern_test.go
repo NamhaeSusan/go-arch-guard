@@ -1,24 +1,37 @@
-package types_test
+package naming_test
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/NamhaeSusan/go-arch-guard/analyzer"
 	"github.com/NamhaeSusan/go-arch-guard/core"
-	types "github.com/NamhaeSusan/go-arch-guard/rules/types"
+	"github.com/NamhaeSusan/go-arch-guard/rules/naming"
+	"golang.org/x/tools/go/packages"
 )
 
-func writeTempFile(t *testing.T, path, content string) {
+var (
+	typePatternFixtureOnce sync.Once
+	typePatternFixturePkgs []*packages.Package
+	typePatternFixtureErr  error
+)
+
+func loadTypePatternFixture(t *testing.T) []*packages.Package {
 	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
+	typePatternFixtureOnce.Do(func() {
+		typePatternFixturePkgs, typePatternFixtureErr = analyzer.Load("../../testdata/types", "internal/...", "mocks/...")
+	})
+	if typePatternFixtureErr != nil {
+		t.Fatal(typePatternFixtureErr)
 	}
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	return typePatternFixturePkgs
+}
+
+func typePatternFixtureContext(t *testing.T, arch core.Architecture, exclude []string) *core.Context {
+	t.Helper()
+	return core.NewContext(loadTypePatternFixture(t), "github.com/kimtaeyun/testproject-types", "../../testdata/types", arch, exclude)
 }
 
 func typePatternArch() core.Architecture {
@@ -37,10 +50,10 @@ func typePatternArch() core.Architecture {
 }
 
 func TestTypePatternSpec(t *testing.T) {
-	spec := types.NewTypePattern(types.WithSeverity(core.Warning)).Spec()
+	spec := naming.NewTypePattern(naming.WithSeverity(core.Warning)).Spec()
 
-	if spec.ID != "types.type-pattern" {
-		t.Fatalf("ID = %q, want types.type-pattern", spec.ID)
+	if spec.ID != "naming.type-pattern" {
+		t.Fatalf("ID = %q, want naming.type-pattern", spec.ID)
 	}
 	if spec.DefaultSeverity != core.Warning {
 		t.Fatalf("DefaultSeverity = %v, want Warning", spec.DefaultSeverity)
@@ -57,8 +70,8 @@ func TestTypePatternSpec(t *testing.T) {
 }
 
 func TestTypePatternFlagsMissingTypeAndMethod(t *testing.T) {
-	ctx := newFixtureContext(t, typePatternArch(), nil)
-	got := types.NewTypePattern().Check(ctx)
+	ctx := typePatternFixtureContext(t, typePatternArch(), nil)
+	got := naming.NewTypePattern().Check(ctx)
 
 	var mismatch, missingMethod int
 	for _, v := range got {
@@ -86,16 +99,16 @@ func TestTypePatternFlagsMissingTypeAndMethod(t *testing.T) {
 
 func TestTypePatternMatchesFlatLayout(t *testing.T) {
 	root := t.TempDir()
-	writeTempFile(t, filepath.Join(root, "go.mod"), "module example.com/flat\n\ngo 1.25.0\n")
-	writeTempFile(t, filepath.Join(root, "worker", "worker_order.go"), "package worker\n\ntype OrderWorker struct{}\n\nfunc (w *OrderWorker) Process() {}\n")
-	writeTempFile(t, filepath.Join(root, "worker", "worker_payment.go"), "package worker\n\ntype Payment struct{}\n")
+	writeFile(t, filepath.Join(root, "go.mod"), "module example.com/flat\n\ngo 1.25.0\n")
+	writeFile(t, filepath.Join(root, "worker", "worker_order.go"), "package worker\n\ntype OrderWorker struct{}\n\nfunc (w *OrderWorker) Process() {}\n")
+	writeFile(t, filepath.Join(root, "worker", "worker_payment.go"), "package worker\n\ntype Payment struct{}\n")
 
 	pkgs, err := analyzer.Load(root, "worker/...")
 	if err != nil {
 		t.Fatal(err)
 	}
 	ctx := core.NewContext(pkgs, "example.com/flat", root, typePatternArch(), nil)
-	got := types.NewTypePattern().Check(ctx)
+	got := naming.NewTypePattern().Check(ctx)
 
 	var mismatch int
 	for _, v := range got {
@@ -113,16 +126,16 @@ func TestTypePatternMatchesFlatLayout(t *testing.T) {
 
 func TestTypePatternIgnoresPrefixSubstringDirs(t *testing.T) {
 	root := t.TempDir()
-	writeTempFile(t, filepath.Join(root, "go.mod"), "module example.com/edge\n\ngo 1.25.0\n")
-	writeTempFile(t, filepath.Join(root, "oldworker", "worker_thing.go"), "package oldworker\n\ntype Thing struct{}\n")
-	writeTempFile(t, filepath.Join(root, "worker", "sub", "worker_other.go"), "package sub\n\ntype Other struct{}\n")
+	writeFile(t, filepath.Join(root, "go.mod"), "module example.com/edge\n\ngo 1.25.0\n")
+	writeFile(t, filepath.Join(root, "oldworker", "worker_thing.go"), "package oldworker\n\ntype Thing struct{}\n")
+	writeFile(t, filepath.Join(root, "worker", "sub", "worker_other.go"), "package sub\n\ntype Other struct{}\n")
 
 	pkgs, err := analyzer.Load(root, "...")
 	if err != nil {
 		t.Fatal(err)
 	}
 	ctx := core.NewContext(pkgs, "example.com/edge", root, typePatternArch(), nil)
-	got := types.NewTypePattern().Check(ctx)
+	got := naming.NewTypePattern().Check(ctx)
 
 	for _, v := range got {
 		if strings.Contains(v.File, "oldworker") || strings.Contains(v.File, "worker/sub") {
@@ -132,8 +145,8 @@ func TestTypePatternIgnoresPrefixSubstringDirs(t *testing.T) {
 }
 
 func TestTypePatternSkipsValidAndExcludedFiles(t *testing.T) {
-	ctx := newFixtureContext(t, typePatternArch(), []string{"internal/worker/worker_payment.go"})
-	got := types.NewTypePattern().Check(ctx)
+	ctx := typePatternFixtureContext(t, typePatternArch(), []string{"internal/worker/worker_payment.go"})
+	got := naming.NewTypePattern().Check(ctx)
 
 	for _, v := range got {
 		if strings.Contains(v.File, "worker_order.go") {

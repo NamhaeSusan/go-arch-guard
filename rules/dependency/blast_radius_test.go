@@ -19,8 +19,8 @@ func TestBlastRadiusSpec(t *testing.T) {
 	if spec.DefaultSeverity != core.Error {
 		t.Fatalf("Spec().DefaultSeverity = %v, want %v", spec.DefaultSeverity, core.Error)
 	}
-	if !slices.Contains(spec.ViolationIDs(), "blast.high-coupling") {
-		t.Fatalf("Spec().ViolationIDs() missing blast.high-coupling")
+	if !slices.Contains(spec.ViolationIDs(), "dependency.high-coupling") {
+		t.Fatalf("Spec().ViolationIDs() missing dependency.high-coupling")
 	}
 }
 
@@ -28,14 +28,14 @@ func TestBlastRadiusValidProject(t *testing.T) {
 	ctx := loadContext(t, "../../testdata/valid", "github.com/kimtaeyun/testproject-dc", dddArchitecture(), "internal/...")
 
 	violations := dependency.NewBlastRadius().Check(ctx)
-	// A valid project must produce ZERO blast.high-coupling violations.
+	// A valid project must produce ZERO dependency.high-coupling violations.
 	// Asserting only "no Error" lets the IQR threshold silently break: a
 	// mutated coefficient (e.g. 1.5 → 0.0) would mark every package as an
 	// outlier and emit Warnings against the clean fixture, but
 	// EffectiveSeverity stays Warning so the looser assertion would miss it.
 	for _, v := range violations {
-		if v.Rule == "blast.high-coupling" {
-			t.Fatalf("valid project should have no blast.high-coupling violations; got %s", v.String())
+		if v.Rule == "dependency.high-coupling" {
+			t.Fatalf("valid project should have no dependency.high-coupling violations; got %s", v.String())
 		}
 		if v.EffectiveSeverity == core.Error {
 			t.Fatalf("unexpected error violation: %s", v.String())
@@ -48,12 +48,12 @@ func TestBlastRadiusDetectsOutlier(t *testing.T) {
 
 	violations := dependency.NewBlastRadius().Check(ctx)
 	if len(violations) == 0 {
-		t.Fatal("expected at least one blast.high-coupling violation")
+		t.Fatal("expected at least one dependency.high-coupling violation")
 	}
 
 	foundPkg := false
 	for _, v := range violations {
-		if v.Rule != "blast.high-coupling" {
+		if v.Rule != "dependency.high-coupling" {
 			t.Fatalf("unexpected rule: %s", v.Rule)
 		}
 		if v.EffectiveSeverity != core.Warning {

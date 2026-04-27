@@ -53,11 +53,6 @@ func validContext(t *testing.T) *core.Context {
 	return newContext(loadValid(t), "github.com/kimtaeyun/testproject-dc", "../../testdata/valid", dddArch(), nil)
 }
 
-func invalidContext(t *testing.T, exclude []string) *core.Context {
-	t.Helper()
-	return newContext(loadInvalid(t), "github.com/kimtaeyun/testproject-dc-invalid", "../../testdata/invalid", dddArch(), exclude)
-}
-
 func tempContext(t *testing.T, files map[string]string, arch core.Architecture) *core.Context {
 	t.Helper()
 	root := t.TempDir()

@@ -91,7 +91,7 @@ func TestIntegration_RejectsUnexpectedInternalTopLevelPackages(t *testing.T) {
 	assertHasPackage(t, pkgs, module+"/internal/foundation")
 
 	violations := runDDD(pkgs, module, root)
-	assertHasRule(t, violations, "structure.internal-top-level")
+	assertHasRule(t, violations, "structural.internal-top-level")
 }
 
 func assertHasRule(t *testing.T, violations []core.Violation, rule string) {
@@ -213,7 +213,7 @@ func TestIntegration_CleanArchModel_DirectionViolation(t *testing.T) {
 	}
 
 	violations := runArchitecture(pkgs, module, root, arch, rs)
-	assertHasRule(t, violations, "layer.direction")
+	assertHasRule(t, violations, "dependency.invalid-import-direction")
 }
 
 func TestIntegration_CustomModel_DirectionViolation(t *testing.T) {
@@ -235,7 +235,7 @@ func TestIntegration_CustomModel_DirectionViolation(t *testing.T) {
 	}
 
 	violations := runArchitecture(pkgs, module, root, arch, rs)
-	assertHasRule(t, violations, "layer.direction")
+	assertHasRule(t, violations, "dependency.invalid-import-direction")
 }
 
 // TestIntegration_RealWorldDDD simulates a realistic multi-domain DDD project
@@ -562,18 +562,18 @@ func TestIntegration_RealWorldCleanArch_Violations(t *testing.T) {
 
 	layerViolations := runArchitecture(pkgs, module, root, arch, rs)
 	t.Run("detects direction violation", func(t *testing.T) {
-		assertHasRule(t, layerViolations, "layer.direction")
+		assertHasRule(t, layerViolations, "dependency.invalid-import-direction")
 	})
 	t.Run("detects entity importing pkg", func(t *testing.T) {
-		assertHasRule(t, layerViolations, "layer.inner-imports-pkg")
+		assertHasRule(t, layerViolations, "dependency.inner-imports-pkg")
 	})
 	t.Run("detects unknown sublayer", func(t *testing.T) {
-		assertHasRule(t, layerViolations, "layer.unknown-sublayer")
+		assertHasRule(t, layerViolations, "dependency.unknown-sublayer")
 	})
 
 	isolationViolations := runArchitecture(pkgs, module, root, arch, rs)
 	t.Run("detects cross-domain import", func(t *testing.T) {
-		assertHasRule(t, isolationViolations, "isolation.cross-domain")
+		assertHasRule(t, isolationViolations, "dependency.cross-domain")
 	})
 }
 
@@ -668,10 +668,10 @@ func TestIntegration_Layered_Violations(t *testing.T) {
 
 	layerViolations := runArchitecture(pkgs, module, root, arch, rs)
 	t.Run("detects direction violation", func(t *testing.T) {
-		assertHasRule(t, layerViolations, "layer.direction")
+		assertHasRule(t, layerViolations, "dependency.invalid-import-direction")
 	})
 	t.Run("detects model importing pkg", func(t *testing.T) {
-		assertHasRule(t, layerViolations, "layer.inner-imports-pkg")
+		assertHasRule(t, layerViolations, "dependency.inner-imports-pkg")
 	})
 }
 
@@ -768,10 +768,10 @@ func TestIntegration_Hexagonal_Violations(t *testing.T) {
 
 	layerViolations := runArchitecture(pkgs, module, root, arch, rs)
 	t.Run("detects direction violation", func(t *testing.T) {
-		assertHasRule(t, layerViolations, "layer.direction")
+		assertHasRule(t, layerViolations, "dependency.invalid-import-direction")
 	})
 	t.Run("detects domain importing pkg", func(t *testing.T) {
-		assertHasRule(t, layerViolations, "layer.inner-imports-pkg")
+		assertHasRule(t, layerViolations, "dependency.inner-imports-pkg")
 	})
 }
 
@@ -866,12 +866,12 @@ func TestIntegration_ModularMonolith_Violations(t *testing.T) {
 
 	layerViolations := runArchitecture(pkgs, module, root, arch, rs)
 	t.Run("detects direction violation", func(t *testing.T) {
-		assertHasRule(t, layerViolations, "layer.direction")
+		assertHasRule(t, layerViolations, "dependency.invalid-import-direction")
 	})
 
 	isolationViolations := runArchitecture(pkgs, module, root, arch, rs)
 	t.Run("detects cross-domain import", func(t *testing.T) {
-		assertHasRule(t, isolationViolations, "isolation.cross-domain")
+		assertHasRule(t, isolationViolations, "dependency.cross-domain")
 	})
 }
 
@@ -958,10 +958,10 @@ func TestIntegration_ConsumerWorker_Violations(t *testing.T) {
 		t.Fatal("expected violations")
 	}
 
-	assertHasRule(t, violations, "layer.direction")
-	assertHasRule(t, violations, "layer.inner-imports-pkg")
+	assertHasRule(t, violations, "dependency.invalid-import-direction")
+	assertHasRule(t, violations, "dependency.inner-imports-pkg")
 	assertHasRule(t, violations, "naming.type-pattern-mismatch")
-	assertHasRule(t, violations, "structure.internal-top-level")
+	assertHasRule(t, violations, "structural.internal-top-level")
 }
 
 func TestIntegration_Batch_Valid(t *testing.T) {
@@ -1047,10 +1047,10 @@ func TestIntegration_Batch_Violations(t *testing.T) {
 		t.Fatal("expected violations")
 	}
 
-	assertHasRule(t, violations, "layer.direction")
-	assertHasRule(t, violations, "layer.inner-imports-pkg")
+	assertHasRule(t, violations, "dependency.invalid-import-direction")
+	assertHasRule(t, violations, "dependency.inner-imports-pkg")
 	assertHasRule(t, violations, "naming.type-pattern-mismatch")
-	assertHasRule(t, violations, "structure.internal-top-level")
+	assertHasRule(t, violations, "structural.internal-top-level")
 }
 
 func TestIntegration_EventPipeline_Valid(t *testing.T) {
@@ -1141,11 +1141,11 @@ func TestIntegration_EventPipeline_Violations(t *testing.T) {
 		t.Fatal("expected violations")
 	}
 
-	assertHasRule(t, violations, "layer.direction")
-	assertHasRule(t, violations, "layer.inner-imports-pkg")
+	assertHasRule(t, violations, "dependency.invalid-import-direction")
+	assertHasRule(t, violations, "dependency.inner-imports-pkg")
 	assertHasRule(t, violations, "naming.type-pattern-mismatch")
 	assertHasRule(t, violations, "naming.type-pattern-missing-method")
-	assertHasRule(t, violations, "structure.internal-top-level")
+	assertHasRule(t, violations, "structural.internal-top-level")
 }
 
 func writeIntegrationFile(t *testing.T, path string, content string) {

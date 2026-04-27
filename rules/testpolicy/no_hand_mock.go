@@ -1,4 +1,4 @@
-package naming
+package testpolicy
 
 import (
 	"go/ast"
@@ -22,7 +22,7 @@ func NewNoHandMock(opts ...Option) *NoHandMock {
 
 func (r *NoHandMock) Spec() core.RuleSpec {
 	return core.RuleSpec{
-		ID:              "testing.no-handmock",
+		ID:              "testpolicy.no-handmock",
 		Description:     "test files must not define hand-rolled mocks with methods",
 		DefaultSeverity: r.severity,
 	}
@@ -80,9 +80,9 @@ func (r *NoHandMock) checkFile(path, relPath string) []core.Violation {
 		violations = append(violations, core.Violation{
 			File:              relPath,
 			Line:              line,
-			Rule:              "testing.no-handmock",
-			Message:           `test file "` + base + `" defines hand-rolled mock "` + recvName + `" with methods - use mockery instead`,
-			Fix:               "generate mock with mockery and import from mocks/ package",
+			Rule:              "testpolicy.no-handmock",
+			Message:           `test file "` + base + `" defines hand-rolled mock "` + recvName + `" with methods - use a mock generator instead`,
+			Fix:               "generate the mock with your project's mock generator and import from the dedicated mocks package",
 			DefaultSeverity:   r.severity,
 			EffectiveSeverity: r.severity,
 		})
