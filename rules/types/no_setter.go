@@ -40,7 +40,13 @@ func NewNoSetter(opts ...Option) *NoSetter {
 }
 
 func (r *NoSetter) Spec() core.RuleSpec {
-	return specWithSeverity(NoSetterDefaultSpec(), r.severity)
+	spec := NoSetterDefaultSpec()
+	spec.DefaultSeverity = r.severity
+	spec.Violations = append([]core.ViolationSpec(nil), spec.Violations...)
+	for i := range spec.Violations {
+		spec.Violations[i].DefaultSeverity = r.severity
+	}
+	return spec
 }
 
 func (r *NoSetter) Check(ctx *core.Context) []core.Violation {

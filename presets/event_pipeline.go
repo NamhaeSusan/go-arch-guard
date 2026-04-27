@@ -6,6 +6,7 @@ import (
 	"github.com/NamhaeSusan/go-arch-guard/rules/interfaces"
 	"github.com/NamhaeSusan/go-arch-guard/rules/naming"
 	"github.com/NamhaeSusan/go-arch-guard/rules/structural"
+	"github.com/NamhaeSusan/go-arch-guard/rules/testpolicy"
 	"github.com/NamhaeSusan/go-arch-guard/rules/types"
 )
 
@@ -68,14 +69,14 @@ func RecommendedEventPipeline() core.RuleSet {
 		naming.NewImplSuffix(),
 		naming.NewSnakeCaseFiles(),
 		naming.NewNoLayerSuffix(),
-		naming.NewNoHandMock(),
+		testpolicy.NewNoHandMock(),
 		structural.NewRepoFileInterface(),
 		structural.NewPlacement(),
 		structural.NewBannedPackage(),
 		structural.NewInternalTopLevel(),
 		interfaces.NewPattern(),
 		interfaces.NewContainer(),
-		types.NewTypePattern(),
+		naming.NewTypePattern(),
 		types.NewNoSetter(),
 	)
 }

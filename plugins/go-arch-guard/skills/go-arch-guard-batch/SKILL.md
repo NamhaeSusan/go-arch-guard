@@ -211,7 +211,7 @@ core.Run(ctx, presets.RecommendedBatch(),
 |---------|------|
 | 레이어 방향 | `dependency.invalid-import-direction`, `dependency.inner-imports-pkg` |
 | 구조 | `structural.internal-top-level`, `structural.banned-package-name`, `structural.legacy-package`, `structural.middleware-placement` |
-| 네이밍 | `naming.no-stutter`, `naming.no-impl-suffix`, `naming.snake-case-file`, `naming.no-layer-suffix`, `testing.no-handmock` |
+| 네이밍 | `naming.no-stutter`, `naming.no-impl-suffix`, `naming.snake-case-file`, `naming.no-layer-suffix`, `testpolicy.no-handmock` |
 | 타입 패턴 | `naming.type-pattern-mismatch`, `naming.type-pattern-missing-method` |
 | 인터페이스 패턴 | `interfaces.exported-impl`, `interfaces.constructor-name`, `interfaces.constructor-returns-interface`, `interfaces.single-per-package` |
 | 커플링 | `dependency.high-coupling` |

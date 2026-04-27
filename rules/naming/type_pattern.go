@@ -1,4 +1,4 @@
-package types
+package naming
 
 import (
 	"fmt"
@@ -22,7 +22,7 @@ const (
 // on subsequent calls.
 func TypePatternDefaultSpec() core.RuleSpec {
 	return core.RuleSpec{
-		ID:              "types.type-pattern",
+		ID:              "naming.type-pattern",
 		Description:     "files matching configured type patterns must define expected types and methods",
 		DefaultSeverity: core.Error,
 		Violations: []core.ViolationSpec{
@@ -42,7 +42,13 @@ func NewTypePattern(opts ...Option) *TypePattern {
 }
 
 func (r *TypePattern) Spec() core.RuleSpec {
-	return specWithSeverity(TypePatternDefaultSpec(), r.severity)
+	spec := TypePatternDefaultSpec()
+	spec.DefaultSeverity = r.severity
+	spec.Violations = append([]core.ViolationSpec(nil), spec.Violations...)
+	for i := range spec.Violations {
+		spec.Violations[i].DefaultSeverity = r.severity
+	}
+	return spec
 }
 
 func (r *TypePattern) Check(ctx *core.Context) []core.Violation {
@@ -68,7 +74,7 @@ func (r *TypePattern) checkPackage(ctx *core.Context, pkg *packages.Package, pat
 		return nil
 	}
 
-	methods := collectMethods(pkg)
+	methods := collectTypePatternMethods(pkg)
 	var violations []core.Violation
 	for _, file := range pkg.Syntax {
 		filename := pkg.Fset.Position(file.Pos()).Filename
@@ -87,7 +93,7 @@ func (r *TypePattern) checkPackage(ctx *core.Context, pkg *packages.Package, pat
 		}
 
 		expectedType := analysisutil.SnakeToPascal(suffix) + pattern.TypeSuffix
-		if !hasExportedType(file, expectedType) {
+		if !hasTypePatternExportedType(file, expectedType) {
 			violations = append(violations, core.Violation{
 				File:              relPath,
 				Rule:              typePatternMismatchID,
@@ -113,16 +119,7 @@ func (r *TypePattern) checkPackage(ctx *core.Context, pkg *packages.Package, pat
 	return violations
 }
 
-func specWithSeverity(spec core.RuleSpec, severity core.Severity) core.RuleSpec {
-	spec.DefaultSeverity = severity
-	spec.Violations = append([]core.ViolationSpec(nil), spec.Violations...)
-	for i := range spec.Violations {
-		spec.Violations[i].DefaultSeverity = severity
-	}
-	return spec
-}
-
-func hasExportedType(file *ast.File, name string) bool {
+func hasTypePatternExportedType(file *ast.File, name string) bool {
 	for _, decl := range file.Decls {
 		gd, ok := decl.(*ast.GenDecl)
 		if !ok {
@@ -141,7 +138,7 @@ func hasExportedType(file *ast.File, name string) bool {
 	return false
 }
 
-func collectMethods(pkg *packages.Package) map[string]bool {
+func collectTypePatternMethods(pkg *packages.Package) map[string]bool {
 	result := make(map[string]bool)
 	for _, file := range pkg.Syntax {
 		for _, decl := range file.Decls {
@@ -157,3 +154,5 @@ func collectMethods(pkg *packages.Package) map[string]bool {
 	}
 	return result
 }
+
+var _ core.Rule = (*TypePattern)(nil)

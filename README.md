@@ -495,8 +495,8 @@ DTO files (`dto.go`, `*_dto.go`) may only exist in allowed layers (handler, app)
 ## Naming Rules
 
 `naming.NewNoStutter()`, `naming.NewImplSuffix()`,
-`naming.NewSnakeCaseFiles()`, `naming.NewNoLayerSuffix()`, and
-`naming.NewNoHandMock()`
+`naming.NewSnakeCaseFiles()`, `naming.NewNoLayerSuffix()`,
+and `naming.NewTypePattern()`
 
 Enforces Go naming conventions that keep the codebase consistent and grep-friendly.
 
@@ -584,11 +584,6 @@ consumes) are allowed anywhere they are used: `handler/`, `app/`, `svc/`, etc.
 Also flags `type X = otherdomain.Repo` aliases that re-export a repository
 interface across domain boundaries — those belong in `orchestration/`.
 
-### `testing.no-handmock`
-
-Test files must not define hand-rolled mock/fake/stub structs with methods.
-Use mockery or other generation tools instead.
-
 ### `naming.type-pattern-mismatch` (flat presets)
 
 Files matching a TypePattern prefix must define the corresponding type.
@@ -610,6 +605,19 @@ type OrderWorker struct{}
 
 func (w *OrderWorker) Process(ctx context.Context) error { ... }  // correct
 ```
+
+## Test Policy Rules
+
+`testpolicy.NewNoHandMock()`
+
+Constraints on what test files may contain. Lives in its own package because
+testing concerns are orthogonal to naming or structural conventions.
+
+### `testpolicy.no-handmock`
+
+Test files must not define hand-rolled mock/fake/stub structs with methods.
+Use a mock generator (e.g. mockery) and import the generated types from a
+dedicated mocks package instead.
 
 ## Interface Pattern Rules
 
@@ -881,12 +889,13 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `presets.Batch()` / `presets.RecommendedBatch()` | Batch flat-layout architecture and ruleset |
 | `presets.EventPipeline()` / `presets.RecommendedEventPipeline()` | event-sourcing / CQRS architecture and ruleset |
 | `dependency.NewIsolation()` / `NewLayerDirection()` / `NewBlastRadius()` | dependency rules |
-| `naming.NewNoStutter()` / `NewImplSuffix()` / `NewSnakeCaseFiles()` / `NewNoLayerSuffix()` / `NewNoHandMock()` | naming rules |
+| `naming.NewNoStutter()` / `NewImplSuffix()` / `NewSnakeCaseFiles()` / `NewNoLayerSuffix()` / `NewTypePattern()` | naming rules |
 | `structural.NewAlias()` / `NewPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` / `NewRepoFileInterface()` | structure rules |
 | `interfaces.NewPattern()` / `NewContainer()` / `NewCrossDomainAnonymous()` | interface rules |
+| `testpolicy.NewNoHandMock()` | test policy rules |
 | `interfaces.WithMaxMethods(n)` | option for `interfaces.NewPattern` setting the per-interface method cap (default 0 = disabled; DDD/CleanArch/Hexagonal recommended bundles bake in 10) |
 | `tx.New(tx.Config{...})` | transaction boundary enforcement (opt-in) |
-| `types.NewTypePattern()` / `types.NewNoSetter()` | type pattern and setter rules |
+| `types.NewNoSetter()` | setter rule (immutability for value types) |
 
 ## Machine-readable JSON Output
 
