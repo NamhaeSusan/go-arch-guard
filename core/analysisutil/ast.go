@@ -5,6 +5,7 @@ import (
 	"go/token"
 	"go/types"
 	"strings"
+	"unicode"
 )
 
 // IsTestFile reports whether file's source path ends with "_test.go". The
@@ -105,6 +106,28 @@ func SnakeToPascal(s string) string {
 		b.WriteString(part[1:])
 	}
 	return b.String()
+}
+
+// PascalToSnake converts a PascalCase / camelCase / mixed identifier to
+// snake_case. Runs of uppercase are kept together as one word; an underscore
+// is inserted only at a real word boundary:
+//   - between a lowercase/digit and an uppercase ("createOrder" -> "create_order")
+//   - between an uppercase and an uppercase that is followed by a lowercase
+//     ("XMLParser" -> "xml_parser")
+func PascalToSnake(name string) string {
+	runes := []rune(name)
+	var result []rune
+	for i, r := range runes {
+		if i > 0 && unicode.IsUpper(r) {
+			prev := runes[i-1]
+			nextLower := i+1 < len(runes) && unicode.IsLower(runes[i+1])
+			if unicode.IsLower(prev) || unicode.IsDigit(prev) || (unicode.IsUpper(prev) && nextLower) {
+				result = append(result, '_')
+			}
+		}
+		result = append(result, unicode.ToLower(r))
+	}
+	return string(result)
 }
 
 func ResolveIdentImportPath(file *ast.File, identName string) string {

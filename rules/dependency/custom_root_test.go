@@ -35,4 +35,3 @@ func TestIsolationCustomInternalRootEmitsMetaForMissingRoot(t *testing.T) {
 		t.Fatalf("expected exactly 1 meta.layout-not-supported when InternalRoot points to a missing dir, got %d: %+v", meta, violations)
 	}
 }
-

@@ -1,18 +1,69 @@
-package naming_test
+package structural_test
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
+	"github.com/NamhaeSusan/go-arch-guard/analyzer"
 	"github.com/NamhaeSusan/go-arch-guard/core"
-	"github.com/NamhaeSusan/go-arch-guard/rules/naming"
+	"github.com/NamhaeSusan/go-arch-guard/rules/structural"
+	"golang.org/x/tools/go/packages"
 )
 
-func TestRepoFileInterfaceSpec(t *testing.T) {
-	spec := naming.NewRepoFileInterface(naming.WithSeverity(core.Warning)).Spec()
+var (
+	repoIfaceInvalidOnce sync.Once
+	repoIfaceInvalidPkgs []*packages.Package
+	repoIfaceInvalidErr  error
+)
 
-	if spec.ID != "naming.repo-file-interface" {
-		t.Fatalf("ID = %q, want naming.repo-file-interface", spec.ID)
+func loadInvalidForRepoIface(t *testing.T) []*packages.Package {
+	t.Helper()
+	repoIfaceInvalidOnce.Do(func() {
+		repoIfaceInvalidPkgs, repoIfaceInvalidErr = analyzer.Load("../../testdata/invalid", "internal/...")
+	})
+	if repoIfaceInvalidErr != nil {
+		t.Fatal(repoIfaceInvalidErr)
+	}
+	return repoIfaceInvalidPkgs
+}
+
+func invalidContextForRepoIface(t *testing.T) *core.Context {
+	t.Helper()
+	return core.NewContext(loadInvalidForRepoIface(t), "github.com/kimtaeyun/testproject-dc-invalid", "../../testdata/invalid", dddArch(), nil)
+}
+
+func tempContextForRepoIface(t *testing.T, files map[string]string, arch core.Architecture) *core.Context {
+	t.Helper()
+	root := t.TempDir()
+	writeRepoIfaceFile(t, filepath.Join(root, "go.mod"), "module example.com/structuraltest\n\ngo 1.25.0\n")
+	for name, content := range files {
+		writeRepoIfaceFile(t, filepath.Join(root, name), content)
+	}
+	pkgs, err := analyzer.Load(root, "internal/...")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return core.NewContext(pkgs, "example.com/structuraltest", root, arch, nil)
+}
+
+func writeRepoIfaceFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRepoFileInterfaceSpec(t *testing.T) {
+	spec := structural.NewRepoFileInterface(structural.WithSeverity(core.Warning)).Spec()
+
+	if spec.ID != "structural.repo-file-interface" {
+		t.Fatalf("ID = %q, want structural.repo-file-interface", spec.ID)
 	}
 	if spec.DefaultSeverity != core.Warning {
 		t.Fatalf("DefaultSeverity = %v, want Warning", spec.DefaultSeverity)
@@ -27,11 +78,11 @@ func TestRepoFileInterfaceSpec(t *testing.T) {
 }
 
 func TestRepoFileInterfaceFlagsRepoFilenameContract(t *testing.T) {
-	ctx := tempContext(t, map[string]string{
+	ctx := tempContextForRepoIface(t, map[string]string{
 		"internal/domain/order/core/repo/order.go": "package repo\n\nfunc FindOrder() {}\n",
 	}, dddArch())
 
-	got := naming.NewRepoFileInterface().Check(ctx)
+	got := structural.NewRepoFileInterface().Check(ctx)
 	if len(got) != 1 {
 		t.Fatalf("len = %d, want 1: %+v", len(got), got)
 	}
@@ -41,22 +92,22 @@ func TestRepoFileInterfaceFlagsRepoFilenameContract(t *testing.T) {
 }
 
 func TestRepoFileInterfaceFlagsExtraInterfaces(t *testing.T) {
-	ctx := tempContext(t, map[string]string{
+	ctx := tempContextForRepoIface(t, map[string]string{
 		"internal/domain/order/core/repo/review.go": "package repo\n\ntype Review interface { Find() }\ntype Helper interface { Assist() }\n",
 	}, dddArch())
 
-	got := naming.NewRepoFileInterface().Check(ctx)
+	got := structural.NewRepoFileInterface().Check(ctx)
 	if len(got) != 1 || got[0].Rule != "structure.repo-file-extra-interface" {
 		t.Fatalf("got %+v, want one extra-interface violation", got)
 	}
 }
 
 func TestRepoFileInterfaceExtraInterfaceFixUsesSnakeCase(t *testing.T) {
-	ctx := tempContext(t, map[string]string{
+	ctx := tempContextForRepoIface(t, map[string]string{
 		"internal/domain/order/core/repo/order.go": "package repo\n\ntype Order interface { Find() }\ntype UserRepository interface { Save() }\n",
 	}, dddArch())
 
-	got := naming.NewRepoFileInterface().Check(ctx)
+	got := structural.NewRepoFileInterface().Check(ctx)
 	var found bool
 	for _, v := range got {
 		if v.Rule != "structure.repo-file-extra-interface" {
@@ -76,7 +127,7 @@ func TestRepoFileInterfaceExtraInterfaceFixUsesSnakeCase(t *testing.T) {
 }
 
 func TestRepoFileInterfaceFlagsRepositoryPortOutsidePortLayer(t *testing.T) {
-	got := naming.NewRepoFileInterface().Check(invalidContext(t, nil))
+	got := structural.NewRepoFileInterface().Check(invalidContextForRepoIface(t))
 
 	var direct, alias bool
 	for _, v := range got {

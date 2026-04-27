@@ -495,8 +495,8 @@ DTO files (`dto.go`, `*_dto.go`) may only exist in allowed layers (handler, app)
 ## Naming Rules
 
 `naming.NewNoStutter()`, `naming.NewImplSuffix()`,
-`naming.NewSnakeCaseFiles()`, `naming.NewNoLayerSuffix()`,
-`naming.NewNoHandMock()`, and `naming.NewRepoFileInterface()`
+`naming.NewSnakeCaseFiles()`, `naming.NewNoLayerSuffix()`, and
+`naming.NewNoHandMock()`
 
 Enforces Go naming conventions that keep the codebase consistent and grep-friendly.
 
@@ -881,8 +881,8 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `presets.Batch()` / `presets.RecommendedBatch()` | Batch flat-layout architecture and ruleset |
 | `presets.EventPipeline()` / `presets.RecommendedEventPipeline()` | event-sourcing / CQRS architecture and ruleset |
 | `dependency.NewIsolation()` / `NewLayerDirection()` / `NewBlastRadius()` | dependency rules |
-| `naming.NewNoStutter()` / `NewImplSuffix()` / `NewSnakeCaseFiles()` / `NewNoLayerSuffix()` / `NewNoHandMock()` / `NewRepoFileInterface()` | naming rules |
-| `structural.NewAlias()` / `NewPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` | structure rules |
+| `naming.NewNoStutter()` / `NewImplSuffix()` / `NewSnakeCaseFiles()` / `NewNoLayerSuffix()` / `NewNoHandMock()` | naming rules |
+| `structural.NewAlias()` / `NewPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` / `NewRepoFileInterface()` | structure rules |
 | `interfaces.NewPattern()` / `NewContainer()` / `NewCrossDomainAnonymous()` | interface rules |
 | `interfaces.WithMaxMethods(n)` | option for `interfaces.NewPattern` setting the per-interface method cap (default 0 = disabled; DDD/CleanArch/Hexagonal recommended bundles bake in 10) |
 | `tx.New(tx.Config{...})` | transaction boundary enforcement (opt-in) |

@@ -84,7 +84,7 @@ func RecommendedDDD() core.RuleSet {
 		naming.NewSnakeCaseFiles(),
 		naming.NewNoLayerSuffix(),
 		naming.NewNoHandMock(),
-		naming.NewRepoFileInterface(),
+		structural.NewRepoFileInterface(),
 		structural.NewAlias(),
 		structural.NewPlacement(),
 		structural.NewBannedPackage(),
