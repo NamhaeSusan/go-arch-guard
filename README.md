@@ -547,12 +547,19 @@ type Review interface {
 }
 ```
 
-To use a custom cap:
+To use a custom cap, build a custom RuleSet instead of using a recommended
+bundle. `RuleSet.Without("interfaces.too-many-methods")` filters that violation
+ID, so appending another `NewTooManyMethods` after `Without` would still hide
+the custom rule's violations.
 
 ```go
-ruleset := presets.RecommendedDDD().
-    Without("interfaces.too-many-methods")
-ruleset = ruleset.With(interfaces.NewTooManyMethods(interfaces.WithMaxMethods(7)))
+ruleset := core.NewRuleSet(
+    dependency.NewIsolation(),
+    dependency.NewLayerDirection(),
+    structural.NewAlias(),
+    interfaces.NewPattern(),
+    interfaces.NewTooManyMethods(interfaces.WithMaxMethods(7)),
+)
 ```
 
 `interfaces.WithMaxMethods` is a TooManyMethods option only — passing it to `NewPattern` / `NewContainer` / `NewCrossDomainAnonymous` is silently ignored.

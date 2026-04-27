@@ -517,12 +517,19 @@ type Review interface {
 }
 ```
 
-상한을 바꾸려면:
+상한을 바꾸려면 권장 번들을 그대로 쓰지 말고 custom RuleSet을 구성하세요.
+`RuleSet.Without("interfaces.too-many-methods")`는 해당 violation ID를
+필터링하므로, 그 뒤에 `NewTooManyMethods`를 다시 붙여도 custom rule의
+violation까지 숨겨집니다.
 
 ```go
-ruleset := presets.RecommendedDDD().
-    Without("interfaces.too-many-methods")
-ruleset = ruleset.With(interfaces.NewTooManyMethods(interfaces.WithMaxMethods(7)))
+ruleset := core.NewRuleSet(
+    dependency.NewIsolation(),
+    dependency.NewLayerDirection(),
+    structural.NewAlias(),
+    interfaces.NewPattern(),
+    interfaces.NewTooManyMethods(interfaces.WithMaxMethods(7)),
+)
 ```
 
 `interfaces.WithMaxMethods`는 TooManyMethods 전용 옵션. `NewPattern` / `NewContainer` / `NewCrossDomainAnonymous`에 넘겨도 silently 무시됨.
