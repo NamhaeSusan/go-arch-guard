@@ -423,7 +423,7 @@ internal/domain/order/utils/   "utils" is not a recognized sublayer
 ## Structure Rules
 
 `structural.NewInternalTopLevel()`, `structural.NewBannedPackage()`,
-`structural.NewLayerPlacement()`, `structural.NewMiddlewarePlacement()`, `structural.NewAlias()`, and
+`structural.NewLayerPlacement()`, `structural.NewAlias()`, and
 `structural.NewModelRequired()`
 
 Enforces filesystem layout conventions that prevent structural drift during vibe coding.
@@ -459,10 +459,6 @@ Flags package names that should be migrated: `router`, `bootstrap`. Default seve
 
 Layer directories (`app`, `handler`, `infra`) must only exist inside domain slices,
 not floating at the internal/ top level.
-
-### `structural.middleware-placement`
-
-`middleware/` must live in `internal/pkg/middleware/`, not scattered across domains.
 
 ### `structural.domain-alias-exists` (DDD only)
 
@@ -887,7 +883,7 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `presets.EventPipeline()` / `presets.RecommendedEventPipeline()` | event-sourcing / CQRS architecture and ruleset |
 | `dependency.NewIsolation()` / `NewLayerDirection()` / `NewBlastRadius()` | dependency rules |
 | `naming.NewNoStutter()` / `NewImplSuffix()` / `NewSnakeCaseFiles()` / `NewNoLayerSuffix()` / `NewTypePattern()` | naming rules |
-| `structural.NewAlias()` / `NewLayerPlacement()` / `NewMiddlewarePlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` / `NewRepoFileInterface()` | structure rules |
+| `structural.NewAlias()` / `NewLayerPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` / `NewRepoFileInterface()` | structure rules |
 | `interfaces.NewPattern()` / `NewContainer()` / `NewCrossDomainAnonymous()` | interface rules |
 | `testpolicy.NewNoHandMock()` | test policy rules |
 | `interfaces.WithMaxMethods(n)` | option for `interfaces.NewPattern` setting the per-interface method cap (default 0 = disabled; DDD/CleanArch/Hexagonal recommended bundles bake in 10) |

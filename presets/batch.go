@@ -62,7 +62,6 @@ func RecommendedBatch() core.RuleSet {
 		testpolicy.NewNoHandMock(),
 		structural.NewRepoFileInterface(),
 		structural.NewLayerPlacement(),
-		structural.NewMiddlewarePlacement(),
 		structural.NewBannedPackage(),
 		structural.NewInternalTopLevel(),
 		interfaces.NewPattern(interfaces.WithMaxMethods(10)),

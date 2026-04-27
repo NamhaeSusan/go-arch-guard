@@ -5,21 +5,12 @@ import "github.com/NamhaeSusan/go-arch-guard/core"
 type Option func(*ruleConfig)
 
 type ruleConfig struct {
-	severity      core.Severity
-	middlewareDir string
+	severity core.Severity
 }
 
 func WithSeverity(severity core.Severity) Option {
 	return func(cfg *ruleConfig) {
 		cfg.severity = severity
-	}
-}
-
-// WithMiddlewareDir overrides the directory name MiddlewarePlacement looks
-// for and demands to live under <SharedDir>/<name>/. Default: "middleware".
-func WithMiddlewareDir(name string) Option {
-	return func(cfg *ruleConfig) {
-		cfg.middlewareDir = name
 	}
 }
 
