@@ -32,7 +32,7 @@ func (rs RuleSet) With(rules ...Rule) RuleSet {
 
 // Without returns a new RuleSet whose runner filters out violations whose
 // Rule field matches any of the given violation-level IDs (e.g.
-// "isolation.cross-domain"). IDs not present in the active rule set are
+// "dependency.cross-domain"). IDs not present in the active rule set are
 // rejected by Run; see WithSeverityOverride for the same guarantee.
 func (rs RuleSet) Without(violationIDs ...string) RuleSet {
 	out := rs.copy()

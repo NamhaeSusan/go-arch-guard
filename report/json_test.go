@@ -14,7 +14,7 @@ func TestBuildJSONReport(t *testing.T) {
 		{
 			File:              "internal/domain/order/app/service.go",
 			Line:              12,
-			Rule:              "isolation.cross-domain",
+			Rule:              "dependency.cross-domain",
 			Message:           "bad import",
 			Fix:               "move orchestration",
 			DefaultSeverity:   core.Error,
@@ -22,7 +22,7 @@ func TestBuildJSONReport(t *testing.T) {
 		},
 		{
 			File:              "internal/domain/order/app/service.go",
-			Rule:              "blast.high-coupling",
+			Rule:              "dependency.high-coupling",
 			Message:           "too central",
 			Fix:               "extract boundary",
 			DefaultSeverity:   core.Error,
@@ -40,13 +40,13 @@ func TestBuildJSONReport(t *testing.T) {
 	if got.Summary.Files != 1 {
 		t.Fatalf("expected one unique file, got %d", got.Summary.Files)
 	}
-	if len(got.Summary.Rules) != 2 || got.Summary.Rules[0] != "blast.high-coupling" || got.Summary.Rules[1] != "isolation.cross-domain" {
+	if len(got.Summary.Rules) != 2 || got.Summary.Rules[0] != "dependency.cross-domain" || got.Summary.Rules[1] != "dependency.high-coupling" {
 		t.Fatalf("unexpected rules summary: %+v", got.Summary.Rules)
 	}
 	// Output is sorted by (File, Line, Rule, Message). Both violations share
-	// the same File, so the Line=0 entry (blast.high-coupling) sorts ahead
-	// of the Line=12 entry (isolation.cross-domain).
-	if got.Violations[0].Rule != "blast.high-coupling" || got.Violations[1].Rule != "isolation.cross-domain" {
+	// the same File, so the Line=0 entry (dependency.high-coupling) sorts ahead
+	// of the Line=12 entry (dependency.cross-domain).
+	if got.Violations[0].Rule != "dependency.high-coupling" || got.Violations[1].Rule != "dependency.cross-domain" {
 		t.Fatalf("violations not sorted: %+v", got.Violations)
 	}
 	if got.Violations[0].EffectiveSeverity != "warning" || got.Violations[1].EffectiveSeverity != "error" {

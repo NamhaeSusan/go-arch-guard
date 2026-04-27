@@ -10,12 +10,12 @@ import (
 func TestModelRequired(t *testing.T) {
 	t.Run("valid fixture has no model-required violations", func(t *testing.T) {
 		violations := runRule(t, "../../testdata/valid", structural.NewModelRequired())
-		assertNoRulePrefix(t, violations, "structure.domain-model-required")
+		assertNoRulePrefix(t, violations, "structural.domain-model-required")
 	})
 
 	t.Run("detects invalid fixture missing domain model", func(t *testing.T) {
 		violations := runRule(t, "../../testdata/invalid", structural.NewModelRequired())
-		assertViolation(t, violations, "structure.domain-model-required", "internal/domain/ghost/")
+		assertViolation(t, violations, "structural.domain-model-required", "internal/domain/ghost/")
 	})
 
 	t.Run("skips non-DDD architecture", func(t *testing.T) {

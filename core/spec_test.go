@@ -8,12 +8,12 @@ func TestRuleSpecViolationIDs(t *testing.T) {
 		Description:     "domain boundaries",
 		DefaultSeverity: Error,
 		Violations: []ViolationSpec{
-			{ID: "isolation.cross-domain", Description: "no sibling import", DefaultSeverity: Error},
-			{ID: "isolation.pkg-imports-domain", Description: "pkg cannot import domain", DefaultSeverity: Error},
+			{ID: "dependency.cross-domain", Description: "no sibling import", DefaultSeverity: Error},
+			{ID: "dependency.pkg-imports-domain", Description: "pkg cannot import domain", DefaultSeverity: Error},
 		},
 	}
 	got := spec.ViolationIDs()
-	want := []string{"isolation.cross-domain", "isolation.pkg-imports-domain"}
+	want := []string{"dependency.cross-domain", "dependency.pkg-imports-domain"}
 	if len(got) != len(want) {
 		t.Fatalf("ViolationIDs() len = %d, want %d", len(got), len(want))
 	}

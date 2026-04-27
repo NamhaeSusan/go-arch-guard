@@ -21,7 +21,7 @@ func (r *BlastRadius) Spec() core.RuleSpec {
 		ID:              "dependency.blast-radius",
 		Description:     "internal packages with unusually many transitive dependents are coupling hotspots",
 		DefaultSeverity: r.severity,
-		Violations:      violationSpecs(r.severity, "blast.high-coupling"),
+		Violations:      violationSpecs(r.severity, "dependency.high-coupling"),
 	}
 }
 
@@ -92,7 +92,7 @@ func (r *BlastRadius) Check(ctx *core.Context) []core.Violation {
 		relPath := analysisutil.ProjectRelativePackagePath(m.path, projectModule)
 		violations = append(violations, core.Violation{
 			File: relPath,
-			Rule: "blast.high-coupling",
+			Rule: "dependency.high-coupling",
 			Message: fmt.Sprintf(
 				"package %q has %d transitive dependents (Ca:%d Ce:%d Instability:%.2f, threshold:%.0f)",
 				relPath, m.transitiveDependents, m.ca, m.ce, m.instability, threshold,

@@ -23,17 +23,17 @@ func (r *Isolation) Spec() core.RuleSpec {
 		Description:     "internal packages must respect domain isolation boundaries",
 		DefaultSeverity: r.severity,
 		Violations: violationSpecs(r.severity,
-			"isolation.cross-domain",
-			"isolation.cmd-deep-import",
-			"isolation.orchestration-deep-import",
-			"isolation.pkg-imports-domain",
-			"isolation.pkg-imports-orchestration",
-			"isolation.domain-imports-orchestration",
-			"isolation.stray-imports-orchestration",
-			"isolation.stray-imports-domain",
-			"isolation.transport-imports-domain",
-			"isolation.transport-imports-orchestration",
-			"isolation.transport-imports-unclassified",
+			"dependency.cross-domain",
+			"dependency.cmd-deep-import",
+			"dependency.orchestration-deep-import",
+			"dependency.pkg-imports-domain",
+			"dependency.pkg-imports-orchestration",
+			"dependency.domain-imports-orchestration",
+			"dependency.stray-imports-orchestration",
+			"dependency.stray-imports-domain",
+			"dependency.transport-imports-domain",
+			"dependency.transport-imports-orchestration",
+			"dependency.transport-imports-unclassified",
 		),
 	}
 }
@@ -102,7 +102,7 @@ func (r *Isolation) checkCmdPackage(pkg *packages.Package, arch core.Architectur
 		}
 		file, line := analysisutil.FindImportPosition(pkg, impPath, projectRoot)
 		violations = append(violations, r.violation(file, line,
-			"isolation.cmd-deep-import",
+			"dependency.cmd-deep-import",
 			fmt.Sprintf("cmd/ must only import domain alias, not sub-package %q", impPath),
 			fmt.Sprintf("import the domain alias package instead: %s%s/%s", internalPrefix, layout.DomainDir, imp.Domain),
 		))
@@ -151,7 +151,7 @@ func (r *Isolation) checkOrchestrationDeepImport(pkg *packages.Package, imp clas
 	}
 	file, line := analysisutil.FindImportPosition(pkg, impPath, projectRoot)
 	return []core.Violation{r.violation(file, line,
-		"isolation.orchestration-deep-import",
+		"dependency.orchestration-deep-import",
 		fmt.Sprintf("%s must only import domain alias, not sub-package %q", label, impPath),
 		fmt.Sprintf("import the domain alias package instead: %s%s/%s", internalPrefix, layout.DomainDir, imp.Domain),
 	)}
@@ -162,14 +162,14 @@ func (r *Isolation) checkSharedImport(pkg *packages.Package, imp classified, imp
 	case isDomainKind(imp.Kind):
 		file, line := analysisutil.FindImportPosition(pkg, impPath, projectRoot)
 		return []core.Violation{r.violation(file, line,
-			"isolation.pkg-imports-domain",
+			"dependency.pkg-imports-domain",
 			fmt.Sprintf("%s/ must not import domain %q", layout.SharedDir, imp.Domain),
 			fmt.Sprintf("%s/ should only contain shared utilities with no domain or orchestration dependencies", layout.SharedDir),
 		)}
 	case imp.Kind == kindOrchestration:
 		file, line := analysisutil.FindImportPosition(pkg, impPath, projectRoot)
 		return []core.Violation{r.violation(file, line,
-			"isolation.pkg-imports-orchestration",
+			"dependency.pkg-imports-orchestration",
 			fmt.Sprintf("%s/ must not import %s", layout.SharedDir, layout.OrchestrationDir),
 			fmt.Sprintf("move %s-aware code to %s/%s or cmd/", layout.OrchestrationDir, layout.InternalRoot, layout.OrchestrationDir),
 		)}
@@ -181,13 +181,13 @@ func (r *Isolation) checkOrchestrationDependent(pkg *packages.Package, src class
 	file, line := analysisutil.FindImportPosition(pkg, impPath, projectRoot)
 	if isDomainKind(src.Kind) {
 		return []core.Violation{r.violation(file, line,
-			"isolation.domain-imports-orchestration",
+			"dependency.domain-imports-orchestration",
 			fmt.Sprintf("domain %q must not import %s", src.Domain, layout.OrchestrationDir),
 			fmt.Sprintf("move cross-domain coordination to %s/%s callers instead of domain internals", layout.InternalRoot, layout.OrchestrationDir),
 		)}
 	}
 	return []core.Violation{r.violation(file, line,
-		"isolation.stray-imports-orchestration",
+		"dependency.stray-imports-orchestration",
 		fmt.Sprintf("package %q must not import %s", pkg.PkgPath, layout.OrchestrationDir),
 		fmt.Sprintf("only cmd/ and %s/%s may depend on %s", layout.InternalRoot, layout.OrchestrationDir, layout.OrchestrationDir),
 	)}
@@ -196,7 +196,7 @@ func (r *Isolation) checkOrchestrationDependent(pkg *packages.Package, src class
 func (r *Isolation) crossDomainViolation(pkg *packages.Package, src, imp classified, impPath string, layout core.LayoutModel, projectRoot string) []core.Violation {
 	file, line := analysisutil.FindImportPosition(pkg, impPath, projectRoot)
 	return []core.Violation{r.violation(file, line,
-		"isolation.cross-domain",
+		"dependency.cross-domain",
 		fmt.Sprintf("domain %q must not import domain %q", src.Domain, imp.Domain),
 		fmt.Sprintf("use %s/ for cross-domain orchestration or move shared types to %s/", layout.OrchestrationDir, layout.SharedDir),
 	)}
@@ -205,7 +205,7 @@ func (r *Isolation) crossDomainViolation(pkg *packages.Package, src, imp classif
 func (r *Isolation) strayDomainViolation(pkg *packages.Package, imp classified, impPath string, layout core.LayoutModel, projectRoot string) []core.Violation {
 	file, line := analysisutil.FindImportPosition(pkg, impPath, projectRoot)
 	return []core.Violation{r.violation(file, line,
-		"isolation.stray-imports-domain",
+		"dependency.stray-imports-domain",
 		fmt.Sprintf("package %q must not import domain %q", pkg.PkgPath, imp.Domain),
 		fmt.Sprintf("move domain orchestration to %s/%s or app wiring to cmd/", layout.InternalRoot, layout.OrchestrationDir),
 	)}
@@ -231,21 +231,21 @@ func (r *Isolation) checkTransportImport(pkg *packages.Package, projectRoot, imp
 	case kindDomain, kindDomainRoot:
 		file, line := analysisutil.FindImportPosition(pkg, impPath, projectRoot)
 		return []core.Violation{r.violation(file, line,
-			"isolation.transport-imports-domain",
+			"dependency.transport-imports-domain",
 			fmt.Sprintf("transport package %q must not import domain %q directly", pkg.PkgPath, imp.Domain),
 			fmt.Sprintf("import %s/ (the app/composition root) instead of domain sub-packages directly", layout.AppDir),
 		)}
 	case kindOrchestration:
 		file, line := analysisutil.FindImportPosition(pkg, impPath, projectRoot)
 		return []core.Violation{r.violation(file, line,
-			"isolation.transport-imports-orchestration",
+			"dependency.transport-imports-orchestration",
 			fmt.Sprintf("transport package %q must not import %s directly", pkg.PkgPath, layout.OrchestrationDir),
 			fmt.Sprintf("transport layers should only import %s/ (composition root) and %s/ (shared utilities)", layout.AppDir, layout.SharedDir),
 		)}
 	case kindUnclassified:
 		file, line := analysisutil.FindImportPosition(pkg, impPath, projectRoot)
 		return []core.Violation{r.violation(file, line,
-			"isolation.transport-imports-unclassified",
+			"dependency.transport-imports-unclassified",
 			fmt.Sprintf("transport package %q must not import unclassified internal package %q", pkg.PkgPath, impPath),
 			fmt.Sprintf("move the dependency into %s/%s (expose via Container), %s/%s, or another transport package", layout.InternalRoot, layout.AppDir, layout.InternalRoot, layout.SharedDir),
 		)}

@@ -27,7 +27,7 @@ func (o *runOpts) severityFor(violationID string) (Severity, bool) {
 // Example:
 //
 //	core.Run(ctx, rules,
-//	    core.WithSeverityOverride("isolation.cross-domain", core.Warning))
+//	    core.WithSeverityOverride("dependency.cross-domain", core.Warning))
 func WithSeverityOverride(violationID string, s Severity) RunOption {
 	return func(o *runOpts) {
 		o.severityOverrides[violationID] = s

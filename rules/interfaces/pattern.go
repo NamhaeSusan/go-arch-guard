@@ -26,11 +26,11 @@ func (r *Pattern) Spec() core.RuleSpec {
 		Description:     "enforce interface package and constructor conventions",
 		DefaultSeverity: r.cfg.severity,
 		Violations: []core.ViolationSpec{
-			{ID: "interface.constructor-name", DefaultSeverity: r.cfg.severity},
-			{ID: "interface.constructor-returns-interface", DefaultSeverity: r.cfg.severity},
-			{ID: "interface.exported-impl", DefaultSeverity: r.cfg.severity},
-			{ID: "interface.too-many-methods", DefaultSeverity: r.cfg.severity},
-			{ID: "interface.single-per-package", DefaultSeverity: r.cfg.severity},
+			{ID: "interfaces.constructor-name", DefaultSeverity: r.cfg.severity},
+			{ID: "interfaces.constructor-returns-interface", DefaultSeverity: r.cfg.severity},
+			{ID: "interfaces.exported-impl", DefaultSeverity: r.cfg.severity},
+			{ID: "interfaces.too-many-methods", DefaultSeverity: r.cfg.severity},
+			{ID: "interfaces.single-per-package", DefaultSeverity: r.cfg.severity},
 		},
 	}
 }
@@ -134,7 +134,7 @@ func (r *Pattern) checkSingleInterfacePerPackage(pkg *packages.Package, ifaces m
 		names = append(names, name)
 	}
 	sort.Strings(names)
-	return []core.Violation{r.violation(pkg, 0, "interface.single-per-package",
+	return []core.Violation{r.violation(pkg, 0, "interfaces.single-per-package",
 		fmt.Sprintf("package has %d exported interfaces (%s), expected at most 1", len(ifaces), strings.Join(names, ", ")),
 		"split into separate packages, one interface each")}
 }
@@ -161,7 +161,7 @@ func (r *Pattern) checkTooManyMethods(pkg *packages.Package, ifaces map[string]*
 		violations = append(violations, core.Violation{
 			File:              analysisutil.RelativePathForPackage(pkg, pos.Filename),
 			Line:              pos.Line,
-			Rule:              "interface.too-many-methods",
+			Rule:              "interfaces.too-many-methods",
 			Message:           fmt.Sprintf("interface %q has %d methods, expected at most %d", name, count, r.cfg.maxMethods),
 			Fix:               "split the interface by consumer needs",
 			DefaultSeverity:   r.cfg.severity,
@@ -221,7 +221,7 @@ func (r *Pattern) checkExportedImpl(pkg *packages.Package) []core.Violation {
 			if !types.Implements(named, iface) && !types.Implements(ptrType, iface) {
 				continue
 			}
-			violations = append(violations, r.violation(pkg, 0, "interface.exported-impl",
+			violations = append(violations, r.violation(pkg, 0, "interfaces.exported-impl",
 				fmt.Sprintf("type %q is exported but implements interface %q; make it unexported", structName, ifaceName),
 				fmt.Sprintf("rename to %q", strings.ToLower(structName[:1])+structName[1:])))
 		}
@@ -273,7 +273,7 @@ func (r *Pattern) checkConstructorName(pkg *packages.Package) []core.Violation {
 			}
 			name := fd.Name.Name
 			if strings.HasPrefix(name, "New") && name != "New" {
-				violations = append(violations, r.violation(pkg, 0, "interface.constructor-name",
+				violations = append(violations, r.violation(pkg, 0, "interfaces.constructor-name",
 					fmt.Sprintf("constructor %q must be named \"New\"; NewXxx variants are not allowed", name),
 					"rename to \"New\""))
 			}
@@ -305,7 +305,7 @@ func (r *Pattern) checkConstructorReturnsInterface(pkg *packages.Package, ifaces
 					fix = fmt.Sprintf("return %s instead", ifaceName)
 				}
 			}
-			violations = append(violations, r.violation(pkg, 0, "interface.constructor-returns-interface",
+			violations = append(violations, r.violation(pkg, 0, "interfaces.constructor-returns-interface",
 				fmt.Sprintf("New() returns %s, should return an interface", formatTypeExpr(firstRet)),
 				fix))
 		}

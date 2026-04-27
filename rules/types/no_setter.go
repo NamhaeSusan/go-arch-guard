@@ -12,7 +12,7 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-const setterForbiddenID = "setter.forbidden"
+const setterForbiddenID = "types.no-setter"
 
 // NoSetterDefaultSpec returns a fresh copy of the rule's static metadata
 // (with the hard-coded default severity, before any construction-time

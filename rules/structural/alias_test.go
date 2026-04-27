@@ -13,15 +13,15 @@ import (
 func TestAlias(t *testing.T) {
 	t.Run("valid fixture has no alias violations", func(t *testing.T) {
 		violations := runRule(t, "../../testdata/valid", structural.NewAlias())
-		assertNoRulePrefix(t, violations, "structure.domain-alias-")
+		assertNoRulePrefix(t, violations, "structural.domain-alias-")
 	})
 
 	t.Run("detects invalid fixture alias violations", func(t *testing.T) {
 		violations := runRule(t, "../../testdata/invalid", structural.NewAlias())
 
-		assertViolation(t, violations, "structure.domain-alias-exists", "internal/domain/noalias/")
-		assertViolation(t, violations, "structure.domain-alias-exclusive", "internal/domain/order/alias_bad.go")
-		assertMessageContains(t, violations, "structure.domain-alias-no-interface", "CrossDomainOps")
+		assertViolation(t, violations, "structural.domain-alias-exists", "internal/domain/noalias/")
+		assertViolation(t, violations, "structural.domain-alias-exclusive", "internal/domain/order/alias_bad.go")
+		assertMessageContains(t, violations, "structural.domain-alias-no-interface", "CrossDomainOps")
 	})
 
 	t.Run("detects alias package name mismatch", func(t *testing.T) {
@@ -30,7 +30,7 @@ func TestAlias(t *testing.T) {
 		writeTestFile(t, filepath.Join(root, "internal", "domain", "billing", "core", "model", "billing.go"), "package model\n")
 
 		violations := runRule(t, root, structural.NewAlias())
-		assertViolation(t, violations, "structure.domain-alias-package", "internal/domain/billing/alias.go")
+		assertViolation(t, violations, "structural.domain-alias-package", "internal/domain/billing/alias.go")
 	})
 
 	t.Run("detects contract re-export from alias", func(t *testing.T) {
@@ -45,7 +45,7 @@ type AdminOps = svc.AdminOps
 		writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "core", "svc", "admin.go"), "package svc\n\ntype AdminOps interface{ Do() }\n")
 
 		violations := runRule(t, root, structural.NewAlias())
-		assertMessageContains(t, violations, "structure.domain-alias-contract-reexport", "AdminOps")
+		assertMessageContains(t, violations, "structural.domain-alias-contract-reexport", "AdminOps")
 	})
 
 	t.Run("skips non-DDD architecture", func(t *testing.T) {

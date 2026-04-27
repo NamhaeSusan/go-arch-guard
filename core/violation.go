@@ -3,7 +3,7 @@ package core
 import "fmt"
 
 // Violation is a single rule failure emitted by Rule.Check. The Rule field
-// is the violation-level ID (e.g. "isolation.cross-domain"), not the
+// is the violation-level ID (e.g. "dependency.cross-domain"), not the
 // rule-type ID. DefaultSeverity records what the rule declared in its
 // ViolationSpec; EffectiveSeverity is what callers see after construction-
 // and runtime-level overrides have been applied by Run.

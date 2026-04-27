@@ -22,17 +22,17 @@ func TestIsolationSpec(t *testing.T) {
 	}
 
 	for _, id := range []string{
-		"isolation.cross-domain",
-		"isolation.cmd-deep-import",
-		"isolation.orchestration-deep-import",
-		"isolation.pkg-imports-domain",
-		"isolation.pkg-imports-orchestration",
-		"isolation.domain-imports-orchestration",
-		"isolation.stray-imports-orchestration",
-		"isolation.stray-imports-domain",
-		"isolation.transport-imports-domain",
-		"isolation.transport-imports-orchestration",
-		"isolation.transport-imports-unclassified",
+		"dependency.cross-domain",
+		"dependency.cmd-deep-import",
+		"dependency.orchestration-deep-import",
+		"dependency.pkg-imports-domain",
+		"dependency.pkg-imports-orchestration",
+		"dependency.domain-imports-orchestration",
+		"dependency.stray-imports-orchestration",
+		"dependency.stray-imports-domain",
+		"dependency.transport-imports-domain",
+		"dependency.transport-imports-orchestration",
+		"dependency.transport-imports-unclassified",
 	} {
 		if !slices.Contains(spec.ViolationIDs(), id) {
 			t.Fatalf("Spec().ViolationIDs() missing %q", id)
@@ -58,14 +58,14 @@ func TestIsolationInvalidProject(t *testing.T) {
 	violations := dependency.NewIsolation().Check(ctx)
 
 	for _, id := range []string{
-		"isolation.cross-domain",
-		"isolation.cmd-deep-import",
-		"isolation.orchestration-deep-import",
-		"isolation.pkg-imports-domain",
-		"isolation.pkg-imports-orchestration",
-		"isolation.domain-imports-orchestration",
-		"isolation.stray-imports-orchestration",
-		"isolation.stray-imports-domain",
+		"dependency.cross-domain",
+		"dependency.cmd-deep-import",
+		"dependency.orchestration-deep-import",
+		"dependency.pkg-imports-domain",
+		"dependency.pkg-imports-orchestration",
+		"dependency.domain-imports-orchestration",
+		"dependency.stray-imports-orchestration",
+		"dependency.stray-imports-domain",
 	} {
 		assertHasRule(t, violations, id)
 	}
@@ -76,7 +76,7 @@ func TestIsolationDDDAppServerTransport(t *testing.T) {
 
 	violations := dependency.NewIsolation().Check(ctx)
 
-	assertHasRule(t, violations, "isolation.transport-imports-domain")
+	assertHasRule(t, violations, "dependency.transport-imports-domain")
 }
 
 func TestIsolationFlatLayoutEmitsMetaWarning(t *testing.T) {

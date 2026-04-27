@@ -152,7 +152,7 @@ func main() {
 ```go
 ctx := core.NewContext(pkgs, "", "", presets.ConsumerWorker(), []string{"internal/legacy/..."})
 core.Run(ctx, presets.RecommendedConsumerWorker(),
-    core.WithSeverityOverride("layer.direction", core.Warning))
+    core.WithSeverityOverride("dependency.invalid-import-direction", core.Warning))
 ```
 
 ---
@@ -161,11 +161,11 @@ core.Run(ctx, presets.RecommendedConsumerWorker(),
 
 | 카테고리 | 규칙 |
 |---------|------|
-| 레이어 방향 | `layer.direction`, `layer.inner-imports-pkg` |
-| 구조 | `structure.internal-top-level`, `structure.banned-package`, `structure.legacy-package`, `structure.middleware-placement` |
+| 레이어 방향 | `dependency.invalid-import-direction`, `dependency.inner-imports-pkg` |
+| 구조 | `structural.internal-top-level`, `structural.banned-package-name`, `structural.legacy-package`, `structural.middleware-placement` |
 | 네이밍 | `naming.no-stutter`, `naming.no-impl-suffix`, `naming.snake-case-file`, `naming.no-layer-suffix`, `testing.no-handmock` |
 | 타입 패턴 | `naming.type-pattern-mismatch`, `naming.type-pattern-missing-method` |
-| 인터페이스 패턴 | `interface.exported-impl`, `interface.constructor-name`, `interface.constructor-returns-interface`, `interface.single-per-package` |
-| 커플링 | `blast.high-coupling` |
+| 인터페이스 패턴 | `interfaces.exported-impl`, `interfaces.constructor-name`, `interfaces.constructor-returns-interface`, `interfaces.single-per-package` |
+| 커플링 | `dependency.high-coupling` |
 
-**미적용:** `isolation.*` (도메인 격리) — 플랫 레이아웃에는 도메인 개념 없음.
+**미적용:** `dependency.*` (도메인 격리) — 플랫 레이아웃에는 도메인 개념 없음.

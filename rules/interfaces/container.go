@@ -25,7 +25,7 @@ func (r *Container) Spec() core.RuleSpec {
 		Description:     "detect interfaces used only as struct field containers",
 		DefaultSeverity: r.cfg.severity,
 		Violations: []core.ViolationSpec{
-			{ID: "interface.container-only", DefaultSeverity: r.cfg.severity},
+			{ID: "interfaces.container-only", DefaultSeverity: r.cfg.severity},
 		},
 	}
 }
@@ -95,7 +95,7 @@ func (r *Container) checkPackage(pkg *packages.Package) []core.Violation {
 		violations = append(violations, core.Violation{
 			File:              file,
 			Line:              pos.Line,
-			Rule:              "interface.container-only",
+			Rule:              "interfaces.container-only",
 			Message:           fmt.Sprintf("interface %q is only used as a struct field type, never as a function parameter or return type", name),
 			Fix:               "use the concrete type or pass this interface as a constructor parameter",
 			DefaultSeverity:   r.cfg.severity,

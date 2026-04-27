@@ -92,7 +92,7 @@ should be able to express it.
   the sole trigger for `Error` severity — teams may promote a rule to `Error`
   when the convention is firm.
 
-Example: `interface.cross-domain-anonymous` is shipped as `Error` because the
+Example: `interfaces.cross-domain-anonymous` is shipped as `Error` because the
 fix is clear (move the adapter into `internal/orchestration/`) and the
 convention — cross-domain abstractions owned by the orchestration package —
 is firm in every preset that enables it. Teams that use a different

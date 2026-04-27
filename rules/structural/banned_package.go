@@ -10,8 +10,8 @@ import (
 
 const (
 	ruleBannedPackage = "structural.banned-package"
-	bannedPackage     = "structure.banned-package"
-	legacyPackage     = "structure.legacy-package"
+	bannedPackage     = "structural.banned-package-name"
+	legacyPackage     = "structural.legacy-package"
 )
 
 type BannedPackage struct {

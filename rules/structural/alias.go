@@ -13,11 +13,11 @@ import (
 
 const (
 	ruleAlias           = "structural.alias"
-	aliasExists         = "structure.domain-alias-exists"
-	aliasPackage        = "structure.domain-alias-package"
-	aliasExclusive      = "structure.domain-alias-exclusive"
-	aliasNoInterface    = "structure.domain-alias-no-interface"
-	aliasContractExport = "structure.domain-alias-contract-reexport"
+	aliasExists         = "structural.domain-alias-exists"
+	aliasPackage        = "structural.domain-alias-package"
+	aliasExclusive      = "structural.domain-alias-exclusive"
+	aliasNoInterface    = "structural.domain-alias-no-interface"
+	aliasContractExport = "structural.domain-alias-contract-reexport"
 )
 
 type Alias struct {

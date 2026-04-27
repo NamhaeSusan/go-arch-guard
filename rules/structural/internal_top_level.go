@@ -11,7 +11,7 @@ import (
 
 const (
 	ruleInternalTopLevel = "structural.internal-top-level"
-	internalTopLevel     = "structure.internal-top-level"
+	internalTopLevel     = "structural.internal-top-level"
 )
 
 type InternalTopLevel struct {
