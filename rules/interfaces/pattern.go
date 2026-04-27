@@ -29,7 +29,6 @@ func (r *Pattern) Spec() core.RuleSpec {
 			{ID: "interfaces.constructor-name", DefaultSeverity: r.cfg.severity},
 			{ID: "interfaces.constructor-returns-interface", DefaultSeverity: r.cfg.severity},
 			{ID: "interfaces.exported-impl", DefaultSeverity: r.cfg.severity},
-			{ID: "interfaces.too-many-methods", DefaultSeverity: r.cfg.severity},
 			{ID: "interfaces.single-per-package", DefaultSeverity: r.cfg.severity},
 		},
 	}
@@ -47,11 +46,6 @@ func (r *Pattern) Check(ctx *core.Context) []core.Violation {
 	}
 
 	var violations []core.Violation
-	if r.cfg.maxMethods <= 0 {
-		violations = append(violations, metaRuleDisabledByConfig("interfaces.pattern",
-			"WithMaxMethods option not provided; interfaces.too-many-methods sub-check will not fire",
-			"pass interfaces.WithMaxMethods(n) to NewPattern to enable the method-count cap"))
-	}
 	for _, pkg := range pkgs {
 		if isExcludedInterfacePatternPkg(arch, pkg) {
 			continue
@@ -65,7 +59,6 @@ func (r *Pattern) Check(ctx *core.Context) []core.Violation {
 		}
 
 		violations = append(violations, r.checkSingleInterfacePerPackage(pkg, ifaces)...)
-		violations = append(violations, r.checkTooManyMethods(pkg, ifaces)...)
 		violations = append(violations, r.checkConstructorName(pkg)...)
 		violations = append(violations, r.checkConstructorReturnsInterface(pkg, ifaces)...)
 	}
@@ -142,38 +135,6 @@ func (r *Pattern) checkSingleInterfacePerPackage(pkg *packages.Package, ifaces m
 	return []core.Violation{r.violation(pkg, 0, "interfaces.single-per-package",
 		fmt.Sprintf("package has %d exported interfaces (%s), expected at most 1", len(ifaces), strings.Join(names, ", ")),
 		"split into separate packages, one interface each")}
-}
-
-func (r *Pattern) checkTooManyMethods(pkg *packages.Package, ifaces map[string]*ast.InterfaceType) []core.Violation {
-	if r.cfg.maxMethods <= 0 {
-		return nil
-	}
-
-	names := make([]string, 0, len(ifaces))
-	for name := range ifaces {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-
-	var violations []core.Violation
-	for _, name := range names {
-		iface := ifaces[name]
-		count := iface.Methods.NumFields()
-		if count <= r.cfg.maxMethods {
-			continue
-		}
-		pos := pkg.Fset.Position(iface.Pos())
-		violations = append(violations, core.Violation{
-			File:              analysisutil.RelativePathForPackage(pkg, pos.Filename),
-			Line:              pos.Line,
-			Rule:              "interfaces.too-many-methods",
-			Message:           fmt.Sprintf("interface %q has %d methods, expected at most %d", name, count, r.cfg.maxMethods),
-			Fix:               "split the interface by consumer needs",
-			DefaultSeverity:   r.cfg.severity,
-			EffectiveSeverity: r.cfg.severity,
-		})
-	}
-	return violations
 }
 
 func (r *Pattern) checkExportedImpl(pkg *packages.Package) []core.Violation {

@@ -15,6 +15,12 @@ func WithSeverity(severity core.Severity) Option {
 	}
 }
 
+// WithMaxMethods sets the per-interface method count cap. It applies only
+// to interfaces.NewTooManyMethods — passing it to other interfaces.New*()
+// rules (NewPattern, NewContainer, NewCrossDomainAnonymous) is silently
+// ignored to keep the option API uniform across the package.
+//
+// Values <= 0 are treated as "use the default" (currently 10).
 func WithMaxMethods(n int) Option {
 	return func(cfg *ruleConfig) {
 		cfg.maxMethods = n

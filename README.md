@@ -538,19 +538,24 @@ type Helper interface { Assist() } // violation: move to helper.go
 
 ### `interfaces.too-many-methods`
 
-Repo interfaces must not exceed the method limit set by `interfaces.WithMaxMethods`. The DDD, CleanArch, and Hexagonal recommended bundles enable a default limit of 10. Other presets leave it disabled.
+Emitted by `interfaces.NewTooManyMethods()` (separate rule, not part of `interfaces.NewPattern`). Default cap is 10; override with `interfaces.WithMaxMethods(n)`. Every recommended bundle includes this rule with the default cap.
 
 ```go
 // repo/review.go
 type Review interface {
-    // 11 methods --- violation (max 10) under RecommendedDDD/CleanArch/Hexagonal
+    // 11 methods --- violation (max 10)
 }
 ```
 
-To override the bundled default, build a custom RuleSet with your own
-`interfaces.NewPattern(interfaces.WithMaxMethods(N))` instead of using the
-recommended bundle. Don't append a second `interfaces.NewPattern` on top of
-a recommended bundle — both instances run, producing duplicate violations.
+To use a custom cap:
+
+```go
+ruleset := presets.RecommendedDDD().
+    Without("interfaces.too-many-methods")
+ruleset = ruleset.With(interfaces.NewTooManyMethods(interfaces.WithMaxMethods(7)))
+```
+
+`interfaces.WithMaxMethods` is a TooManyMethods option only — passing it to `NewPattern` / `NewContainer` / `NewCrossDomainAnonymous` is silently ignored.
 
 ### `naming.no-layer-suffix`
 
@@ -609,8 +614,8 @@ dedicated mocks package instead.
 
 ## Interface Pattern Rules
 
-`interfaces.NewPattern()`, `interfaces.NewContainer()`, and
-`interfaces.NewCrossDomainAnonymous()`
+`interfaces.NewPattern()`, `interfaces.NewTooManyMethods()`,
+`interfaces.NewContainer()`, and `interfaces.NewCrossDomainAnonymous()`
 
 Enforces Go interface best practices: private implementation, `New()`-only constructor,
 interface return type, and single interface per package.
@@ -831,7 +836,7 @@ diagnostics survive even when multiple rules emit the same ID.
 |---|---|---|
 | `meta.no-matching-packages` | Warning | the configured project module does not match any loaded package |
 | `meta.layout-not-supported` | Warning | a layout-dependent rule is run against a project without a recognized package root (`<root>/<InternalRoot>/`) |
-| `meta.rule-disabled-by-config` | Warning | a rule (or one of its sub-checks) is registered in the ruleset but Architecture config disables it — e.g. `Structure.RequireAlias=false` for `structural.alias`, `Layout.DomainDir=""` for `dependency.isolation`, `WithMaxMethods` not provided to `interfaces.NewPattern`, empty `tx.Config` for `tx.boundary` |
+| `meta.rule-disabled-by-config` | Warning | a rule (or one of its sub-checks) is registered in the ruleset but Architecture config disables it — e.g. `Structure.RequireAlias=false` for `structural.alias`, `Layout.DomainDir=""` for `dependency.isolation`, empty `tx.Config` for `tx.boundary` |
 | `meta.rule-panic` | Error | a rule's `Check` panicked; the panic is captured and other rules continue to run |
 | `meta.unknown-violation-id` | per rule | a rule emits a violation ID it didn't declare in `Spec().Violations` |
 
@@ -880,9 +885,9 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `dependency.NewIsolation()` / `NewLayerDirection()` / `NewBlastRadius()` | dependency rules |
 | `naming.NewNoStutter()` / `NewImplSuffix()` / `NewSnakeCaseFiles()` / `NewNoLayerSuffix()` / `NewTypePattern()` | naming rules |
 | `structural.NewAlias()` / `NewLayerPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` / `NewRepoFileInterface()` | structure rules |
-| `interfaces.NewPattern()` / `NewContainer()` / `NewCrossDomainAnonymous()` | interface rules |
+| `interfaces.NewPattern()` / `NewContainer()` / `NewCrossDomainAnonymous()` / `NewTooManyMethods()` | interface rules |
 | `testpolicy.NewNoHandMock()` | test policy rules |
-| `interfaces.WithMaxMethods(n)` | option for `interfaces.NewPattern` setting the per-interface method cap (default 0 = disabled; DDD/CleanArch/Hexagonal recommended bundles bake in 10) |
+| `interfaces.WithMaxMethods(n)` | option for `interfaces.NewTooManyMethods` setting the per-interface method cap. Default 10 when the option is omitted; n ≤ 0 also falls back to 10. Silently ignored if passed to other interfaces.New*() rules. |
 | `tx.New(tx.Config{...})` | transaction boundary enforcement (opt-in) |
 | `types.NewNoSetter()` | setter rule (immutability for value types) |
 
