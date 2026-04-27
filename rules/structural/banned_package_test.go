@@ -20,12 +20,25 @@ func TestBannedPackage(t *testing.T) {
 		assertViolation(t, violations, "structure.legacy-package", "internal/router/")
 	})
 
-	t.Run("defaults to warning", func(t *testing.T) {
+	t.Run("defaults to error for both banned and legacy violations", func(t *testing.T) {
 		violations := runRule(t, "../../testdata/invalid", structural.NewBannedPackage())
+		var sawBanned, sawLegacy bool
 		for _, v := range violations {
-			if v.Rule == "structure.banned-package" && v.DefaultSeverity != core.Warning {
-				t.Fatalf("DefaultSeverity = %v, want Warning", v.DefaultSeverity)
+			switch v.Rule {
+			case "structure.banned-package":
+				sawBanned = true
+				if v.DefaultSeverity != core.Error {
+					t.Fatalf("banned DefaultSeverity = %v, want Error", v.DefaultSeverity)
+				}
+			case "structure.legacy-package":
+				sawLegacy = true
+				if v.DefaultSeverity != core.Error {
+					t.Fatalf("legacy DefaultSeverity = %v, want Error", v.DefaultSeverity)
+				}
 			}
+		}
+		if !sawBanned || !sawLegacy {
+			t.Fatalf("expected both banned and legacy violations in invalid fixture, got banned=%v legacy=%v", sawBanned, sawLegacy)
 		}
 	})
 }
