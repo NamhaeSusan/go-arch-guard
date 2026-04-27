@@ -42,8 +42,7 @@ func Hexagonal() core.Architecture {
 			AliasFileName:  "alias.go",
 		},
 		Structure: core.StructurePolicy{
-			ModelPath:        "domain",
-			DTOAllowedLayers: []string{"handler", "usecase"},
+			ModelPath: "domain",
 			InterfacePatternExclude: map[string]bool{
 				"handler": true, "domain": true,
 			},
@@ -66,7 +65,7 @@ func RecommendedHexagonal() core.RuleSet {
 		naming.NewNoLayerSuffix(),
 		testpolicy.NewNoHandMock(),
 		structural.NewRepoFileInterface(),
-		structural.NewPlacement(),
+		structural.NewLayerPlacement(),
 		structural.NewBannedPackage(),
 		structural.NewInternalTopLevel(),
 		interfaces.NewPattern(interfaces.WithMaxMethods(10)),

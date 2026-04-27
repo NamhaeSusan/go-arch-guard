@@ -40,8 +40,7 @@ func Layered() core.Architecture {
 			AliasFileName:  "alias.go",
 		},
 		Structure: core.StructurePolicy{
-			ModelPath:        "model",
-			DTOAllowedLayers: []string{"handler", "service"},
+			ModelPath: "model",
 			InterfacePatternExclude: map[string]bool{
 				"handler": true, "model": true,
 			},
@@ -64,7 +63,7 @@ func RecommendedLayered() core.RuleSet {
 		naming.NewNoLayerSuffix(),
 		testpolicy.NewNoHandMock(),
 		structural.NewRepoFileInterface(),
-		structural.NewPlacement(),
+		structural.NewLayerPlacement(),
 		structural.NewBannedPackage(),
 		structural.NewInternalTopLevel(),
 		interfaces.NewPattern(interfaces.WithMaxMethods(10)),

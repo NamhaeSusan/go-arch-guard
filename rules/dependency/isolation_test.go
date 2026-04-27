@@ -255,7 +255,6 @@ func dddArchitecture() core.Architecture {
 			RequireAlias:            true,
 			RequireModel:            true,
 			ModelPath:               "core/model",
-			DTOAllowedLayers:        []string{"handler", "app"},
 			InterfacePatternExclude: map[string]bool{"handler": true, "app": true, "core/model": true, "core/repo": true, "event": true},
 		},
 	}

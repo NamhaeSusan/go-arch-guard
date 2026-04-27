@@ -35,8 +35,7 @@ func Batch() core.Architecture {
 			LegacyPkgNames: defaultLegacyPkgNames(),
 		},
 		Structure: core.StructurePolicy{
-			ModelPath:        "model",
-			DTOAllowedLayers: []string{"job", "service"},
+			ModelPath: "model",
 			TypePatterns: []core.TypePattern{
 				{Dir: "job", FilePrefix: "job", TypeSuffix: "Job", RequireMethod: "Run"},
 			},
@@ -61,7 +60,7 @@ func RecommendedBatch() core.RuleSet {
 		naming.NewNoLayerSuffix(),
 		testpolicy.NewNoHandMock(),
 		structural.NewRepoFileInterface(),
-		structural.NewPlacement(),
+		structural.NewLayerPlacement(),
 		structural.NewBannedPackage(),
 		structural.NewInternalTopLevel(),
 		interfaces.NewPattern(interfaces.WithMaxMethods(10)),

@@ -44,8 +44,7 @@ func EventPipeline() core.Architecture {
 			LegacyPkgNames: defaultLegacyPkgNames(),
 		},
 		Structure: core.StructurePolicy{
-			ModelPath:        "model",
-			DTOAllowedLayers: []string{"command", "projection"},
+			ModelPath: "model",
 			TypePatterns: []core.TypePattern{
 				{Dir: "command", FilePrefix: "command", TypeSuffix: "Command", RequireMethod: "Execute"},
 				{Dir: "aggregate", FilePrefix: "aggregate", TypeSuffix: "Aggregate", RequireMethod: "Apply"},
@@ -71,7 +70,7 @@ func RecommendedEventPipeline() core.RuleSet {
 		naming.NewNoLayerSuffix(),
 		testpolicy.NewNoHandMock(),
 		structural.NewRepoFileInterface(),
-		structural.NewPlacement(),
+		structural.NewLayerPlacement(),
 		structural.NewBannedPackage(),
 		structural.NewInternalTopLevel(),
 		interfaces.NewPattern(interfaces.WithMaxMethods(10)),

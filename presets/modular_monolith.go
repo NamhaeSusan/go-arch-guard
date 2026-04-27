@@ -41,8 +41,7 @@ func ModularMonolith() core.Architecture {
 			AliasFileName:  "alias.go",
 		},
 		Structure: core.StructurePolicy{
-			ModelPath:        "core",
-			DTOAllowedLayers: []string{"api", "application"},
+			ModelPath: "core",
 			InterfacePatternExclude: map[string]bool{
 				"api": true, "core": true,
 			},
@@ -65,7 +64,7 @@ func RecommendedModularMonolith() core.RuleSet {
 		naming.NewNoLayerSuffix(),
 		testpolicy.NewNoHandMock(),
 		structural.NewRepoFileInterface(),
-		structural.NewPlacement(),
+		structural.NewLayerPlacement(),
 		structural.NewBannedPackage(),
 		structural.NewInternalTopLevel(),
 		interfaces.NewPattern(interfaces.WithMaxMethods(10)),

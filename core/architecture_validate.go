@@ -89,12 +89,7 @@ func (a Architecture) Validate() error {
 		}
 	}
 
-	// DTOAllowedLayers / InterfacePatternExclude.
-	for _, l := range a.Structure.DTOAllowedLayers {
-		if !known[l] {
-			errs = append(errs, fmt.Sprintf("DTOAllowedLayers references unknown layer %q", l))
-		}
-	}
+	// InterfacePatternExclude.
 	for l := range a.Structure.InterfacePatternExclude {
 		if !known[l] {
 			errs = append(errs, fmt.Sprintf("InterfacePatternExclude references unknown layer %q", l))

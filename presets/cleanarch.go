@@ -44,8 +44,7 @@ func CleanArch() core.Architecture {
 			AliasFileName:  "alias.go",
 		},
 		Structure: core.StructurePolicy{
-			ModelPath:        "entity",
-			DTOAllowedLayers: []string{"handler", "usecase"},
+			ModelPath: "entity",
 			InterfacePatternExclude: map[string]bool{
 				"handler": true, "entity": true,
 			},
@@ -68,7 +67,7 @@ func RecommendedCleanArch() core.RuleSet {
 		naming.NewNoLayerSuffix(),
 		testpolicy.NewNoHandMock(),
 		structural.NewRepoFileInterface(),
-		structural.NewPlacement(),
+		structural.NewLayerPlacement(),
 		structural.NewBannedPackage(),
 		structural.NewInternalTopLevel(),
 		interfaces.NewPattern(interfaces.WithMaxMethods(10)),
