@@ -89,7 +89,6 @@ func TestCloneArchitectureCoversAllMutableFields(t *testing.T) {
 			RequireAlias:            true,
 			RequireModel:            true,
 			ModelPath:               "core/model",
-			DTOAllowedLayers:        []string{"handler"},
 			TypePatterns:            []TypePattern{{Dir: "worker", FilePrefix: "worker", TypeSuffix: "Worker"}},
 			InterfacePatternExclude: map[string]bool{"handler": true},
 		},
@@ -103,7 +102,6 @@ func TestCloneArchitectureCoversAllMutableFields(t *testing.T) {
 	clone.Layers.ContractLayers = append(clone.Layers.ContractLayers, "X")
 	clone.Naming.BannedPkgNames = append(clone.Naming.BannedPkgNames, "X")
 	clone.Naming.LegacyPkgNames = append(clone.Naming.LegacyPkgNames, "X")
-	clone.Structure.DTOAllowedLayers = append(clone.Structure.DTOAllowedLayers, "X")
 	clone.Structure.TypePatterns = append(clone.Structure.TypePatterns, TypePattern{Dir: "X"})
 
 	// Slice element overwrites — these would mutate shared backing arrays
@@ -113,7 +111,6 @@ func TestCloneArchitectureCoversAllMutableFields(t *testing.T) {
 	clone.Layers.ContractLayers[0] = "MUTATED"
 	clone.Naming.BannedPkgNames[0] = "MUTATED"
 	clone.Naming.LegacyPkgNames[0] = "MUTATED"
-	clone.Structure.DTOAllowedLayers[0] = "MUTATED"
 	clone.Structure.TypePatterns[0].Dir = "MUTATED"
 
 	// Map fields — insert a key and verify the original does not see it.
@@ -142,9 +139,6 @@ func TestCloneArchitectureCoversAllMutableFields(t *testing.T) {
 	}
 	if got := original.Naming.LegacyPkgNames; len(got) != 1 || got[0] != "router" {
 		t.Errorf("Naming.LegacyPkgNames leaked: %v", got)
-	}
-	if got := original.Structure.DTOAllowedLayers; len(got) != 1 || got[0] != "handler" {
-		t.Errorf("Structure.DTOAllowedLayers leaked: %v", got)
 	}
 	if got := original.Structure.TypePatterns; len(got) != 1 || got[0].Dir != "worker" {
 		t.Errorf("Structure.TypePatterns leaked: %v", got)

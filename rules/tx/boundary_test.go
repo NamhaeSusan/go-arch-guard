@@ -151,7 +151,6 @@ func txBoundaryArch() core.Architecture {
 			SharedDir:        "pkg",
 		},
 		Structure: core.StructurePolicy{
-			DTOAllowedLayers:        []string{"handler", "app"},
 			InterfacePatternExclude: map[string]bool{"handler": true, "app": true, "core/model": true, "core/repo": true, "event": true},
 		},
 	}

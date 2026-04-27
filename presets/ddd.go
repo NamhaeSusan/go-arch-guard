@@ -60,10 +60,9 @@ func DDD() core.Architecture {
 			AliasFileName:  "alias.go",
 		},
 		Structure: core.StructurePolicy{
-			RequireAlias:     true,
-			RequireModel:     true,
-			ModelPath:        "core/model",
-			DTOAllowedLayers: []string{"handler", "app"},
+			RequireAlias: true,
+			RequireModel: true,
+			ModelPath:    "core/model",
 			InterfacePatternExclude: map[string]bool{
 				"handler": true, "app": true, "core/model": true, "core/repo": true, "event": true,
 			},

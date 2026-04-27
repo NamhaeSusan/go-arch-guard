@@ -119,7 +119,6 @@ names; layer-aware rules read from `LayerModel.Sublayers`.
 | `RequireAlias` | Whether each domain root must define the alias file. |
 | `RequireModel` | Whether each domain must contain a model directory. |
 | `ModelPath` | Model directory path inside a domain, for example `core/model`. |
-| `DTOAllowedLayers` | Sublayers where DTO files are allowed. Every value must appear in `LayerModel.Sublayers`. |
 | `TypePatterns` | File/type/method conventions for flat layouts. |
 | `InterfacePatternExclude` | Sublayers skipped by interface pattern checks. Every key must appear in `LayerModel.Sublayers`. |
 
@@ -145,8 +144,8 @@ invariants that rules rely on:
 
 - every `Sublayers` entry has a `Direction` key
 - every `Direction` source and target exists in `Sublayers`
-- `PortLayers`, `ContractLayers`, `PkgRestricted`, `DTOAllowedLayers`, and
-  `InterfacePatternExclude` reference only known layers
+- `PortLayers`, `ContractLayers`, `PkgRestricted`, and `InterfacePatternExclude`
+  reference only known layers
 - `PortLayers` is a subset of `ContractLayers`
 
 `core.Run` validates the architecture before running rules and panics if it is
@@ -203,7 +202,6 @@ arch := core.Architecture{
     Structure: core.StructurePolicy{
         RequireAlias:     false,
         RequireModel:     false,
-        DTOAllowedLayers: []string{"publisher", "subscriber"},
     },
 }
 if err := core.Validate(arch); err != nil {

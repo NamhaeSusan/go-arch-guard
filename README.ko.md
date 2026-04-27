@@ -123,9 +123,6 @@ arch := core.Architecture{
         LegacyPkgNames: []string{"router", "bootstrap"},
         AliasFileName:  "alias.go",
     },
-    Structure: core.StructurePolicy{
-        DTOAllowedLayers: []string{"api"},
-    },
 }
 if err := arch.Validate(); err != nil {
     t.Fatal(err)
@@ -210,7 +207,6 @@ arch := core.Architecture{
 | `StructurePolicy.RequireAlias` | 도메인 루트 alias 파일 필수 여부 |
 | `StructurePolicy.RequireModel` | 도메인 모델 디렉토리 필수 여부 |
 | `StructurePolicy.ModelPath` | 도메인 모델 디렉토리 경로 |
-| `StructurePolicy.DTOAllowedLayers` | DTO 허용 서브레이어 |
 | `StructurePolicy.TypePatterns` | 플랫 레이아웃용 AST naming/structure 패턴 |
 | `StructurePolicy.InterfacePatternExclude` | 인터페이스 패턴 검사 제외 레이어 |
 

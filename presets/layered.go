@@ -40,8 +40,7 @@ func Layered() core.Architecture {
 			AliasFileName:  "alias.go",
 		},
 		Structure: core.StructurePolicy{
-			ModelPath:        "model",
-			DTOAllowedLayers: []string{"handler", "service"},
+			ModelPath: "model",
 			InterfacePatternExclude: map[string]bool{
 				"handler": true, "model": true,
 			},

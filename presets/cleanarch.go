@@ -44,8 +44,7 @@ func CleanArch() core.Architecture {
 			AliasFileName:  "alias.go",
 		},
 		Structure: core.StructurePolicy{
-			ModelPath:        "entity",
-			DTOAllowedLayers: []string{"handler", "usecase"},
+			ModelPath: "entity",
 			InterfacePatternExclude: map[string]bool{
 				"handler": true, "entity": true,
 			},

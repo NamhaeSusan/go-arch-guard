@@ -122,10 +122,9 @@ func dddArch() core.Architecture {
 			LegacyPkgNames: []string{"router", "bootstrap"},
 		},
 		Structure: core.StructurePolicy{
-			RequireAlias:     true,
-			RequireModel:     true,
-			ModelPath:        "core/model",
-			DTOAllowedLayers: []string{"handler", "app"},
+			RequireAlias: true,
+			RequireModel: true,
+			ModelPath:    "core/model",
 		},
 	}
 }

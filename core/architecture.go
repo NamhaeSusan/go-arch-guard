@@ -85,7 +85,6 @@ type StructurePolicy struct {
 	RequireAlias            bool
 	RequireModel            bool
 	ModelPath               string
-	DTOAllowedLayers        []string
 	TypePatterns            []TypePattern
 	InterfacePatternExclude map[string]bool // sublayer names; validated against Layers.Sublayers
 }
@@ -127,7 +126,6 @@ func cloneArchitecture(a Architecture) Architecture {
 			RequireAlias:            a.Structure.RequireAlias,
 			RequireModel:            a.Structure.RequireModel,
 			ModelPath:               a.Structure.ModelPath,
-			DTOAllowedLayers:        cloneStringSlice(a.Structure.DTOAllowedLayers),
 			TypePatterns:            cloneTypePatterns(a.Structure.TypePatterns),
 			InterfacePatternExclude: cloneBoolMap(a.Structure.InterfacePatternExclude),
 		},

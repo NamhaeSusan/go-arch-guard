@@ -123,9 +123,6 @@ arch := core.Architecture{
         LegacyPkgNames: []string{"router", "bootstrap"},
         AliasFileName:  "alias.go",
     },
-    Structure: core.StructurePolicy{
-        DTOAllowedLayers: []string{"api"},
-    },
 }
 if err := arch.Validate(); err != nil {
     t.Fatal(err)
@@ -222,7 +219,6 @@ Architecture fields:
 | `StructurePolicy.RequireAlias` | whether domain roots must define an alias file |
 | `StructurePolicy.RequireModel` | whether domains must have a model directory |
 | `StructurePolicy.ModelPath` | path to the domain model directory |
-| `StructurePolicy.DTOAllowedLayers` | sublayers where DTOs are allowed |
 | `StructurePolicy.TypePatterns` | AST naming/structure patterns for flat layouts |
 | `StructurePolicy.InterfacePatternExclude` | layers skipped by interface pattern checks |
 

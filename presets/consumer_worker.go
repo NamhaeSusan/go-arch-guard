@@ -35,8 +35,7 @@ func ConsumerWorker() core.Architecture {
 			LegacyPkgNames: defaultLegacyPkgNames(),
 		},
 		Structure: core.StructurePolicy{
-			ModelPath:        "model",
-			DTOAllowedLayers: []string{"worker", "service"},
+			ModelPath: "model",
 			TypePatterns: []core.TypePattern{
 				{Dir: "worker", FilePrefix: "worker", TypeSuffix: "Worker", RequireMethod: "Process"},
 			},

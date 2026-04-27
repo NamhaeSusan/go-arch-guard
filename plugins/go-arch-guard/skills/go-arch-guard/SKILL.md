@@ -293,8 +293,7 @@ arch := core.Architecture{
 `LayoutModel.ServerDir`, `NamingPolicy.BannedPkgNames`, `NamingPolicy.LegacyPkgNames`,
 `NamingPolicy.AliasFileName`, `StructurePolicy.RequireAlias`,
 `StructurePolicy.RequireModel`, `StructurePolicy.ModelPath`,
-`StructurePolicy.DTOAllowedLayers`, `StructurePolicy.TypePatterns`,
-`StructurePolicy.InterfacePatternExclude`
+`StructurePolicy.TypePatterns`, `StructurePolicy.InterfacePatternExclude`
 
 검증은 `arch.Validate()` 또는 `core.Validate(arch)`로 수행한다. 빈 `InternalRoot`는 `cloneArchitecture` 시점에 `"internal"`로 정규화되므로 룰에서는 항상 비어있지 않은 값을 읽는다.
 

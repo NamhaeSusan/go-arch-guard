@@ -21,7 +21,6 @@ func validArchitecture() Architecture {
 			PkgRestricted:  map[string]bool{"core/repo": true},
 		},
 		Structure: StructurePolicy{
-			DTOAllowedLayers:        []string{"handler", "app"},
 			InterfacePatternExclude: map[string]bool{"handler": true},
 		},
 	}
@@ -109,15 +108,6 @@ func TestValidateRejectsPortLayerNotInSublayers(t *testing.T) {
 	err := a.Validate()
 	if err == nil || !strings.Contains(err.Error(), "ghost") {
 		t.Errorf("expected unknown-layer error, got %v", err)
-	}
-}
-
-func TestValidateRejectsDTOAllowedLayerUnknown(t *testing.T) {
-	a := validArchitecture()
-	a.Structure.DTOAllowedLayers = []string{"ghost"}
-	err := a.Validate()
-	if err == nil || !strings.Contains(err.Error(), "DTOAllowedLayers") {
-		t.Errorf("expected DTOAllowedLayers error, got %v", err)
 	}
 }
 

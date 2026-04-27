@@ -42,8 +42,7 @@ func Hexagonal() core.Architecture {
 			AliasFileName:  "alias.go",
 		},
 		Structure: core.StructurePolicy{
-			ModelPath:        "domain",
-			DTOAllowedLayers: []string{"handler", "usecase"},
+			ModelPath: "domain",
 			InterfacePatternExclude: map[string]bool{
 				"handler": true, "domain": true,
 			},
