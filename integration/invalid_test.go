@@ -45,7 +45,6 @@ func TestIntegration_Invalid(t *testing.T) {
 		assertHasRule(t, structureViolations, "structural.internal-top-level")
 		assertHasRule(t, structureViolations, "structural.domain-alias-exists")
 		assertHasRule(t, structureViolations, "structural.domain-model-required")
-		assertHasRule(t, structureViolations, "structural.dto-placement")
 		assertHasRule(t, structureViolations, "structural.misplaced-layer")
 	})
 }

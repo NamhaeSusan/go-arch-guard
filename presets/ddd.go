@@ -89,7 +89,6 @@ func RecommendedDDD() core.RuleSet {
 		structural.NewAlias(),
 		structural.NewLayerPlacement(),
 		structural.NewMiddlewarePlacement(),
-		structural.NewDTOPlacement(),
 		structural.NewBannedPackage(),
 		structural.NewModelRequired(),
 		structural.NewInternalTopLevel(),

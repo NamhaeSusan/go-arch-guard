@@ -63,7 +63,6 @@ func RecommendedBatch() core.RuleSet {
 		structural.NewRepoFileInterface(),
 		structural.NewLayerPlacement(),
 		structural.NewMiddlewarePlacement(),
-		structural.NewDTOPlacement(),
 		structural.NewBannedPackage(),
 		structural.NewInternalTopLevel(),
 		interfaces.NewPattern(interfaces.WithMaxMethods(10)),
