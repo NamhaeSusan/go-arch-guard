@@ -61,6 +61,7 @@ func TestRecommendedRuleSetsContainCoreRules(t *testing.T) {
 		"naming.no-stutter",
 		"naming.no-impl-suffix",
 		"interfaces.pattern",
+		"interfaces.too-many-methods",
 		"interfaces.container",
 		"types.no-setter",
 	}
