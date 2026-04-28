@@ -25,6 +25,8 @@ type Context struct {
 // clone, but cloning here closes the construction-time window where a
 // caller could otherwise mutate shared state before the first Arch() read.
 func NewContext(pkgs []*packages.Package, module, root string, arch Architecture, exclude []string) *Context {
+	module, root = resolveContextDefaults(pkgs, module, root)
+
 	norm := make([]string, len(exclude))
 	for i, p := range exclude {
 		norm[i] = normalizeMatchPath(p)
@@ -36,6 +38,27 @@ func NewContext(pkgs []*packages.Package, module, root string, arch Architecture
 		arch:    cloneArchitecture(arch),
 		exclude: norm,
 	}
+}
+
+func resolveContextDefaults(pkgs []*packages.Package, module, root string) (string, string) {
+	if module != "" && root != "" {
+		return module, root
+	}
+	for _, pkg := range pkgs {
+		if pkg == nil || pkg.Module == nil {
+			continue
+		}
+		if module == "" && pkg.Module.Path != "" {
+			module = pkg.Module.Path
+		}
+		if root == "" && pkg.Module.Dir != "" {
+			root = pkg.Module.Dir
+		}
+		if module != "" && root != "" {
+			return module, root
+		}
+	}
+	return module, root
 }
 
 // Pkgs returns the loaded packages. Treat the returned *packages.Package
