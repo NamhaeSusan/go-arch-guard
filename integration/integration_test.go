@@ -689,7 +689,7 @@ func TestIntegration_RealWorldHexagonal(t *testing.T) {
 	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "usecase", "create_order.go"),
 		"package usecase\n\nimport (\n\t_ \""+module+"/internal/domain/order/port\"\n\t_ \""+module+"/internal/domain/order/domain\"\n)\n")
 	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "port", "repository.go"),
-		"package port\n\nimport _ \""+module+"/internal/domain/order/domain\"\n\ntype OrderRepo interface{ Save(id string) error }\n")
+		"package port\n\nimport _ \""+module+"/internal/domain/order/domain\"\n\ntype Repository interface{ Save(id string) error }\n")
 	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "domain", "order.go"),
 		"package domain\n\ntype Order struct{ ID string }\n")
 	writeIntegrationFile(t, filepath.Join(root, "internal", "domain", "order", "adapter", "pg_order.go"),

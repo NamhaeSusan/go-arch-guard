@@ -50,6 +50,32 @@ func TestRecommendedRuleSetsAreNonEmpty(t *testing.T) {
 	}
 }
 
+func TestHexagonalDeclaresPortLayerWithoutAliasRequirement(t *testing.T) {
+	arch := presets.Hexagonal()
+
+	if arch.Structure.RequireAlias {
+		t.Fatal("Hexagonal().Structure.RequireAlias must remain false")
+	}
+	if got, want := arch.Layers.PortLayers, []string{"port"}; !sameStringSlice(got, want) {
+		t.Fatalf("Hexagonal().Layers.PortLayers = %v, want %v", got, want)
+	}
+	if got, want := arch.Layers.ContractLayers, []string{"port"}; !sameStringSlice(got, want) {
+		t.Fatalf("Hexagonal().Layers.ContractLayers = %v, want %v", got, want)
+	}
+}
+
+func sameStringSlice(got, want []string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			return false
+		}
+	}
+	return true
+}
+
 // TestRecommendedRuleSetsContainCoreRules pins the membership of each
 // recommended bundle so a silent rule deletion (e.g. dropping
 // dependency.NewLayerDirection from RecommendedDDD) breaks this test.

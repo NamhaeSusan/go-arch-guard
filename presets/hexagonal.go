@@ -30,6 +30,8 @@ func Hexagonal() core.Architecture {
 				"controller": true, "service": true, "entity": true,
 				"store": true, "persistence": true,
 			},
+			PortLayers:     []string{"port"},
+			ContractLayers: []string{"port"},
 		},
 		Layout: core.LayoutModel{
 			DomainDir:        domainDir,
