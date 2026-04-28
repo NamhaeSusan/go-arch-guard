@@ -24,6 +24,39 @@ func TestNewContextStoresInputs(t *testing.T) {
 	}
 }
 
+func TestNewContextDerivesModuleAndRootFromPackageModuleMetadata(t *testing.T) {
+	pkgs := []*packages.Package{
+		nil,
+		{},
+		{Module: &packages.Module{}},
+		{Module: &packages.Module{Path: "example.com/app", Dir: "/repo/app"}},
+	}
+
+	c := NewContext(pkgs, "", "", validArchitecture(), nil)
+
+	if c.Module() != "example.com/app" {
+		t.Errorf("Module() = %q, want %q", c.Module(), "example.com/app")
+	}
+	if c.Root() != "/repo/app" {
+		t.Errorf("Root() = %q, want %q", c.Root(), "/repo/app")
+	}
+}
+
+func TestNewContextPreservesExplicitModuleAndRoot(t *testing.T) {
+	pkgs := []*packages.Package{
+		{Module: &packages.Module{Path: "example.com/derived", Dir: "/repo/derived"}},
+	}
+
+	c := NewContext(pkgs, "example.com/explicit", "/repo/explicit", validArchitecture(), nil)
+
+	if c.Module() != "example.com/explicit" {
+		t.Errorf("Module() = %q, want explicit value", c.Module())
+	}
+	if c.Root() != "/repo/explicit" {
+		t.Errorf("Root() = %q, want explicit value", c.Root())
+	}
+}
+
 func TestContextIsExcludedExactMatch(t *testing.T) {
 	c := NewContext(nil, "", "", Architecture{}, []string{"internal/handler/foo.go"})
 	if !c.IsExcluded("internal/handler/foo.go") {
