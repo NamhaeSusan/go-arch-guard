@@ -853,6 +853,7 @@ go run github.com/NamhaeSusan/go-arch-guard/cmd/tui --preset hexagonal .
 | `naming.NewNoStutter()` / `NewImplSuffix()` / `NewSnakeCaseFiles()` / `NewNoLayerSuffix()` / `NewTypePattern()` | 네이밍 규칙 |
 | `testpolicy.NewNoHandMock()` | 테스트 정책 규칙 |
 | `structural.NewAlias()` / `NewLayerPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` / `NewRepoFileInterface()` | 구조 규칙 |
+| `structural.WithRepoPortSuffixes(...)` | `structural.NewRepoFileInterface`의 repository-port 인터페이스 이름 suffix 옵션. 기본값은 `Repository`, `Repo`; 빈 suffix는 무시 |
 | `interfaces.NewPattern()` / `NewContainer()` / `NewCrossDomainAnonymous()` / `NewTooManyMethods()` | 인터페이스 규칙 |
 | `interfaces.WithMaxMethods(n)` | `interfaces.NewTooManyMethods`의 인터페이스 메서드 상한 옵션. 옵션 미지정 시 기본 10; n ≤ 0이면 fallback 10. 다른 interfaces.New*() 룰에 넘기면 silently 무시 |
 | `tx.New(tx.Config{...})` | 트랜잭션 경계 검사 (옵트인) |

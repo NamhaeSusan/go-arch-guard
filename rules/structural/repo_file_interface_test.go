@@ -192,6 +192,45 @@ type OrderRepository interface {
 	}
 }
 
+func TestRepoFileInterfaceWithRepoPortSuffixesBlankIgnored(t *testing.T) {
+	// Blank suffixes must not make every interface name match via
+	// strings.HasSuffix(name, ""). The remaining non-blank suffix should
+	// still apply.
+	ctx := tempContextForRepoIface(t, map[string]string{
+		"internal/domain/order/core/svc/svc.go": `package svc
+
+type LocalReader interface {
+	Read() string
+}
+
+type OrderGateway interface {
+	Find() string
+}
+`,
+	}, dddArch())
+
+	got := structural.NewRepoFileInterface(structural.WithRepoPortSuffixes("", "Gateway")).Check(ctx)
+
+	var localReader, orderGateway bool
+	for _, v := range got {
+		if v.Rule != "structural.interface-placement" {
+			continue
+		}
+		if strings.Contains(v.Message, `"LocalReader"`) {
+			localReader = true
+		}
+		if strings.Contains(v.Message, `"OrderGateway"`) {
+			orderGateway = true
+		}
+	}
+	if localReader {
+		t.Fatalf("blank suffix must not match LocalReader; got %+v", got)
+	}
+	if !orderGateway {
+		t.Fatalf("expected interface-placement violation for OrderGateway, got %+v", got)
+	}
+}
+
 func TestRepoFileInterfaceFlagsRepositoryPortOutsidePortLayer(t *testing.T) {
 	got := structural.NewRepoFileInterface().Check(invalidContextForRepoIface(t))
 

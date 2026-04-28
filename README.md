@@ -895,6 +895,7 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `dependency.NewIsolation()` / `NewLayerDirection()` / `NewBlastRadius()` | dependency rules |
 | `naming.NewNoStutter()` / `NewImplSuffix()` / `NewSnakeCaseFiles()` / `NewNoLayerSuffix()` / `NewTypePattern()` | naming rules |
 | `structural.NewAlias()` / `NewLayerPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` / `NewRepoFileInterface()` | structure rules |
+| `structural.WithRepoPortSuffixes(...)` | option for `structural.NewRepoFileInterface` setting repository-port interface name suffixes. Default is `Repository`, `Repo`; blank suffixes are ignored. |
 | `interfaces.NewPattern()` / `NewContainer()` / `NewCrossDomainAnonymous()` / `NewTooManyMethods()` | interface rules |
 | `testpolicy.NewNoHandMock()` | test policy rules |
 | `interfaces.WithMaxMethods(n)` | option for `interfaces.NewTooManyMethods` setting the per-interface method cap. Default 10 when the option is omitted; n ≤ 0 also falls back to 10. Silently ignored if passed to other interfaces.New*() rules. |

@@ -29,8 +29,18 @@ func WithSeverity(severity core.Severity) Option {
 // "use the default".
 func WithRepoPortSuffixes(suffixes ...string) Option {
 	return func(cfg *ruleConfig) {
-		cfg.repoPortSuffixes = slices.Clone(suffixes)
+		cfg.repoPortSuffixes = nonBlankStrings(suffixes)
 	}
+}
+
+func nonBlankStrings(in []string) []string {
+	out := make([]string, 0, len(in))
+	for _, s := range in {
+		if s != "" {
+			out = append(out, s)
+		}
+	}
+	return slices.Clip(out)
 }
 
 func newConfig(opts []Option, severity core.Severity) ruleConfig {
