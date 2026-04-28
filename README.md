@@ -576,13 +576,16 @@ order.go          correct
 
 ### `structural.interface-placement` (DDD only)
 
-Repository-port interfaces — names ending in `Repository` or `Repo` — must be
-defined in `core/repo/`, not scattered across layers. Consumer-defined
+Repository-port interfaces — names ending in `Repository` or `Repo` by default
+— must be defined in `core/repo/`, not scattered across layers. Consumer-defined
 interfaces (the Go idiom where a package declares the small interface it
 consumes) are allowed anywhere they are used: `handler/`, `app/`, `svc/`, etc.
 
 Also flags `type X = otherdomain.Repo` aliases that re-export a repository
 interface across domain boundaries — those belong in `orchestration/`.
+
+Pass `structural.WithRepoPortSuffixes("Gateway", "Adapter", ...)` to match a
+different vocabulary; default is `["Repository", "Repo"]`.
 
 ### `naming.type-pattern-mismatch` (flat presets)
 

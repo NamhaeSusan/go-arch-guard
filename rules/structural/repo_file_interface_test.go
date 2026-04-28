@@ -143,6 +143,55 @@ func TestRepoFileInterfaceNoPortSublayerEmitsMetaDisabledByConfig(t *testing.T) 
 	}
 }
 
+func TestRepoFileInterfaceWithRepoPortSuffixesOverrideMatchesAlternateVocabulary(t *testing.T) {
+	// Default suffixes are ["Repository", "Repo"]. With WithRepoPortSuffixes,
+	// the rule should match a project that names its ports *Gateway instead.
+	ctx := tempContextForRepoIface(t, map[string]string{
+		"internal/domain/order/core/svc/svc.go": `package svc
+
+type OrderGateway interface {
+	Find() string
+}
+`,
+	}, dddArch())
+
+	got := structural.NewRepoFileInterface(structural.WithRepoPortSuffixes("Gateway")).Check(ctx)
+
+	var found bool
+	for _, v := range got {
+		if v.Rule == "structural.interface-placement" && strings.Contains(v.Message, `"OrderGateway"`) {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected interface-placement violation for OrderGateway, got %+v", got)
+	}
+}
+
+func TestRepoFileInterfaceWithRepoPortSuffixesEmptyFallsBackToDefault(t *testing.T) {
+	// Empty suffix slice should fall back to the default ["Repository", "Repo"].
+	ctx := tempContextForRepoIface(t, map[string]string{
+		"internal/domain/order/core/svc/svc.go": `package svc
+
+type OrderRepository interface {
+	Find() string
+}
+`,
+	}, dddArch())
+
+	got := structural.NewRepoFileInterface(structural.WithRepoPortSuffixes()).Check(ctx)
+
+	var found bool
+	for _, v := range got {
+		if v.Rule == "structural.interface-placement" && strings.Contains(v.Message, `"OrderRepository"`) {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected interface-placement violation for OrderRepository (default suffixes), got %+v", got)
+	}
+}
+
 func TestRepoFileInterfaceFlagsRepositoryPortOutsidePortLayer(t *testing.T) {
 	got := structural.NewRepoFileInterface().Check(invalidContextForRepoIface(t))
 

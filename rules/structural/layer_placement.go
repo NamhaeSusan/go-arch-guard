@@ -13,10 +13,26 @@ const (
 	misplacedLayer     = "structural.misplaced-layer"
 )
 
-// LayerPlacement flags layer-named directories (currently "app", "infra",
-// "handler") that appear outside their configured slice. The rule still
-// hard-codes these three names; full configurability via LayerDirNames is
-// tracked in #93.
+// LayerPlacement flags layer-named directories that appear outside their
+// allowed slice. It enforces a fixed vocabulary of three layer names —
+// "app", "infra", "handler" — each with its own ad-hoc placement logic:
+//
+//   - "app": allowed at internal/<Layout.AppDir> or per-domain
+//     internal/<DomainDir>/<X>/app/
+//   - "infra": allowed only as per-domain
+//     internal/<DomainDir>/<X>/infra/. Global internal/infra/ is rejected
+//     by design (the library opts the team into per-domain infra).
+//   - "handler": allowed under internal/<ServerDir>/, in
+//     internal/<OrchestrationDir>/handler/, or as per-domain
+//     internal/<DomainDir>/<X>/handler/.
+//
+// LayerDirNames can narrow the active set (only names present in the map
+// are checked) but cannot add new names — directory names other than the
+// three above silently pass. Teams using a different vocabulary
+// (e.g. "controller", "usecase", "port") get no protection from this rule.
+//
+// Generalizing to fully data-driven placement (LayerLocations on
+// LayerModel) is tracked in issue #104.
 type LayerPlacement struct {
 	severity core.Severity
 }

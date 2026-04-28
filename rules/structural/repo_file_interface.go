@@ -13,12 +13,34 @@ import (
 )
 
 type RepoFileInterface struct {
-	severity core.Severity
+	severity     core.Severity
+	portSuffixes []string
 }
+
+var defaultRepoPortSuffixes = []string{"Repository", "Repo"}
 
 func NewRepoFileInterface(opts ...Option) *RepoFileInterface {
 	cfg := newConfig(opts, core.Error)
-	return &RepoFileInterface{severity: cfg.severity}
+	return &RepoFileInterface{
+		severity:     cfg.severity,
+		portSuffixes: cfg.repoPortSuffixes,
+	}
+}
+
+func (r *RepoFileInterface) suffixes() []string {
+	if len(r.portSuffixes) == 0 {
+		return defaultRepoPortSuffixes
+	}
+	return r.portSuffixes
+}
+
+func (r *RepoFileInterface) isRepoPortName(name string) bool {
+	for _, suf := range r.suffixes() {
+		if strings.HasSuffix(name, suf) {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *RepoFileInterface) Spec() core.RuleSpec {
@@ -109,7 +131,7 @@ func (r *RepoFileInterface) checkInterfacePlacement(ctx *core.Context, pkg *pack
 			continue
 		}
 		for _, info := range analysisutil.InspectTypeSpecs(file, pkg.Fset) {
-			if info.IsInterface && isRepoPortName(info.Name) {
+			if info.IsInterface && r.isRepoPortName(info.Name) {
 				violations = append(violations, r.violation(
 					filePath,
 					info.Line,
@@ -166,10 +188,6 @@ func collectInterfacesFromFile(file *ast.File) map[string]*ast.InterfaceType {
 
 func isDomainPackage(arch core.Architecture, pkgPath string) bool {
 	return arch.Layout.DomainDir != "" && strings.Contains(pkgPath, "/"+arch.Layout.InternalRoot+"/"+arch.Layout.DomainDir+"/")
-}
-
-func isRepoPortName(name string) bool {
-	return strings.HasSuffix(name, "Repository") || strings.HasSuffix(name, "Repo")
 }
 
 var _ core.Rule = (*RepoFileInterface)(nil)

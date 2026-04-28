@@ -546,14 +546,17 @@ order.go          올바름
 
 ### `structural.interface-placement` (DDD만)
 
-Repository 포트 인터페이스(이름이 `Repository` 또는 `Repo`로 끝나는 것)는
-`core/repo/`에만 정의해야 합니다. Consumer-defined interface(사용처에서
-작은 인터페이스를 선언하는 Go 관례)는 `handler/`, `app/`, `svc/` 등
-사용처 어디든 허용됩니다.
+Repository 포트 인터페이스(기본값: 이름이 `Repository` 또는 `Repo`로
+끝나는 것)는 `core/repo/`에만 정의해야 합니다. Consumer-defined
+interface(사용처에서 작은 인터페이스를 선언하는 Go 관례)는 `handler/`,
+`app/`, `svc/` 등 사용처 어디든 허용됩니다.
 
 `type X = otherdomain.Repo` 처럼 다른 도메인의 repository 인터페이스를
 재노출하는 alias도 함께 감지합니다 — 이런 cross-domain 경계 코드는
 `orchestration/`에 두어야 합니다.
+
+다른 어휘를 쓰려면 `structural.WithRepoPortSuffixes("Gateway", "Adapter", ...)`
+옵션으로 suffix를 지정할 수 있습니다 (기본값: `["Repository", "Repo"]`).
 
 ### `naming.type-pattern-mismatch` (flat 프리셋)
 

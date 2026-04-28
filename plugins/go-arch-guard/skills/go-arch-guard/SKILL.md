@@ -376,7 +376,7 @@ fmt.Println(string(data))
 
 ## DDD 전용: Cross-Domain Interface 금지
 
-Repository 포트 interface(이름이 `Repository`/`Repo`로 끝나는 것)는 **`core/repo/`에만** 정의 가능. Consumer-defined interface(사용처에서 선언하는 Go 관례)는 `handler/`, `app/`, `svc/` 어디든 허용. cross-domain 데이터 필요 시 → `orchestration/handler/`로 이동.
+Repository 포트 interface(기본값: 이름이 `Repository`/`Repo`로 끝나는 것)는 **`core/repo/`에만** 정의 가능. Consumer-defined interface(사용처에서 선언하는 Go 관례)는 `handler/`, `app/`, `svc/` 어디든 허용. cross-domain 데이터 필요 시 → `orchestration/handler/`로 이동. 다른 어휘(`Gateway`, `Adapter` 등) 쓰는 팀은 `structural.WithRepoPortSuffixes(...)`로 매칭 suffix 지정 가능.
 
 | 우회 시도 | 잡는 규칙 |
 |----------|----------|
