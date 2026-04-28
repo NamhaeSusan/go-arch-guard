@@ -71,6 +71,11 @@ report.AssertNoViolations(t, violations)
 Use the matching architecture and recommended ruleset for other presets, for example
 `presets.Hexagonal()` with `presets.RecommendedHexagonal()`.
 
+Passing empty strings for `module` and `root` asks `core.NewContext` to derive
+both values from loaded package module metadata. If package metadata is not
+available, the values stay empty and layout-dependent rules may report
+`meta.layout-not-supported` instead of guessing a project root.
+
 ### Per-rule control (DDD example)
 
 For finer control over individual checks, compose a `core.RuleSet` manually:
@@ -146,7 +151,7 @@ Sample output when violations exist:
 --- FAIL: TestArchitecture/domain_isolation
 ```
 
-Pass empty strings for `module` and `root` to auto-extract from loaded packages. If the module cannot be determined, a `meta.no-matching-packages` warning is emitted. If a rule panics, `core.Run` emits `meta.rule-panic` with Error severity and continues running the remaining rules.
+Pass empty strings for `module` and `root` to derive them from loaded package module metadata. If metadata is unavailable, the values remain empty rather than being guessed; layout-dependent rules may emit `meta.layout-not-supported`. If a rule panics, `core.Run` emits `meta.rule-panic` with Error severity and continues running the remaining rules.
 
 ## Presets
 

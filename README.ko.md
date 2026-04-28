@@ -66,7 +66,7 @@ violations := core.Run(ctx, presets.RecommendedDDD())
 report.AssertNoViolations(t, violations)
 ```
 
-`module`과 `root`에 빈 문자열을 넘기면 로드된 패키지에서 자동 추출합니다. 모듈을 확인할 수 없으면 `meta.no-matching-packages` Warning을 냅니다. rule이 panic을 내면 `core.Run`은 `meta.rule-panic` Error violation을 내고 나머지 rule 실행을 계속합니다.
+`module`과 `root`에 빈 문자열을 넘기면 `core.NewContext`가 로드된 패키지의 module metadata에서 두 값을 자동 추출합니다. 패키지 metadata가 없으면 추측하지 않고 빈 값으로 남기며, layout-dependent rule은 프로젝트 root를 임의로 추정하는 대신 `meta.layout-not-supported`를 낼 수 있습니다. rule이 panic을 내면 `core.Run`은 `meta.rule-panic` Error violation을 내고 나머지 rule 실행을 계속합니다.
 
 다른 프리셋은 `presets.Hexagonal()`과 `presets.RecommendedHexagonal()`처럼
 아키텍처와 권장 ruleset을 같은 프리셋으로 맞춰 사용합니다.
@@ -135,7 +135,7 @@ if err := arch.Validate(); err != nil {
 go test -run TestArchitecture -v
 ```
 
-`module`과 `root`에 빈 문자열을 전달하면 로드된 패키지에서 자동 추출합니다.
+`module`과 `root`에 빈 문자열을 전달하면 로드된 패키지의 module metadata에서 추출합니다. metadata가 없으면 값을 추측하지 않고 빈 값으로 남기며, layout-dependent rule은 `meta.layout-not-supported`를 낼 수 있습니다.
 
 ## 프리셋
 

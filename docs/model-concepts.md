@@ -26,6 +26,11 @@ ctx := core.NewContext(pkgs, "", "", arch, nil)
 violations := core.Run(ctx, presets.RecommendedDDD())
 ```
 
+When `module` and `root` are empty, `core.NewContext` derives them from the
+loaded packages' module metadata (`packages.Package.Module.Path` and `Dir`).
+Explicit non-empty arguments always win. If metadata is unavailable, context
+keeps the empty value instead of guessing from import or file paths.
+
 ## LayerModel
 
 `LayerModel` owns the layer vocabulary. `Sublayers` is the single source of
