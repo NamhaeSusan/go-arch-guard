@@ -78,13 +78,9 @@ func (r *NoSetter) Check(ctx *core.Context) []core.Violation {
 
 func (r *NoSetter) checkFile(pkg *packages.Package, file *ast.File, relPath string) []core.Violation {
 	var violations []core.Violation
-	for _, decl := range file.Decls {
-		fd, ok := decl.(*ast.FuncDecl)
-		if !ok {
-			continue
-		}
+	analysisutil.WalkFuncDecls(file, func(fd *ast.FuncDecl) {
 		if !isExportedSetter(fd.Name.Name) || !hasPointerReceiver(fd) || !hasParams(fd) || isFluentBuilder(fd) {
-			continue
+			return
 		}
 		recvType := receiverTypeString(fd)
 		pos := pkg.Fset.Position(fd.Pos())
@@ -98,7 +94,7 @@ func (r *NoSetter) checkFile(pkg *packages.Package, file *ast.File, relPath stri
 			DefaultSeverity:   r.severity,
 			EffectiveSeverity: r.severity,
 		})
-	}
+	})
 	return violations
 }
 

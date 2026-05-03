@@ -2,6 +2,7 @@ package structural
 
 import (
 	"go/ast"
+	"go/token"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -171,21 +172,11 @@ func (r *RepoFileInterface) violation(file string, line int, rule, message, fix 
 
 func collectInterfacesFromFile(file *ast.File) map[string]*ast.InterfaceType {
 	result := make(map[string]*ast.InterfaceType)
-	for _, decl := range file.Decls {
-		gd, ok := decl.(*ast.GenDecl)
-		if !ok {
-			continue
+	analysisutil.WalkTypeSpecs(file, nil, func(ts *ast.TypeSpec, _ token.Position) {
+		if iface, ok := ts.Type.(*ast.InterfaceType); ok {
+			result[ts.Name.Name] = iface
 		}
-		for _, spec := range gd.Specs {
-			ts, ok := spec.(*ast.TypeSpec)
-			if !ok {
-				continue
-			}
-			if iface, ok := ts.Type.(*ast.InterfaceType); ok {
-				result[ts.Name.Name] = iface
-			}
-		}
-	}
+	})
 	return result
 }
 

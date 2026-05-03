@@ -67,15 +67,14 @@ func (r *NoHandMock) checkFile(path, relPath string) []core.Violation {
 	}
 	var violations []core.Violation
 	base := filepath.Base(path)
-	for _, decl := range file.Decls {
-		fd, ok := decl.(*ast.FuncDecl)
-		if !ok || fd.Recv == nil || len(fd.Recv.List) == 0 {
-			continue
+	analysisutil.WalkFuncDecls(file, func(fd *ast.FuncDecl) {
+		if fd.Recv == nil || len(fd.Recv.List) == 0 {
+			return
 		}
 		recvName := analysisutil.ReceiverTypeName(fd.Recv.List[0].Type)
 		line, ok := structs[recvName]
 		if !ok {
-			continue
+			return
 		}
 		violations = append(violations, core.Violation{
 			File:              relPath,
@@ -87,31 +86,21 @@ func (r *NoHandMock) checkFile(path, relPath string) []core.Violation {
 			EffectiveSeverity: r.severity,
 		})
 		delete(structs, recvName)
-	}
+	})
 	return violations
 }
 
 func collectMockStructs(fset *token.FileSet, file *ast.File) map[string]int {
 	result := make(map[string]int)
-	for _, decl := range file.Decls {
-		gd, ok := decl.(*ast.GenDecl)
-		if !ok {
-			continue
+	analysisutil.WalkTypeSpecs(file, fset, func(ts *ast.TypeSpec, pos token.Position) {
+		if _, ok := ts.Type.(*ast.StructType); !ok {
+			return
 		}
-		for _, spec := range gd.Specs {
-			ts, ok := spec.(*ast.TypeSpec)
-			if !ok {
-				continue
-			}
-			if _, ok := ts.Type.(*ast.StructType); !ok {
-				continue
-			}
-			lower := strings.ToLower(ts.Name.Name)
-			if strings.HasPrefix(lower, "mock") || strings.HasPrefix(lower, "fake") || strings.HasPrefix(lower, "stub") {
-				result[ts.Name.Name] = fset.Position(ts.Name.Pos()).Line
-			}
+		lower := strings.ToLower(ts.Name.Name)
+		if strings.HasPrefix(lower, "mock") || strings.HasPrefix(lower, "fake") || strings.HasPrefix(lower, "stub") {
+			result[ts.Name.Name] = pos.Line
 		}
-	}
+	})
 	return result
 }
 
