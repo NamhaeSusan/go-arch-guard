@@ -51,6 +51,21 @@ func TestLayerPlacement(t *testing.T) {
 		violations := core.Run(ctx, core.NewRuleSet(structural.NewLayerPlacement()))
 		assertViolation(t, violations, "structural.misplaced-layer", "internal/platform/handler/")
 	})
+
+	t.Run("treats LayerLocations keys as recognized layer names", func(t *testing.T) {
+		root := t.TempDir()
+		writeTestFile(t, filepath.Join(root, "internal", "platform", "usecase", "usecase.go"), "package usecase\n")
+
+		arch := dddArch()
+		delete(arch.Layers.LayerDirNames, "usecase")
+		arch.Layers.LayerLocations = map[string][]string{
+			"usecase": {"{InternalRoot}/{DomainDir}/*/usecase"},
+		}
+		ctx := core.NewContext(nil, "github.com/example/app", root, arch, nil)
+
+		violations := core.Run(ctx, core.NewRuleSet(structural.NewLayerPlacement()))
+		assertViolation(t, violations, "structural.misplaced-layer", "internal/platform/usecase/")
+	})
 }
 
 func assertNoViolationAt(t *testing.T, violations []core.Violation, rule, file string) {

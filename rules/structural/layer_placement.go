@@ -91,10 +91,11 @@ func (r *LayerPlacement) Check(ctx *core.Context) []core.Violation {
 }
 
 func isMisplacedLayerDir(arch core.Architecture, rel, name string) bool {
-	if len(arch.Layers.LayerDirNames) > 0 && !arch.Layers.LayerDirNames[name] {
+	locations, hasLocations := arch.Layers.LayerLocations[name]
+	if len(arch.Layers.LayerDirNames) > 0 && !arch.Layers.LayerDirNames[name] && !hasLocations {
 		return false
 	}
-	if locations, ok := arch.Layers.LayerLocations[name]; ok {
+	if hasLocations {
 		return !matchesAnyLayerLocation(arch, rel, locations)
 	}
 	switch name {
