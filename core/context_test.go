@@ -167,11 +167,14 @@ func TestContextPkgsHeaderCopyDoesNotAffectOthers(t *testing.T) {
 func TestNewContextIsolatesCallerArchitectureMutation(t *testing.T) {
 	arch := validArchitecture()
 	arch.Layers.LayerDirNames = map[string]bool{"handler": true, "app": true}
+	arch.Layers.LayerLocations = map[string][]string{"app": {"{InternalRoot}/{AppDir}"}}
 	c := NewContext(nil, "m", "/r", arch, nil)
 
 	// Mutate the original arch maps and slices after NewContext.
 	arch.Layers.Sublayers = append(arch.Layers.Sublayers, "rogue")
 	arch.Layers.LayerDirNames["rogue"] = true
+	arch.Layers.LayerLocations["app"][0] = "mutated"
+	arch.Layers.LayerLocations["rogue"] = []string{"rogue"}
 	arch.Layers.Direction["rogue"] = []string{"handler"}
 
 	got := c.Arch()
@@ -182,6 +185,9 @@ func TestNewContextIsolatesCallerArchitectureMutation(t *testing.T) {
 	}
 	if got.Layers.LayerDirNames["rogue"] {
 		t.Fatalf("caller mutation leaked into Context: LayerDirNames contains rogue")
+	}
+	if got.Layers.LayerLocations["app"][0] == "mutated" || got.Layers.LayerLocations["rogue"] != nil {
+		t.Fatalf("caller mutation leaked into Context: LayerLocations = %#v", got.Layers.LayerLocations)
 	}
 	if _, ok := got.Layers.Direction["rogue"]; ok {
 		t.Fatalf("caller mutation leaked into Context: Direction contains rogue")

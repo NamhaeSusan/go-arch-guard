@@ -44,11 +44,15 @@ func HasPortSublayer(layers core.LayerModel) bool {
 }
 
 func MatchPortSublayer(layers core.LayerModel, pkgPath string) string {
+	return MatchPortSublayerInLayout(layers, core.LayoutModel{InternalRoot: "internal", DomainDir: "domain"}, pkgPath)
+}
+
+func MatchPortSublayerInLayout(layers core.LayerModel, layout core.LayoutModel, pkgPath string) string {
 	for _, sl := range layers.Sublayers {
 		if !IsPortSublayer(layers, sl) {
 			continue
 		}
-		if strings.HasSuffix(pkgPath, "/"+sl) || strings.Contains(pkgPath, "/"+sl+"/") {
+		if matchesSublayerBoundary(layout, pkgPath, sl) {
 			return sl
 		}
 	}
@@ -56,15 +60,52 @@ func MatchPortSublayer(layers core.LayerModel, pkgPath string) string {
 }
 
 func MatchContractSublayer(layers core.LayerModel, pkgPath string) string {
+	return MatchContractSublayerInLayout(layers, core.LayoutModel{InternalRoot: "internal", DomainDir: "domain"}, pkgPath)
+}
+
+func MatchContractSublayerInLayout(layers core.LayerModel, layout core.LayoutModel, pkgPath string) string {
 	for _, sl := range layers.Sublayers {
 		if !IsContractSublayer(layers, sl) {
 			continue
 		}
-		if strings.HasSuffix(pkgPath, "/"+sl) || strings.Contains(pkgPath, "/"+sl+"/") {
+		if matchesSublayerBoundary(layout, pkgPath, sl) {
 			return sl
 		}
 	}
 	return ""
+}
+
+func matchesSublayerBoundary(layout core.LayoutModel, pkgPath, sublayer string) bool {
+	internalRoot := layout.InternalRoot
+	if internalRoot == "" {
+		internalRoot = "internal"
+	}
+	domainDir := layout.DomainDir
+	if domainDir == "" {
+		domainDir = "domain"
+	}
+	parts := strings.Split(pkgPath, "/")
+	for i := 0; i+2 < len(parts); i++ {
+		if parts[i] == internalRoot && parts[i+1] == domainDir {
+			if matchesSublayerParts(parts[i+2:], sublayer) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func matchesSublayerParts(relParts []string, sublayer string) bool {
+	slParts := strings.Split(sublayer, "/")
+	if len(relParts) < 1+len(slParts) {
+		return false
+	}
+	for i, want := range slParts {
+		if relParts[1+i] != want {
+			return false
+		}
+	}
+	return true
 }
 
 func PortSublayerName(layers core.LayerModel) string {

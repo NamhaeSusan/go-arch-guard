@@ -52,6 +52,50 @@ func TestFallbackSublayerMatching(t *testing.T) {
 	}
 }
 
+func TestSublayerMatchingRejectsPathSubstringsOutsideDomainLayer(t *testing.T) {
+	layers := core.LayerModel{
+		Sublayers: []string{"core/repo", "core/svc", "core/model"},
+	}
+
+	if got := MatchPortSublayer(layers, "example.com/app/internal/pkg/core/repo/cache"); got != "" {
+		t.Fatalf("MatchPortSublayer() = %q, want no match outside domain layer", got)
+	}
+	if got := MatchPortSublayer(layers, "example.com/app/internal/pkg/core/repo"); got != "" {
+		t.Fatalf("MatchPortSublayer() = %q, want no exact suffix match outside domain layer", got)
+	}
+	if got := MatchPortSublayer(layers, "example.com/app/internal/pkg/domain/order/core/repo"); got != "" {
+		t.Fatalf("MatchPortSublayer() = %q, want no internal/pkg/domain false match", got)
+	}
+	if got := MatchPortSublayer(layers, "example.com/domain/app/internal/domain/order/core/repo"); got != "core/repo" {
+		t.Fatalf("MatchPortSublayer() = %q, want core/repo with module prefix containing domain", got)
+	}
+	if got := MatchPortSublayer(layers, "example.com/app/internal/domain/order/core/repo/internal/domain/cache"); got != "core/repo" {
+		t.Fatalf("MatchPortSublayer() = %q, want core/repo with nested internal/domain below layer", got)
+	}
+	if got := MatchContractSublayer(layers, "example.com/app/internal/pkg/core/svc/cache"); got != "" {
+		t.Fatalf("MatchContractSublayer() = %q, want no match outside domain layer", got)
+	}
+}
+
+func TestSublayerMatchingUsesConfiguredLayout(t *testing.T) {
+	layers := core.LayerModel{
+		Sublayers: []string{"core/repo", "core/svc", "core/model"},
+	}
+
+	layout := core.LayoutModel{InternalRoot: "packages", DomainDir: "domain"}
+	if got := MatchPortSublayerInLayout(layers, layout, "example.com/app/packages/domain/order/core/repo"); got != "core/repo" {
+		t.Fatalf("MatchPortSublayerInLayout() = %q, want core/repo for custom InternalRoot", got)
+	}
+	if got := MatchPortSublayerInLayout(layers, layout, "example.com/app/internal/domain/order/core/repo"); got != "" {
+		t.Fatalf("MatchPortSublayerInLayout() = %q, want no match for wrong InternalRoot", got)
+	}
+
+	layout = core.LayoutModel{InternalRoot: "internal", DomainDir: "module"}
+	if got := MatchContractSublayerInLayout(layers, layout, "example.com/app/internal/module/order/core/svc"); got != "core/svc" {
+		t.Fatalf("MatchContractSublayerInLayout() = %q, want core/svc for custom DomainDir", got)
+	}
+}
+
 func TestExplicitPortSublayerMatching(t *testing.T) {
 	layers := core.LayerModel{
 		Sublayers:      []string{"handler", "usecase", "port", "domain", "adapter"},

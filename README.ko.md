@@ -71,6 +71,10 @@ report.AssertNoViolations(t, violations)
 다른 프리셋은 `presets.Hexagonal()`과 `presets.RecommendedHexagonal()`처럼
 아키텍처와 권장 ruleset을 같은 프리셋으로 맞춰 사용합니다.
 
+`analyzer.Load`는 프로젝트 상대 filesystem 패턴(`"internal/..."`), 명시적
+상대 패턴(`"./internal/..."`), 모듈 경로 패턴
+(`"github.com/acme/project/internal/..."`), 절대 filesystem 패턴을 지원합니다.
+
 ### 개별 rule 제어 (DDD 예시)
 
 각 체크를 세밀하게 제어하려면 `core.RuleSet`을 직접 조합합니다:
@@ -195,6 +199,7 @@ arch := core.Architecture{
 | `LayerModel.PkgRestricted` | 공유 패키지 import 금지 서브레이어 |
 | `LayerModel.InternalTopLevel` | 패키지 루트 아래 허용 최상위 디렉토리 |
 | `LayerModel.LayerDirNames` | 파일/디렉토리 배치 룰이 인식하는 레이어 **basename** (`"repo"`); 의도적으로 `Sublayers`에 있을 필요 없음 |
+| `LayerModel.LayerLocations` | `structural.layer-placement`용 basename → 허용 경로 템플릿; `{InternalRoot}`, `{DomainDir}`, `{AppDir}`, `{ServerDir}`, `*`, `**` 지원 |
 | `LayoutModel.InternalRoot` | 프로젝트 상대 패키지 루트 디렉토리; 빈 값은 `"internal"`로 정규화됨 (`"packages"`, `"src"` 등 비표준 레이아웃 지원) |
 | `LayoutModel.DomainDir` | 도메인 최상위 디렉토리명. 플랫 레이아웃은 빈 값 |
 | `LayoutModel.OrchestrationDir` | 오케스트레이션 최상위 디렉토리명 |
@@ -760,6 +765,28 @@ ruleset := presets.RecommendedDDD().With(tx.New(tx.Config{
 
 발생 가능한 규칙 ID: `tx.start-outside-allowed-layer`, `tx.type-in-signature`.
 
+### `tx.NewForbiddenCalls` / `tx.NewMandatoryWrapper` (옵트인)
+
+프리셋 번들에 포함하지 않고 SDK/client 직접 호출을 거칠게 막고 싶을 때 사용합니다.
+`AllowedLayers`에는 아키텍처 레이어명(`"infra"`, `"app"`) 또는 프로젝트 상대
+패키지 prefix(`"pkg/httpclient"`)를 넣을 수 있습니다.
+
+```go
+ruleset = ruleset.With(
+    tx.NewForbiddenCalls([]tx.ForbiddenCall{{
+        Symbols:       []string{"database/sql.Open"},
+        AllowedLayers: []string{"infra"},
+    }}),
+    tx.NewMandatoryWrapper([]tx.MandatoryWrapper{{
+        Symbols:       []string{"net/http.(*Client).Do"},
+        AllowedLayers: []string{"pkg/httpclient"},
+        ReplaceWith:   "pkg/httpclient.Do",
+    }}),
+)
+```
+
+발생 가능한 규칙 ID: `tx.forbidden-call`, `tx.mandatory-wrapper`.
+
 ## 세터 패턴
 
 ### `types.NewNoSetter`
@@ -860,7 +887,7 @@ go run github.com/NamhaeSusan/go-arch-guard/cmd/tui --preset hexagonal .
 | `structural.WithRepoPortSuffixes(...)` | `structural.NewRepoFileInterface`의 repository-port 인터페이스 이름 suffix 옵션. 기본값은 `Repository`, `Repo`; 빈 suffix는 무시 |
 | `interfaces.NewPattern()` / `NewContainer()` / `NewCrossDomainAnonymous()` / `NewTooManyMethods()` | 인터페이스 규칙 |
 | `interfaces.WithMaxMethods(n)` | `interfaces.NewTooManyMethods`의 인터페이스 메서드 상한 옵션. 옵션 미지정 시 기본 10; n ≤ 0이면 fallback 10. 다른 interfaces.New*() 룰에 넘기면 silently 무시 |
-| `tx.New(tx.Config{...})` | 트랜잭션 경계 검사 (옵트인) |
+| `tx.New(tx.Config{...})` / `tx.NewForbiddenCalls(...)` / `tx.NewMandatoryWrapper(...)` | 트랜잭션 및 symbol-call 검사 (옵트인) |
 | `types.NewNoSetter()` | setter 규칙 (값 타입의 불변성 강제) |
 
 ## 기계 친화적인 JSON 출력

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/NamhaeSusan/go-arch-guard/core"
+	"github.com/NamhaeSusan/go-arch-guard/rules/internal/rulemeta"
 )
 
 // hasInternalDir reports whether <root>/<internalRoot> exists as a
@@ -21,13 +22,9 @@ func hasInternalDir(root, internalRoot string) bool {
 }
 
 func metaLayoutNotSupported(ruleID string) core.Violation {
-	return core.Violation{
-		Rule:              "meta.layout-not-supported",
-		Message:           fmt.Sprintf("%s requires an internal/-based layout; internal/ directory not found", ruleID),
-		Fix:               "use this rule with internal/-based presets (DDD, CleanArch, Hexagonal, ModularMonolith), or remove it from your ruleset for flat layouts",
-		DefaultSeverity:   core.Warning,
-		EffectiveSeverity: core.Warning,
-	}
+	return rulemeta.LayoutNotSupported(
+		fmt.Sprintf("%s requires an internal/-based layout; internal/ directory not found", ruleID),
+		"use this rule with internal/-based presets (DDD, CleanArch, Hexagonal, ModularMonolith), or remove it from your ruleset for flat layouts")
 }
 
 // metaRuleDisabledByConfig signals that a rule is registered in the RuleSet
@@ -35,11 +32,5 @@ func metaLayoutNotSupported(ruleID string) core.Violation {
 // (whole rule) or makes a sub-check inert (partial). Severity defaults to
 // Warning via the runner's meta.* prefix handling.
 func metaRuleDisabledByConfig(ruleID, reason, fix string) core.Violation {
-	return core.Violation{
-		Rule:              "meta.rule-disabled-by-config",
-		Message:           fmt.Sprintf("%s: %s", ruleID, reason),
-		Fix:               fix,
-		DefaultSeverity:   core.Warning,
-		EffectiveSeverity: core.Warning,
-	}
+	return rulemeta.RuleDisabledByConfig(ruleID, reason, fix)
 }

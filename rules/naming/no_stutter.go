@@ -2,6 +2,7 @@ package naming
 
 import (
 	"go/ast"
+	"go/token"
 	"strings"
 	"unicode"
 
@@ -36,30 +37,22 @@ func (r *NoStutter) Check(ctx *core.Context) []core.Violation {
 			if ctx.IsExcluded(filePath) {
 				continue
 			}
-			for _, decl := range file.Decls {
-				gd, ok := decl.(*ast.GenDecl)
-				if !ok {
-					continue
+			analysisutil.WalkTypeSpecs(file, pkg.Fset, func(ts *ast.TypeSpec, pos token.Position) {
+				if !ts.Name.IsExported() {
+					return
 				}
-				for _, spec := range gd.Specs {
-					ts, ok := spec.(*ast.TypeSpec)
-					if !ok || !ts.Name.IsExported() {
-						continue
-					}
-					name := ts.Name.Name
-					if !stutters(pkgName, name) {
-						continue
-					}
-					suggested := string([]rune(name)[pkgNameLen:])
-					pos := pkg.Fset.Position(ts.Name.Pos())
-					violations = append(violations, r.violation(
-						analysisutil.RelativePathForPackage(pkg, pos.Filename),
-						pos.Line,
-						`type "`+name+`" stutters with package "`+pkgName+`"`,
-						`rename to "`+suggested+`"`,
-					))
+				name := ts.Name.Name
+				if !stutters(pkgName, name) {
+					return
 				}
-			}
+				suggested := string([]rune(name)[pkgNameLen:])
+				violations = append(violations, r.violation(
+					analysisutil.RelativePathForPackage(pkg, pos.Filename),
+					pos.Line,
+					`type "`+name+`" stutters with package "`+pkgName+`"`,
+					`rename to "`+suggested+`"`,
+				))
+			})
 		}
 	}
 	return violations

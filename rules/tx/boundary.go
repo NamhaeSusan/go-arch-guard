@@ -3,11 +3,13 @@ package tx
 import (
 	"fmt"
 	"go/ast"
+	"go/types"
 	"slices"
 	"strings"
 
 	"github.com/NamhaeSusan/go-arch-guard/core"
 	"github.com/NamhaeSusan/go-arch-guard/core/analysisutil"
+	"github.com/NamhaeSusan/go-arch-guard/rules/internal/rulemeta"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -105,30 +107,18 @@ func (r *Boundary) checkStartCalls(ctx *core.Context, allowed []string) []core.V
 	allowedSet := stringSet(allowed)
 
 	var violations []core.Violation
-	r.walkInternalPackages(ctx, func(pkg *packages.Package, layer string) {
-		if allowedSet[layer] || pkg.TypesInfo == nil {
+	checkSymbolCalls(ctx, true, func(hit symbolCall) {
+		if allowedSet[hit.layer] || !wanted[hit.symbol] {
 			return
 		}
-		for _, file := range pkg.Syntax {
-			ast.Inspect(file, func(n ast.Node) bool {
-				call, ok := n.(*ast.CallExpr)
-				if !ok {
-					return true
-				}
-				if !wanted[analysisutil.ResolveCalleeID(pkg.TypesInfo, call)] {
-					return true
-				}
-				pos := pkg.Fset.Position(call.Pos())
-				violations = append(violations, r.violation(
-					startOutsideLayerID,
-					analysisutil.RelPathFromRoot(ctx.Root(), pos.Filename),
-					pos.Line,
-					fmt.Sprintf("transaction must not start in layer %q; allowed layers: %v", layer, allowed),
-					fmt.Sprintf("move the transaction-starting call out of %q into an allowed layer: %v", layer, allowed),
-				))
-				return true
-			})
-		}
+		pos := hit.pkg.Fset.Position(hit.call.Pos())
+		violations = append(violations, r.violation(
+			startOutsideLayerID,
+			analysisutil.RelPathFromRoot(ctx.Root(), pos.Filename),
+			pos.Line,
+			fmt.Sprintf("transaction must not start in layer %q; allowed layers: %v", hit.layer, allowed),
+			fmt.Sprintf("move the transaction-starting call out of %q into an allowed layer: %v", hit.layer, allowed),
+		))
 	})
 	return violations
 }
@@ -146,59 +136,31 @@ func (r *Boundary) checkSignatureTypes(ctx *core.Context, allowed []string) []co
 			return
 		}
 		for _, file := range pkg.Syntax {
-			for _, decl := range file.Decls {
-				fd, ok := decl.(*ast.FuncDecl)
-				if !ok || fd.Type == nil {
-					continue
-				}
-				r.checkFields(ctx, pkg, fd.Type.Params, wanted, allowed, &violations)
-				r.checkFields(ctx, pkg, fd.Type.Results, wanted, allowed, &violations)
-			}
+			analysisutil.WalkFuncSignatureTypes(pkg.TypesInfo, file, func(_ *ast.FuncDecl, field *ast.Field, typ types.Type) {
+				r.checkSignatureField(ctx, pkg, field, typ, wanted, allowed, &violations)
+			})
 		}
 	})
 	return violations
 }
 
-func (r *Boundary) checkFields(ctx *core.Context, pkg *packages.Package, fields *ast.FieldList, wanted map[string]bool, allowed []string, out *[]core.Violation) {
-	if fields == nil {
+func (r *Boundary) checkSignatureField(ctx *core.Context, pkg *packages.Package, field *ast.Field, typ types.Type, wanted map[string]bool, allowed []string, out *[]core.Violation) {
+	id := analysisutil.NamedQualifiedName(analysisutil.StripWrappers(typ))
+	if id == "" || !wanted[id] {
 		return
 	}
-	for _, field := range fields.List {
-		typ := pkg.TypesInfo.TypeOf(field.Type)
-		id := analysisutil.NamedQualifiedName(analysisutil.StripWrappers(typ))
-		if id == "" || !wanted[id] {
-			continue
-		}
-		pos := pkg.Fset.Position(field.Pos())
-		*out = append(*out, r.violation(
-			typeInSignatureID,
-			analysisutil.RelPathFromRoot(ctx.Root(), pos.Filename),
-			pos.Line,
-			fmt.Sprintf("tx type %q must not appear in function signature outside allowed layers: %v", id, allowed),
-			fmt.Sprintf("keep %q confined to allowed layers: %v", id, allowed),
-		))
-	}
+	pos := pkg.Fset.Position(field.Pos())
+	*out = append(*out, r.violation(
+		typeInSignatureID,
+		analysisutil.RelPathFromRoot(ctx.Root(), pos.Filename),
+		pos.Line,
+		fmt.Sprintf("tx type %q must not appear in function signature outside allowed layers: %v", id, allowed),
+		fmt.Sprintf("keep %q confined to allowed layers: %v", id, allowed),
+	))
 }
 
 func (r *Boundary) walkInternalPackages(ctx *core.Context, visit func(*packages.Package, string)) {
-	module := analysisutil.ResolveModuleFromContext(ctx, "")
-	if module == "" {
-		return
-	}
-	internalPrefix := module + "/" + ctx.Arch().Layout.InternalRoot + "/"
-	for _, pkg := range ctx.Pkgs() {
-		if !strings.HasPrefix(pkg.PkgPath, internalPrefix) {
-			continue
-		}
-		if ctx.IsExcluded(analysisutil.ProjectRelativePackagePath(pkg.PkgPath, module)) {
-			continue
-		}
-		layer := packageLayer(ctx.Arch(), pkg.PkgPath, internalPrefix)
-		if layer == "" {
-			continue
-		}
-		visit(pkg, layer)
-	}
+	walkInternalPackages(ctx, visit)
 }
 
 func (r *Boundary) violation(rule, file string, line int, message, fix string) core.Violation {
@@ -217,13 +179,7 @@ func (r *Boundary) violation(rule, file string, line int, message, fix string) c
 // but the supplied core.Architecture configuration prevents it from running.
 // Severity defaults to Warning via the runner's meta.* prefix handling.
 func metaRuleDisabledByConfig(ruleID, reason, fix string) core.Violation {
-	return core.Violation{
-		Rule:              "meta.rule-disabled-by-config",
-		Message:           fmt.Sprintf("%s: %s", ruleID, reason),
-		Fix:               fix,
-		DefaultSeverity:   core.Warning,
-		EffectiveSeverity: core.Warning,
-	}
+	return rulemeta.RuleDisabledByConfig(ruleID, reason, fix)
 }
 
 func packageLayer(arch core.Architecture, pkgPath, internalPrefix string) string {

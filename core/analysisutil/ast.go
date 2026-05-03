@@ -28,12 +28,11 @@ type TypeSpecInfo struct {
 	AliasFrom   string // import path of `type X = pkg.Y`; empty if not an alias
 }
 
-// InspectTypeSpecs walks the top-level type decls in file and returns one
-// entry per interface declaration or per type alias whose RHS is
-// `<ident>.<Name>`. Other type decls are skipped. Callers usually want to
-// detect interfaces or detect re-exports of types from other packages.
-func InspectTypeSpecs(file *ast.File, fset *token.FileSet) []TypeSpecInfo {
-	var result []TypeSpecInfo
+// WalkTypeSpecs visits top-level type declarations in source order.
+func WalkTypeSpecs(file *ast.File, fset *token.FileSet, visit func(*ast.TypeSpec, token.Position)) {
+	if file == nil || visit == nil {
+		return
+	}
 	for _, decl := range file.Decls {
 		gd, ok := decl.(*ast.GenDecl)
 		if !ok {
@@ -44,25 +43,53 @@ func InspectTypeSpecs(file *ast.File, fset *token.FileSet) []TypeSpecInfo {
 			if !ok {
 				continue
 			}
-			info := TypeSpecInfo{
-				Name: ts.Name.Name,
-				Line: fset.Position(ts.Name.Pos()).Line,
+			var pos token.Position
+			if fset != nil {
+				pos = fset.Position(ts.Name.Pos())
 			}
-			if _, ok := ts.Type.(*ast.InterfaceType); ok {
-				info.IsInterface = true
-			}
-			if ts.Assign != 0 {
-				if sel, ok := ts.Type.(*ast.SelectorExpr); ok {
-					if ident, ok := sel.X.(*ast.Ident); ok {
-						info.AliasFrom = ResolveIdentImportPath(file, ident.Name)
-					}
-				}
-			}
-			if info.IsInterface || info.AliasFrom != "" {
-				result = append(result, info)
-			}
+			visit(ts, pos)
 		}
 	}
+}
+
+// WalkFuncDecls visits top-level function declarations in source order.
+func WalkFuncDecls(file *ast.File, visit func(*ast.FuncDecl)) {
+	if file == nil || visit == nil {
+		return
+	}
+	for _, decl := range file.Decls {
+		fd, ok := decl.(*ast.FuncDecl)
+		if ok {
+			visit(fd)
+		}
+	}
+}
+
+// InspectTypeSpecs walks the top-level type decls in file and returns one
+// entry per interface declaration or per type alias whose RHS is
+// `<ident>.<Name>`. Other type decls are skipped. Callers usually want to
+// detect interfaces or detect re-exports of types from other packages.
+func InspectTypeSpecs(file *ast.File, fset *token.FileSet) []TypeSpecInfo {
+	var result []TypeSpecInfo
+	WalkTypeSpecs(file, fset, func(ts *ast.TypeSpec, pos token.Position) {
+		info := TypeSpecInfo{
+			Name: ts.Name.Name,
+			Line: pos.Line,
+		}
+		if _, ok := ts.Type.(*ast.InterfaceType); ok {
+			info.IsInterface = true
+		}
+		if ts.Assign != 0 {
+			if sel, ok := ts.Type.(*ast.SelectorExpr); ok {
+				if ident, ok := sel.X.(*ast.Ident); ok {
+					info.AliasFrom = ResolveIdentImportPath(file, ident.Name)
+				}
+			}
+		}
+		if info.IsInterface || info.AliasFrom != "" {
+			result = append(result, info)
+		}
+	})
 	return result
 }
 
@@ -151,14 +178,13 @@ func WalkFuncSignatureTypes(info *types.Info, file *ast.File, visit func(*ast.Fu
 	if info == nil || file == nil || visit == nil {
 		return
 	}
-	for _, decl := range file.Decls {
-		fd, ok := decl.(*ast.FuncDecl)
-		if !ok || fd.Type == nil {
-			continue
+	WalkFuncDecls(file, func(fd *ast.FuncDecl) {
+		if fd.Type == nil {
+			return
 		}
 		walkFieldListTypes(info, fd, fd.Type.Params, visit)
 		walkFieldListTypes(info, fd, fd.Type.Results, visit)
-	}
+	})
 }
 
 func StripWrappers(t types.Type) types.Type {

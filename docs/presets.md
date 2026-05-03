@@ -8,6 +8,10 @@ For custom architectures, see [Architecture Concepts](model-concepts.md).
 > Projects that keep packages under a different directory (`packages/`, `src/`, etc.)
 > should set `arch.Layout.InternalRoot` accordingly — the same layout structure applies,
 > just under a different root.
+>
+> Custom layer vocabularies can also set `arch.Layers.LayerLocations` so
+> `structural.layer-placement` checks names beyond the built-in
+> `app`/`infra`/`handler` fallback vocabulary.
 
 ## DDD Layout
 

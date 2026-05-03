@@ -16,7 +16,7 @@ import (
 func Run(pkgs []*packages.Package, module, root string, arch core.Architecture, ruleSet core.RuleSet) error {
 	violations := BuildViolationIndex(pkgs, module, root, arch, ruleSet)
 	importedBy := BuildImportedByMap(pkgs)
-	metrics := BuildMetricsIndex(pkgs, module)
+	metrics := BuildMetricsIndexForRoot(pkgs, module, arch.Layout.InternalRoot)
 	tree := BuildTree(pkgs, module, violations)
 	detail := NewDetailPanel(importedBy, violations, metrics, module)
 

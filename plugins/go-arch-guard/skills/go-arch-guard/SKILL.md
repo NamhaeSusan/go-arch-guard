@@ -286,8 +286,8 @@ arch := core.Architecture{
 ```
 
 전체 필드: `LayerModel.Sublayers`, `LayerModel.Direction`, `LayerModel.PkgRestricted`,
-`LayerModel.InternalTopLevel`, `LayerModel.LayerDirNames`, `LayerModel.PortLayers`,
-`LayerModel.ContractLayers`, `LayoutModel.InternalRoot` (default `"internal"`,
+`LayerModel.InternalTopLevel`, `LayerModel.LayerDirNames`, `LayerModel.LayerLocations`,
+`LayerModel.PortLayers`, `LayerModel.ContractLayers`, `LayoutModel.InternalRoot` (default `"internal"`,
 `"packages"`/`"src"` 등 비표준 패키지 루트 지원), `LayoutModel.DomainDir`,
 `LayoutModel.OrchestrationDir`, `LayoutModel.SharedDir`, `LayoutModel.AppDir`,
 `LayoutModel.ServerDir`, `NamingPolicy.BannedPkgNames`, `NamingPolicy.LegacyPkgNames`,
@@ -348,6 +348,24 @@ ruleset := presets.RecommendedDDD().With(tx.New(tx.Config{
 ```
 
 위반 규칙 ID: `tx.start-outside-allowed-layer`, `tx.type-in-signature`.
+
+SDK/client 직접 호출을 제한하려면 opt-in symbol-call 룰을 추가한다:
+
+```go
+ruleset = ruleset.With(
+    tx.NewForbiddenCalls([]tx.ForbiddenCall{{
+        Symbols:       []string{"database/sql.Open"},
+        AllowedLayers: []string{"infra"},
+    }}),
+    tx.NewMandatoryWrapper([]tx.MandatoryWrapper{{
+        Symbols:       []string{"net/http.(*Client).Do"},
+        AllowedLayers: []string{"pkg/httpclient"},
+        ReplaceWith:   "pkg/httpclient.Do",
+    }}),
+)
+```
+
+위반 규칙 ID: `tx.forbidden-call`, `tx.mandatory-wrapper`.
 
 ## Machine-readable Output
 

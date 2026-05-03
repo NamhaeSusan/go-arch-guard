@@ -157,8 +157,10 @@ func TestRecommendedRuleSetsContainCoreRules(t *testing.T) {
 					t.Errorf("unexpected rule %q in Recommended%s", id, tc.name)
 				}
 			}
-			if ids["tx.boundary"] {
-				t.Errorf("tx.boundary must remain opt-in; found in Recommended%s", tc.name)
+			for _, optInID := range []string{"tx.boundary", "tx.forbidden-call", "tx.mandatory-wrapper"} {
+				if ids[optInID] {
+					t.Errorf("%s must remain opt-in; found in Recommended%s", optInID, tc.name)
+				}
 			}
 		})
 	}
