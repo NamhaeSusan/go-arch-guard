@@ -105,30 +105,18 @@ func (r *Boundary) checkStartCalls(ctx *core.Context, allowed []string) []core.V
 	allowedSet := stringSet(allowed)
 
 	var violations []core.Violation
-	r.walkInternalPackages(ctx, func(pkg *packages.Package, layer string) {
-		if allowedSet[layer] || pkg.TypesInfo == nil {
+	checkSymbolCalls(ctx, true, func(hit symbolCall) {
+		if allowedSet[hit.layer] || !wanted[hit.symbol] {
 			return
 		}
-		for _, file := range pkg.Syntax {
-			ast.Inspect(file, func(n ast.Node) bool {
-				call, ok := n.(*ast.CallExpr)
-				if !ok {
-					return true
-				}
-				if !wanted[analysisutil.ResolveCalleeID(pkg.TypesInfo, call)] {
-					return true
-				}
-				pos := pkg.Fset.Position(call.Pos())
-				violations = append(violations, r.violation(
-					startOutsideLayerID,
-					analysisutil.RelPathFromRoot(ctx.Root(), pos.Filename),
-					pos.Line,
-					fmt.Sprintf("transaction must not start in layer %q; allowed layers: %v", layer, allowed),
-					fmt.Sprintf("move the transaction-starting call out of %q into an allowed layer: %v", layer, allowed),
-				))
-				return true
-			})
-		}
+		pos := hit.pkg.Fset.Position(hit.call.Pos())
+		violations = append(violations, r.violation(
+			startOutsideLayerID,
+			analysisutil.RelPathFromRoot(ctx.Root(), pos.Filename),
+			pos.Line,
+			fmt.Sprintf("transaction must not start in layer %q; allowed layers: %v", hit.layer, allowed),
+			fmt.Sprintf("move the transaction-starting call out of %q into an allowed layer: %v", hit.layer, allowed),
+		))
 	})
 	return violations
 }

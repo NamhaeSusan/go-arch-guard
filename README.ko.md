@@ -760,6 +760,28 @@ ruleset := presets.RecommendedDDD().With(tx.New(tx.Config{
 
 발생 가능한 규칙 ID: `tx.start-outside-allowed-layer`, `tx.type-in-signature`.
 
+### `tx.NewForbiddenCalls` / `tx.NewMandatoryWrapper` (옵트인)
+
+프리셋 번들에 포함하지 않고 SDK/client 직접 호출을 거칠게 막고 싶을 때 사용합니다.
+`AllowedLayers`에는 아키텍처 레이어명(`"infra"`, `"app"`) 또는 프로젝트 상대
+패키지 prefix(`"pkg/httpclient"`)를 넣을 수 있습니다.
+
+```go
+ruleset = ruleset.With(
+    tx.NewForbiddenCalls([]tx.ForbiddenCall{{
+        Symbols:       []string{"database/sql.Open"},
+        AllowedLayers: []string{"infra"},
+    }}),
+    tx.NewMandatoryWrapper([]tx.MandatoryWrapper{{
+        Symbols:       []string{"net/http.(*Client).Do"},
+        AllowedLayers: []string{"pkg/httpclient"},
+        ReplaceWith:   "pkg/httpclient.Do",
+    }}),
+)
+```
+
+발생 가능한 규칙 ID: `tx.forbidden-call`, `tx.mandatory-wrapper`.
+
 ## 세터 패턴
 
 ### `types.NewNoSetter`
@@ -860,7 +882,7 @@ go run github.com/NamhaeSusan/go-arch-guard/cmd/tui --preset hexagonal .
 | `structural.WithRepoPortSuffixes(...)` | `structural.NewRepoFileInterface`의 repository-port 인터페이스 이름 suffix 옵션. 기본값은 `Repository`, `Repo`; 빈 suffix는 무시 |
 | `interfaces.NewPattern()` / `NewContainer()` / `NewCrossDomainAnonymous()` / `NewTooManyMethods()` | 인터페이스 규칙 |
 | `interfaces.WithMaxMethods(n)` | `interfaces.NewTooManyMethods`의 인터페이스 메서드 상한 옵션. 옵션 미지정 시 기본 10; n ≤ 0이면 fallback 10. 다른 interfaces.New*() 룰에 넘기면 silently 무시 |
-| `tx.New(tx.Config{...})` | 트랜잭션 경계 검사 (옵트인) |
+| `tx.New(tx.Config{...})` / `tx.NewForbiddenCalls(...)` / `tx.NewMandatoryWrapper(...)` | 트랜잭션 및 symbol-call 검사 (옵트인) |
 | `types.NewNoSetter()` | setter 규칙 (값 타입의 불변성 강제) |
 
 ## 기계 친화적인 JSON 출력
