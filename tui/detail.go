@@ -186,10 +186,11 @@ func (d *DetailPanel) renderGroup(node *PkgNode) {
 }
 
 func (d *DetailPanel) writeViolations(b *strings.Builder, relPath string) {
-	viols, ok := d.violations[relPath]
-	if !ok || len(viols) == 0 {
+	stored, ok := d.violations[relPath]
+	if !ok || len(stored) == 0 {
 		return
 	}
+	viols := append([]core.Violation(nil), stored...)
 	sort.Slice(viols, func(i, j int) bool {
 		if viols[i].EffectiveSeverity != viols[j].EffectiveSeverity {
 			return viols[i].EffectiveSeverity < viols[j].EffectiveSeverity

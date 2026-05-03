@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/NamhaeSusan/go-arch-guard/analyzer"
@@ -34,6 +35,7 @@ func presetNames() string {
 	for k := range presetTable {
 		names = append(names, k)
 	}
+	sort.Strings(names)
 	return strings.Join(names, ", ")
 }
 
