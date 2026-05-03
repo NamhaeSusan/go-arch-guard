@@ -60,7 +60,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	pkgs, err := analyzer.Load(dir, "internal/...", "cmd/...")
+	arch := entry.arch()
+	pkgs, err := analyzer.Load(dir, loadPatterns(arch)...)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "warning: %v\n", err)
 	}
@@ -81,8 +82,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := tui.Run(pkgs, module, absDir, entry.arch(), entry.ruleset()); err != nil {
+	if err := tui.Run(pkgs, module, absDir, arch, entry.ruleset()); err != nil {
 		fmt.Fprintf(os.Stderr, "tui error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func loadPatterns(arch core.Architecture) []string {
+	internalRoot := strings.Trim(strings.TrimSpace(arch.Layout.InternalRoot), "/")
+	if internalRoot == "" {
+		internalRoot = "internal"
+	}
+	return []string{internalRoot + "/...", "cmd/..."}
 }
