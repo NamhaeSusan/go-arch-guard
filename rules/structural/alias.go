@@ -145,7 +145,7 @@ func (r *Alias) checkAliasTypes(aliasPath, aliasRel, aliasName string, arch core
 			v.Line = info.Line
 			violations = append(violations, v)
 		}
-		if src := analysisutil.MatchContractSublayer(arch.Layers, info.AliasFrom); src != "" {
+		if src := analysisutil.MatchContractSublayerInLayout(arch.Layers, arch.Layout, info.AliasFrom); src != "" {
 			v := violation(r.severity, aliasContractExport, aliasRel,
 				aliasName+` re-exports "`+info.Name+`" from `+src+` - suspected cross-domain dependency; use `+arch.Layout.OrchestrationDir+`/ instead`,
 				"move cross-domain coordination to "+arch.Layout.OrchestrationDir+"/handler/ or "+arch.Layout.OrchestrationDir+"/")
