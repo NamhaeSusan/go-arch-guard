@@ -9,12 +9,7 @@ import (
 )
 
 func NormalizeMatchPath(path string) string {
-	path = strings.ReplaceAll(path, `\`, `/`)
-	path = filepath.ToSlash(path)
-	for strings.HasPrefix(path, "./") {
-		path = strings.TrimPrefix(path, "./")
-	}
-	return path
+	return core.NormalizeMatchPath(path)
 }
 
 func RelPathFromRoot(projectRoot, filename string) string {
