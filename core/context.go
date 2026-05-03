@@ -1,9 +1,9 @@
 package core
 
 import (
-	"path/filepath"
 	"strings"
 
+	"github.com/NamhaeSusan/go-arch-guard/internal/pathmatch"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -128,14 +128,5 @@ func matchExcludePattern(pattern, path string) bool {
 // As a result "internal/foo", "/internal/foo", "./internal/foo",
 // "internal\\foo", and "internal/foo/" are all the same key.
 func normalizeMatchPath(path string) string {
-	path = strings.ReplaceAll(path, "\\", "/")
-	path = filepath.ToSlash(path)
-	path = strings.TrimPrefix(path, "/")
-	for strings.HasPrefix(path, "./") {
-		path = strings.TrimPrefix(path, "./")
-	}
-	if strings.HasSuffix(path, "/") && !strings.HasSuffix(path, "...") {
-		path = strings.TrimSuffix(path, "/")
-	}
-	return path
+	return pathmatch.Normalize(path)
 }

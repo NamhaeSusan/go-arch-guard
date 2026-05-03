@@ -89,9 +89,22 @@ func TestProjectRelativePackagePath(t *testing.T) {
 }
 
 func TestNormalizeMatchPath(t *testing.T) {
-	got := NormalizeMatchPath("./internal\\domain/order")
-	want := "internal/domain/order"
-	if got != want {
-		t.Fatalf("NormalizeMatchPath() = %q, want %q", got, want)
+	tests := []struct {
+		name string
+		path string
+		want string
+	}{
+		{name: "dot slash and backslash", path: "./internal\\domain/order", want: "internal/domain/order"},
+		{name: "leading slash", path: "/internal/domain/order", want: "internal/domain/order"},
+		{name: "trailing slash", path: "internal/domain/order/", want: "internal/domain/order"},
+		{name: "recursive suffix", path: "internal/domain/...", want: "internal/domain/..."},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := NormalizeMatchPath(tc.path); got != tc.want {
+				t.Fatalf("NormalizeMatchPath() = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }

@@ -5,16 +5,12 @@ import (
 	"strings"
 
 	"github.com/NamhaeSusan/go-arch-guard/core"
+	"github.com/NamhaeSusan/go-arch-guard/internal/pathmatch"
 	"golang.org/x/tools/go/packages"
 )
 
 func NormalizeMatchPath(path string) string {
-	path = strings.ReplaceAll(path, `\`, `/`)
-	path = filepath.ToSlash(path)
-	for strings.HasPrefix(path, "./") {
-		path = strings.TrimPrefix(path, "./")
-	}
-	return path
+	return pathmatch.Normalize(path)
 }
 
 func RelPathFromRoot(projectRoot, filename string) string {
