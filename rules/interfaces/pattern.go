@@ -103,21 +103,9 @@ func isExcludedInterfacePatternPkg(arch core.Architecture, pkg *packages.Package
 
 func collectExportedInterfacesFromPkg(pkg *packages.Package) map[string]*ast.InterfaceType {
 	result := make(map[string]*ast.InterfaceType)
-	for _, file := range pkg.Syntax {
-		for _, decl := range file.Decls {
-			gd, ok := decl.(*ast.GenDecl)
-			if !ok {
-				continue
-			}
-			for _, spec := range gd.Specs {
-				ts, ok := spec.(*ast.TypeSpec)
-				if !ok || !ts.Name.IsExported() {
-					continue
-				}
-				if iface, ok := ts.Type.(*ast.InterfaceType); ok {
-					result[ts.Name.Name] = iface
-				}
-			}
+	for _, ts := range collectExportedTypeSpecs(pkg) {
+		if iface, ok := ts.Type.(*ast.InterfaceType); ok {
+			result[ts.Name.Name] = iface
 		}
 	}
 	return result
@@ -197,6 +185,16 @@ func (r *Pattern) checkExportedImpl(pkg *packages.Package) []core.Violation {
 
 func collectExportedStructs(pkg *packages.Package) map[string]bool {
 	result := make(map[string]bool)
+	for _, ts := range collectExportedTypeSpecs(pkg) {
+		if _, ok := ts.Type.(*ast.StructType); ok {
+			result[ts.Name.Name] = true
+		}
+	}
+	return result
+}
+
+func collectExportedTypeSpecs(pkg *packages.Package) []*ast.TypeSpec {
+	var result []*ast.TypeSpec
 	for _, file := range pkg.Syntax {
 		for _, decl := range file.Decls {
 			gd, ok := decl.(*ast.GenDecl)
@@ -208,9 +206,7 @@ func collectExportedStructs(pkg *packages.Package) map[string]bool {
 				if !ok || !ts.Name.IsExported() {
 					continue
 				}
-				if _, ok := ts.Type.(*ast.StructType); ok {
-					result[ts.Name.Name] = true
-				}
+				result = append(result, ts)
 			}
 		}
 	}

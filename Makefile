@@ -7,7 +7,7 @@ lint: vet
 	golangci-lint run ./...
 
 fmt:
-	gofmt -l -w .
+	go list -f '{{.Dir}}' ./... | xargs -I{} find {} -maxdepth 1 -name '*.go' -print | xargs gofmt -w
 
 vet:
 	go vet ./...
