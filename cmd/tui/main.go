@@ -41,6 +41,7 @@ func presetNames() string {
 
 func main() {
 	preset := flag.String("preset", "ddd", "architecture preset: "+presetNames())
+	internalRoot := flag.String("internal-root", "", `package root to analyze, e.g. "internal", "packages", or "src"`)
 	flag.Parse()
 
 	dir := "."
@@ -61,6 +62,7 @@ func main() {
 	}
 
 	arch := entry.arch()
+	applyInternalRoot(&arch, *internalRoot)
 	pkgs, err := analyzer.Load(dir, loadPatterns(arch)...)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "warning: %v\n", err)
@@ -85,6 +87,13 @@ func main() {
 	if err := tui.Run(pkgs, module, absDir, arch, entry.ruleset()); err != nil {
 		fmt.Fprintf(os.Stderr, "tui error: %v\n", err)
 		os.Exit(1)
+	}
+}
+
+func applyInternalRoot(arch *core.Architecture, internalRoot string) {
+	internalRoot = strings.Trim(strings.TrimSpace(internalRoot), "/")
+	if internalRoot != "" {
+		arch.Layout.InternalRoot = internalRoot
 	}
 }
 
