@@ -37,7 +37,7 @@ func TestAlias(t *testing.T) {
 		root := t.TempDir()
 		writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"), `package order
 
-import "example.com/app/internal/domain/order/core/svc"
+import "github.com/example/app/internal/domain/order/core/svc"
 
 type AdminOps = svc.AdminOps
 `)
@@ -46,6 +46,40 @@ type AdminOps = svc.AdminOps
 
 		violations := runRule(t, root, structural.NewAlias())
 		assertMessageContains(t, violations, "structural.domain-alias-contract-reexport", "AdminOps")
+	})
+
+	t.Run("ignores external imports with matching layout-shaped path", func(t *testing.T) {
+		root := t.TempDir()
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "alias.go"), `package order
+
+import external "github.com/acme/lib/internal/domain/order/core/svc"
+
+type ExternalOps = external.ExternalOps
+`)
+		writeTestFile(t, filepath.Join(root, "internal", "domain", "order", "core", "model", "order.go"), "package model\n")
+
+		violations := runRule(t, root, structural.NewAlias())
+		assertNoRulePrefix(t, violations, "structural.domain-alias-contract-reexport")
+	})
+
+	t.Run("detects project contract re-export with custom layout", func(t *testing.T) {
+		root := t.TempDir()
+		writeTestFile(t, filepath.Join(root, "packages", "module", "order", "alias.go"), `package order
+
+import "github.com/example/app/packages/module/order/core/svc"
+
+type AdminOps = svc.AdminOps
+`)
+		writeTestFile(t, filepath.Join(root, "packages", "module", "order", "core", "model", "order.go"), "package model\n")
+		writeTestFile(t, filepath.Join(root, "packages", "module", "order", "core", "svc", "admin.go"), "package svc\n\ntype AdminOps interface{ Do() }\n")
+
+		arch := dddArch()
+		arch.Layout.InternalRoot = "packages"
+		arch.Layout.DomainDir = "module"
+		ctx := core.NewContext(nil, "github.com/example/app", root, arch, nil)
+
+		got := structural.NewAlias().Check(ctx)
+		assertMessageContains(t, got, "structural.domain-alias-contract-reexport", "AdminOps")
 	})
 
 	t.Run("emits meta.rule-disabled-by-config when DomainDir is empty (flat layout)", func(t *testing.T) {

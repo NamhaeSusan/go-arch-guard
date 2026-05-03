@@ -93,7 +93,7 @@ func (r *Alias) Check(ctx *core.Context) []core.Violation {
 
 		violations = append(violations, r.checkAliasPackage(aliasPath, aliasRel, aliasName, domainName)...)
 		violations = append(violations, r.checkAliasOnly(ctx, rootDir, relPath, aliasName, domainName)...)
-		violations = append(violations, r.checkAliasTypes(aliasPath, aliasRel, aliasName, arch)...)
+		violations = append(violations, r.checkAliasTypes(ctx, aliasPath, aliasRel, aliasName, arch)...)
 	}
 	return violations
 }
@@ -130,7 +130,7 @@ func (r *Alias) checkAliasOnly(ctx *core.Context, rootDir, relPath, aliasName, d
 	return violations
 }
 
-func (r *Alias) checkAliasTypes(aliasPath, aliasRel, aliasName string, arch core.Architecture) []core.Violation {
+func (r *Alias) checkAliasTypes(ctx *core.Context, aliasPath, aliasRel, aliasName string, arch core.Architecture) []core.Violation {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, aliasPath, nil, 0)
 	if err != nil {
@@ -145,7 +145,7 @@ func (r *Alias) checkAliasTypes(aliasPath, aliasRel, aliasName string, arch core
 			v.Line = info.Line
 			violations = append(violations, v)
 		}
-		if src := analysisutil.MatchContractSublayer(arch.Layers, info.AliasFrom); src != "" {
+		if src := projectContractSublayer(ctx.Module(), arch, info.AliasFrom); src != "" {
 			v := violation(r.severity, aliasContractExport, aliasRel,
 				aliasName+` re-exports "`+info.Name+`" from `+src+` - suspected cross-domain dependency; use `+arch.Layout.OrchestrationDir+`/ instead`,
 				"move cross-domain coordination to "+arch.Layout.OrchestrationDir+"/handler/ or "+arch.Layout.OrchestrationDir+"/")
@@ -154,6 +154,17 @@ func (r *Alias) checkAliasTypes(aliasPath, aliasRel, aliasName string, arch core
 		}
 	}
 	return violations
+}
+
+func projectContractSublayer(module string, arch core.Architecture, importPath string) string {
+	if module == "" || importPath == "" {
+		return ""
+	}
+	prefix := strings.TrimSuffix(module, "/") + "/" + arch.Layout.InternalRoot + "/"
+	if !strings.HasPrefix(importPath, prefix) {
+		return ""
+	}
+	return analysisutil.MatchContractSublayerInLayout(arch.Layers, arch.Layout, importPath)
 }
 
 func withSeverity(spec core.RuleSpec, severity core.Severity) core.RuleSpec {
