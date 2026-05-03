@@ -9,7 +9,11 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-// Load parses Go packages matching the given patterns under dir.
+// Load parses Go packages matching the given patterns under dir. Relative
+// directory patterns such as "internal/..." are resolved under dir, patterns
+// beginning with "./" are passed through, module-path patterns such as
+// "github.com/acme/project/..." are passed through, and absolute filesystem
+// patterns are passed through unchanged.
 // When some packages contain errors (e.g. type-check failures), they are
 // skipped and the successfully loaded packages are returned alongside a
 // non-nil error describing what was skipped. Callers that want partial
@@ -38,6 +42,8 @@ func Load(dir string, patterns ...string) ([]*packages.Package, error) {
 	for i, p := range patterns {
 		switch {
 		case strings.HasPrefix(p, "./"):
+			prefixed[i] = p
+		case filepath.IsAbs(p):
 			prefixed[i] = p
 		case looksLikeModulePath(p):
 			prefixed[i] = p

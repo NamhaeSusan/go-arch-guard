@@ -1,6 +1,7 @@
 package analyzer_test
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -133,6 +134,26 @@ func TestLoad(t *testing.T) {
 			// be from pattern handling, not classification
 			if strings.Contains(err.Error(), "./github.com/") {
 				t.Fatalf("loader double-prefixed an absolute module pattern: %v", err)
+			}
+		}
+	})
+
+	t.Run("absolute filesystem patterns are passed through unchanged", func(t *testing.T) {
+		root, err := filepath.Abs("../testdata/load_type_error")
+		if err != nil {
+			t.Fatal(err)
+		}
+		pattern := filepath.Join(root, "internal", "...")
+		pkgs, err := analyzer.Load(root, pattern)
+		if err != nil {
+			t.Fatalf("expected absolute filesystem pattern to load, got %v", err)
+		}
+		if len(pkgs) == 0 {
+			t.Fatal("expected packages to be loaded from absolute filesystem pattern")
+		}
+		for _, pkg := range pkgs {
+			if !strings.HasPrefix(pkg.PkgPath, "github.com/kimtaeyun/testproject-load-type-error/internal/") {
+				t.Fatalf("loaded unexpected package %q from absolute filesystem pattern", pkg.PkgPath)
 			}
 		}
 	})
