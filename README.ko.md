@@ -66,7 +66,7 @@ violations := core.Run(ctx, presets.RecommendedDDD())
 report.AssertNoViolations(t, violations)
 ```
 
-`module`과 `root`에 빈 문자열을 넘기면 로드된 패키지에서 자동 추출합니다. 모듈을 확인할 수 없으면 `meta.no-matching-packages` Warning을 냅니다. rule이 panic을 내면 `core.Run`은 `meta.rule-panic` Error violation을 내고 나머지 rule 실행을 계속합니다.
+`module`과 `root`에 빈 문자열을 넘기면 `core.NewContext`가 로드된 패키지의 module metadata에서 두 값을 자동 추출합니다. 패키지 metadata가 없으면 추측하지 않고 빈 값으로 남기며, layout-dependent rule은 프로젝트 root를 임의로 추정하는 대신 `meta.layout-not-supported`를 낼 수 있습니다. rule이 panic을 내면 `core.Run`은 `meta.rule-panic` Error violation을 내고 나머지 rule 실행을 계속합니다.
 
 다른 프리셋은 `presets.Hexagonal()`과 `presets.RecommendedHexagonal()`처럼
 아키텍처와 권장 ruleset을 같은 프리셋으로 맞춰 사용합니다.
@@ -135,7 +135,7 @@ if err := arch.Validate(); err != nil {
 go test -run TestArchitecture -v
 ```
 
-`module`과 `root`에 빈 문자열을 전달하면 로드된 패키지에서 자동 추출합니다.
+`module`과 `root`에 빈 문자열을 전달하면 로드된 패키지의 module metadata에서 추출합니다. metadata가 없으면 값을 추측하지 않고 빈 값으로 남기며, layout-dependent rule은 `meta.layout-not-supported`를 낼 수 있습니다.
 
 ## 프리셋
 
@@ -190,7 +190,7 @@ arch := core.Architecture{
 |------|------|
 | `LayerModel.Sublayers` | authoritative 서브레이어 경로 목록 (`"core/repo"`); direction/port/contract 룰의 권위 |
 | `LayerModel.Direction` | 허용 import 방향 매트릭스 (key는 `Sublayers`에 있어야 함) |
-| `LayerModel.PortLayers` | repo/gateway 같은 순수 인터페이스 레이어 (`Sublayers`에 있어야 함) |
+| `LayerModel.PortLayers` | repo, gateway, Hexagonal port 같은 순수 인터페이스 레이어 (`Sublayers`에 있어야 함; `port`는 명시적으로 listed되지 않으면 추론하지 않음) |
 | `LayerModel.ContractLayers` | 계약 레이어; `PortLayers`의 superset이어야 함 |
 | `LayerModel.PkgRestricted` | 공유 패키지 import 금지 서브레이어 |
 | `LayerModel.InternalTopLevel` | 패키지 루트 아래 허용 최상위 디렉토리 |
@@ -489,19 +489,21 @@ order_service.go  올바름
 
 ### `structural.repo-file-interface-missing`
 
-`repo/` (또는 `core/repo/`) 파일은 파일명과 일치하는 인터페이스를 포함해야 합니다.
+설정된 port layer(`core/repo/`, `gateway/`, Hexagonal `port/` 등)의 파일은
+파일명에 대응하는 인터페이스를 포함해야 합니다.
 
 ```go
-// repo/order.go는 다음을 정의해야:
-type Order interface { ... }  // 파일명과 일치
+// port layer의 order.go는 다음 인터페이스를 정의해야 함:
+type Order interface { ... } // 파일명과 일치
 ```
 
 ### `structural.repo-file-extra-interface`
 
-`repo/` 파일에는 인터페이스가 정확히 1개만 있어야 합니다. 추가 인터페이스는 별도 파일로 분리하세요.
+설정된 port layer의 각 파일에는 인터페이스가 정확히 1개만 있어야 합니다.
+추가 인터페이스는 별도 파일로 분리하세요.
 
 ```go
-// repo/review.go
+// core/repo/review.go 또는 port/review.go
 type Review interface { Find() }   // 올바름
 type Helper interface { Assist() } // 위반: helper.go로 이동
 ```
@@ -544,14 +546,16 @@ order_service.go  "_service" 접미사 불필요
 order.go          올바름
 ```
 
-### `structural.interface-placement` (DDD만)
+### `structural.interface-placement`
 
-Repository 포트 인터페이스(기본값: 이름이 `Repository` 또는 `Repo`로
-끝나는 것)는 `core/repo/`에만 정의해야 합니다. Consumer-defined
-interface(사용처에서 작은 인터페이스를 선언하는 Go 관례)는 `handler/`,
-`app/`, `svc/` 등 사용처 어디든 허용됩니다.
+Repository-port 인터페이스(기본값: 이름이 `Repository` 또는 `Repo`로
+끝나는 것)는 아키텍처가 설정한 port layer(DDD는 `core/repo/`, Clean
+Architecture는 `gateway/`, Hexagonal은 `port/`)에 정의해야 하며, 다른
+레이어에 흩어져 있으면 안 됩니다. Consumer-defined interface(사용처에서
+작은 인터페이스를 선언하는 Go 관례)는 `handler/`, `app/`, `usecase/`,
+`svc/` 등 사용처 어디든 허용됩니다.
 
-`type X = otherdomain.Repo` 처럼 다른 도메인의 repository 인터페이스를
+`type X = otherdomain.Repo`처럼 port layer의 repository 인터페이스를
 재노출하는 alias도 함께 감지합니다 — 이런 cross-domain 경계 코드는
 `orchestration/`에 두어야 합니다.
 

@@ -26,6 +26,11 @@ ctx := core.NewContext(pkgs, "", "", arch, nil)
 violations := core.Run(ctx, presets.RecommendedDDD())
 ```
 
+When `module` and `root` are empty, `core.NewContext` derives them from the
+loaded packages' module metadata (`packages.Package.Module.Path` and `Dir`).
+Explicit non-empty arguments always win. If metadata is unavailable, context
+keeps the empty value instead of guessing from import or file paths.
+
 ## LayerModel
 
 `LayerModel` owns the layer vocabulary. `Sublayers` is the single source of
@@ -35,7 +40,7 @@ truth: every field that names a layer must refer to a value in `Sublayers`.
 |-------|---------|
 | `Sublayers` | Authoritative list of layer names. Domain presets classify paths under each domain using this list; flat presets classify top-level `internal/` directories. |
 | `Direction` | Allowed import matrix. Every sublayer must have a key, even if the allowed target list is empty. |
-| `PortLayers` | Pure interface layers such as `core/repo`, `gateway`, or `port`. |
+| `PortLayers` | Pure interface layers such as `core/repo`, `gateway`, or explicitly configured `port`. The basename `port` is not inferred unless listed here. |
 | `ContractLayers` | Layers that expose contracts. Must include every entry in `PortLayers`. |
 | `PkgRestricted` | Layers that must not import the shared package tree. |
 | `InternalTopLevel` | Top-level directories allowed under `internal/`. Structure rules use this to catch accidental directories. |

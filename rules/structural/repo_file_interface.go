@@ -2,7 +2,6 @@ package structural
 
 import (
 	"go/ast"
-	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -65,8 +64,8 @@ func (r *RepoFileInterface) Check(ctx *core.Context) []core.Violation {
 	}
 	var violations []core.Violation
 	for _, pkg := range ctx.Pkgs() {
-		if analysisutil.MatchPortSublayer(layers, pkg.PkgPath) != "" {
-			violations = append(violations, r.checkPortPackage(ctx, pkg)...)
+		if portLayer := analysisutil.MatchPortSublayer(layers, pkg.PkgPath); portLayer != "" {
+			violations = append(violations, r.checkPortPackage(ctx, pkg, portLayer)...)
 			continue
 		}
 		violations = append(violations, r.checkInterfacePlacement(ctx, pkg)...)
@@ -74,8 +73,9 @@ func (r *RepoFileInterface) Check(ctx *core.Context) []core.Violation {
 	return violations
 }
 
-func (r *RepoFileInterface) checkPortPackage(ctx *core.Context, pkg *packages.Package) []core.Violation {
+func (r *RepoFileInterface) checkPortPackage(ctx *core.Context, pkg *packages.Package, portLayer string) []core.Violation {
 	var violations []core.Violation
+	portDisplay := layerDisplay(portLayer)
 	for _, file := range pkg.Syntax {
 		filename := pkg.Fset.Position(file.Pos()).Filename
 		base := filepath.Base(filename)
@@ -93,7 +93,7 @@ func (r *RepoFileInterface) checkPortPackage(ctx *core.Context, pkg *packages.Pa
 				relPath,
 				0,
 				"structural.repo-file-interface-missing",
-				`file "`+base+`" in repo/ must contain interface "`+expected+`"`,
+				`file "`+base+`" in `+portDisplay+`/ must contain interface "`+expected+`"`,
 				`add "type `+expected+` interface { ... }" or rename the file`,
 			))
 		}
@@ -111,7 +111,7 @@ func (r *RepoFileInterface) checkPortPackage(ctx *core.Context, pkg *packages.Pa
 			relPath,
 			0,
 			"structural.repo-file-extra-interface",
-			`file "`+base+`" in repo/ must define only "`+expected+`", found extra: `+strings.Join(extra, ", "),
+			`file "`+base+`" in `+portDisplay+`/ must define only "`+expected+`", found extra: `+strings.Join(extra, ", "),
 			"move each extra interface to its own file (e.g. "+analysisutil.PascalToSnake(extra[0])+".go)",
 		))
 	}
@@ -120,10 +120,13 @@ func (r *RepoFileInterface) checkPortPackage(ctx *core.Context, pkg *packages.Pa
 
 func (r *RepoFileInterface) checkInterfacePlacement(ctx *core.Context, pkg *packages.Package) []core.Violation {
 	arch := ctx.Arch()
-	if !arch.Structure.RequireAlias || !isDomainPackage(arch, pkg.PkgPath) {
+	sublayer, ok := domainSublayerForPackage(ctx.Module(), arch, pkg.PkgPath)
+	if !ok || analysisutil.IsPortSublayer(arch.Layers, sublayer) {
 		return nil
 	}
 	repoName := analysisutil.PortSublayerName(arch.Layers)
+	repoDisplay := layerDisplay(repoName)
+	currentDisplay := layerDisplay(sublayer)
 	var violations []core.Violation
 	for _, file := range pkg.Syntax {
 		filePath := analysisutil.RelativePathForPackage(pkg, pkg.Fset.Position(file.Pos()).Filename)
@@ -136,16 +139,16 @@ func (r *RepoFileInterface) checkInterfacePlacement(ctx *core.Context, pkg *pack
 					filePath,
 					info.Line,
 					"structural.interface-placement",
-					`interface "`+info.Name+`" matches repository-port naming and must be defined in `+repoName+`/, not in `+path.Base(path.Dir(pkg.PkgPath))+`/`,
-					"move to "+repoName+"/, or rename if it's a consumer-defined interface",
+					`interface "`+info.Name+`" matches repository-port naming and must be defined in `+repoDisplay+`/, not in `+currentDisplay+`/`,
+					"move to "+repoDisplay+"/, or rename if it's a consumer-defined interface",
 				))
 			}
-			if info.AliasFrom != "" && analysisutil.MatchPortSublayer(arch.Layers, info.AliasFrom) != "" {
+			if info.AliasFrom != "" && isPortPackage(ctx.Module(), arch, info.AliasFrom) {
 				violations = append(violations, r.violation(
 					filePath,
 					info.Line,
 					"structural.interface-placement",
-					`type alias "`+info.Name+`" re-exports interface from `+repoName+` - suspected cross-domain dependency; use `+arch.Layout.OrchestrationDir+`/ instead`,
+					`type alias "`+info.Name+`" re-exports interface from `+repoDisplay+`/ - repository-port contracts must stay in `+repoDisplay+`/`,
 					"remove alias and move cross-domain coordination to "+arch.Layout.OrchestrationDir+"/",
 				))
 			}
@@ -186,8 +189,50 @@ func collectInterfacesFromFile(file *ast.File) map[string]*ast.InterfaceType {
 	return result
 }
 
-func isDomainPackage(arch core.Architecture, pkgPath string) bool {
-	return arch.Layout.DomainDir != "" && strings.Contains(pkgPath, "/"+arch.Layout.InternalRoot+"/"+arch.Layout.DomainDir+"/")
+func isPortPackage(module string, arch core.Architecture, pkgPath string) bool {
+	sublayer, ok := domainSublayerForPackage(module, arch, pkgPath)
+	return ok && analysisutil.IsPortSublayer(arch.Layers, sublayer)
+}
+
+func domainSublayerForPackage(module string, arch core.Architecture, pkgPath string) (string, bool) {
+	module = strings.TrimSuffix(module, "/")
+	if module == "" || arch.Layout.InternalRoot == "" || arch.Layout.DomainDir == "" {
+		return "", false
+	}
+	internalPrefix := module + "/" + arch.Layout.InternalRoot + "/"
+	rel, ok := strings.CutPrefix(pkgPath, internalPrefix)
+	if !ok {
+		return "", false
+	}
+	domainPrefix := arch.Layout.DomainDir + "/"
+	domainRel, ok := strings.CutPrefix(rel, domainPrefix)
+	if !ok {
+		return "", false
+	}
+	_, layerRel, ok := strings.Cut(domainRel, "/")
+	if !ok || layerRel == "" {
+		return "", false
+	}
+	if sublayer, ok := knownSublayerForRel(arch.Layers.Sublayers, layerRel); ok {
+		return sublayer, true
+	}
+	return "", false
+}
+
+func knownSublayerForRel(sublayers []string, layerRel string) (string, bool) {
+	var best string
+	for _, sublayer := range sublayers {
+		if layerRel == sublayer || strings.HasPrefix(layerRel, sublayer+"/") {
+			if len(sublayer) > len(best) {
+				best = sublayer
+			}
+		}
+	}
+	return best, best != ""
+}
+
+func layerDisplay(sublayer string) string {
+	return strings.TrimSuffix(sublayer, "/")
 }
 
 var _ core.Rule = (*RepoFileInterface)(nil)

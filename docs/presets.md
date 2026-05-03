@@ -124,6 +124,15 @@ Hexagonal direction:
 | `domain` | nothing |
 | `adapter` | `port`, `domain` |
 
+`port` is explicitly configured as both `PortLayers` and `ContractLayers` for
+Hexagonal presets. This keeps repository-port interface checks active for
+`presets.RecommendedHexagonal()` while leaving `Structure.RequireAlias` false:
+Hexagonal projects do not have to expose domain-root `alias.go` packages.
+Repository-like interfaces (`*Repository`, `*Repo`, or custom suffixes) belong
+in `internal/domain/<domain>/port/`; consumer-defined interfaces in `usecase/`
+or adapter packages are not treated as repository ports unless their names
+match that configured vocabulary.
+
 ## Modular Monolith Layout
 
 ```text
