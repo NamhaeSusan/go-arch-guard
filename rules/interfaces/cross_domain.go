@@ -3,6 +3,7 @@ package interfaces
 import (
 	"fmt"
 	"go/ast"
+	"go/token"
 	"sort"
 	"strings"
 
@@ -64,27 +65,19 @@ func (r *CrossDomainAnonymous) checkPackage(pkg *packages.Package, arch core.Arc
 		if analysisutil.IsTestFile(file, pkg.Fset) {
 			continue
 		}
-		for _, decl := range file.Decls {
-			switch d := decl.(type) {
-			case *ast.GenDecl:
-				for _, spec := range d.Specs {
-					ts, ok := spec.(*ast.TypeSpec)
-					if !ok {
-						continue
-					}
-					if _, isIface := ts.Type.(*ast.InterfaceType); isIface {
-						continue
-					}
-					violations = append(violations, r.inspectExpr(ts.Type, file, pkg, currentDomain, arch)...)
-				}
-			case *ast.FuncDecl:
-				if d.Type == nil {
-					continue
-				}
-				violations = append(violations, r.inspectFieldList(d.Type.Params, file, pkg, currentDomain, arch)...)
-				violations = append(violations, r.inspectFieldList(d.Type.Results, file, pkg, currentDomain, arch)...)
+		analysisutil.WalkTypeSpecs(file, pkg.Fset, func(ts *ast.TypeSpec, _ token.Position) {
+			if _, isIface := ts.Type.(*ast.InterfaceType); isIface {
+				return
 			}
-		}
+			violations = append(violations, r.inspectExpr(ts.Type, file, pkg, currentDomain, arch)...)
+		})
+		analysisutil.WalkFuncDecls(file, func(fd *ast.FuncDecl) {
+			if fd.Type == nil {
+				return
+			}
+			violations = append(violations, r.inspectFieldList(fd.Type.Params, file, pkg, currentDomain, arch)...)
+			violations = append(violations, r.inspectFieldList(fd.Type.Results, file, pkg, currentDomain, arch)...)
+		})
 	}
 	return violations
 }

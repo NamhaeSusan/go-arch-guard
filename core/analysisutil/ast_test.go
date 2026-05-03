@@ -6,6 +6,7 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
+	"strings"
 	"testing"
 )
 
@@ -135,6 +136,38 @@ func Process(items []Item, err error) (*Item, error) { return nil, nil }
 		if got[i] != want[i] {
 			t.Fatalf("WalkFuncSignatureTypes()[%d] = %q, want %q", i, got[i], want[i])
 		}
+	}
+}
+
+func TestWalkTypeSpecsAndFuncDecls(t *testing.T) {
+	src := `package p
+
+type A struct{}
+type B = A
+func one() {}
+var ignored = 1
+func two() {}
+`
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "sample.go", src, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var types []string
+	WalkTypeSpecs(file, fset, func(ts *ast.TypeSpec, _ token.Position) {
+		types = append(types, ts.Name.Name)
+	})
+	if got, want := strings.Join(types, ","), "A,B"; got != want {
+		t.Fatalf("WalkTypeSpecs() = %q, want %q", got, want)
+	}
+
+	var funcs []string
+	WalkFuncDecls(file, func(fd *ast.FuncDecl) {
+		funcs = append(funcs, fd.Name.Name)
+	})
+	if got, want := strings.Join(funcs, ","), "one,two"; got != want {
+		t.Fatalf("WalkFuncDecls() = %q, want %q", got, want)
 	}
 }
 

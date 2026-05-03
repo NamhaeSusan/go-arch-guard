@@ -2,6 +2,7 @@ package naming
 
 import (
 	"go/ast"
+	"go/token"
 	"strings"
 
 	"github.com/NamhaeSusan/go-arch-guard/core"
@@ -33,28 +34,20 @@ func (r *ImplSuffix) Check(ctx *core.Context) []core.Violation {
 			if ctx.IsExcluded(filePath) {
 				continue
 			}
-			for _, decl := range file.Decls {
-				gd, ok := decl.(*ast.GenDecl)
-				if !ok {
-					continue
+			analysisutil.WalkTypeSpecs(file, pkg.Fset, func(ts *ast.TypeSpec, pos token.Position) {
+				if !ts.Name.IsExported() || !strings.HasSuffix(ts.Name.Name, "Impl") {
+					return
 				}
-				for _, spec := range gd.Specs {
-					ts, ok := spec.(*ast.TypeSpec)
-					if !ok || !ts.Name.IsExported() || !strings.HasSuffix(ts.Name.Name, "Impl") {
-						continue
-					}
-					pos := pkg.Fset.Position(ts.Name.Pos())
-					violations = append(violations, core.Violation{
-						File:              analysisutil.RelativePathForPackage(pkg, pos.Filename),
-						Line:              pos.Line,
-						Rule:              "naming.no-impl-suffix",
-						Message:           `type "` + ts.Name.Name + `" uses banned suffix "Impl"`,
-						Fix:               "rename without Impl suffix",
-						DefaultSeverity:   r.severity,
-						EffectiveSeverity: r.severity,
-					})
-				}
-			}
+				violations = append(violations, core.Violation{
+					File:              analysisutil.RelativePathForPackage(pkg, pos.Filename),
+					Line:              pos.Line,
+					Rule:              "naming.no-impl-suffix",
+					Message:           `type "` + ts.Name.Name + `" uses banned suffix "Impl"`,
+					Fix:               "rename without Impl suffix",
+					DefaultSeverity:   r.severity,
+					EffectiveSeverity: r.severity,
+				})
+			})
 		}
 	}
 	return violations

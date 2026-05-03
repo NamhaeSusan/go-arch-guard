@@ -3,6 +3,7 @@ package naming
 import (
 	"fmt"
 	"go/ast"
+	"go/token"
 	"path/filepath"
 	"strings"
 
@@ -120,37 +121,27 @@ func (r *TypePattern) checkPackage(ctx *core.Context, pkg *packages.Package, pat
 }
 
 func hasTypePatternExportedType(file *ast.File, name string) bool {
-	for _, decl := range file.Decls {
-		gd, ok := decl.(*ast.GenDecl)
-		if !ok {
-			continue
+	found := false
+	analysisutil.WalkTypeSpecs(file, nil, func(ts *ast.TypeSpec, _ token.Position) {
+		if ts.Name.Name == name && ts.Name.IsExported() {
+			found = true
 		}
-		for _, spec := range gd.Specs {
-			ts, ok := spec.(*ast.TypeSpec)
-			if !ok {
-				continue
-			}
-			if ts.Name.Name == name && ts.Name.IsExported() {
-				return true
-			}
-		}
-	}
-	return false
+	})
+	return found
 }
 
 func collectTypePatternMethods(pkg *packages.Package) map[string]bool {
 	result := make(map[string]bool)
 	for _, file := range pkg.Syntax {
-		for _, decl := range file.Decls {
-			fd, ok := decl.(*ast.FuncDecl)
-			if !ok || fd.Recv == nil || len(fd.Recv.List) == 0 {
-				continue
+		analysisutil.WalkFuncDecls(file, func(fd *ast.FuncDecl) {
+			if fd.Recv == nil || len(fd.Recv.List) == 0 {
+				return
 			}
 			typeName := analysisutil.ReceiverTypeName(fd.Recv.List[0].Type)
 			if typeName != "" {
 				result[typeName+"."+fd.Name.Name] = true
 			}
-		}
+		})
 	}
 	return result
 }

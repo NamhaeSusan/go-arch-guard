@@ -172,21 +172,14 @@ func collectNonTestInterfaces(pkg *packages.Package) map[string]token.Position {
 		if analysisutil.IsTestFile(file, pkg.Fset) {
 			continue
 		}
-		for _, decl := range file.Decls {
-			gd, ok := decl.(*ast.GenDecl)
-			if !ok {
-				continue
+		analysisutil.WalkTypeSpecs(file, pkg.Fset, func(ts *ast.TypeSpec, pos token.Position) {
+			if ts.Assign != 0 {
+				return
 			}
-			for _, spec := range gd.Specs {
-				ts, ok := spec.(*ast.TypeSpec)
-				if !ok || ts.Assign != 0 {
-					continue
-				}
-				if _, ok := ts.Type.(*ast.InterfaceType); ok {
-					result[ts.Name.Name] = pkg.Fset.Position(ts.Name.Pos())
-				}
+			if _, ok := ts.Type.(*ast.InterfaceType); ok {
+				result[ts.Name.Name] = pos
 			}
-		}
+		})
 	}
 	return result
 }
