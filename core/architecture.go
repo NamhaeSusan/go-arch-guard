@@ -54,6 +54,11 @@ type LayerModel struct {
 	// directory placement rules. Keys are basenames, NOT full Sublayer
 	// paths.
 	LayerDirNames map[string]bool
+	// LayerLocations maps a layer basename to allowed project-relative path
+	// templates for structural placement checks. Templates may use layout
+	// placeholders such as {InternalRoot}, {DomainDir}, {AppDir},
+	// {ServerDir}, and glob segments "*" or "**".
+	LayerLocations map[string][]string
 }
 
 // LayoutModel describes the package-root directory topology. Empty fields
@@ -115,6 +120,7 @@ func cloneArchitecture(a Architecture) Architecture {
 			PkgRestricted:    cloneBoolMap(a.Layers.PkgRestricted),
 			InternalTopLevel: cloneBoolMap(a.Layers.InternalTopLevel),
 			LayerDirNames:    cloneBoolMap(a.Layers.LayerDirNames),
+			LayerLocations:   cloneStringSliceMap(a.Layers.LayerLocations),
 		},
 		Layout: a.Layout, // value type with only string fields
 		Naming: NamingPolicy{

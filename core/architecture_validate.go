@@ -103,6 +103,19 @@ func (a Architecture) Validate() error {
 			errs = append(errs, "LayerDirNames contains empty-string key")
 		}
 	}
+	for k, locations := range a.Layers.LayerLocations {
+		if k == "" {
+			errs = append(errs, "LayerLocations contains empty-string key")
+		}
+		if len(locations) == 0 {
+			errs = append(errs, fmt.Sprintf("LayerLocations[%q] has no locations", k))
+		}
+		for _, location := range locations {
+			if strings.TrimSpace(location) == "" {
+				errs = append(errs, fmt.Sprintf("LayerLocations[%q] contains empty location", k))
+			}
+		}
+	}
 	// InternalTopLevel keys are top-level dir names; they don't have to map
 	// to Sublayers either, but empty keys are always a typo.
 	for k := range a.Layers.InternalTopLevel {

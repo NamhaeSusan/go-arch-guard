@@ -14,8 +14,9 @@ const (
 )
 
 // LayerPlacement flags layer-named directories that appear outside their
-// allowed slice. It enforces a fixed vocabulary of three layer names —
-// "app", "infra", "handler" — each with its own ad-hoc placement logic:
+// allowed slice. LayerModel.LayerLocations can define custom placement
+// templates for any layer basename. When no explicit template exists for a
+// name, the rule keeps its legacy fallback vocabulary:
 //
 //   - "app": allowed at internal/<Layout.AppDir> or per-domain
 //     internal/<DomainDir>/<X>/app/
@@ -27,12 +28,8 @@ const (
 //     internal/<DomainDir>/<X>/handler/.
 //
 // LayerDirNames can narrow the active set (only names present in the map
-// are checked) but cannot add new names — directory names other than the
-// three above silently pass. Teams using a different vocabulary
-// (e.g. "controller", "usecase", "port") get no protection from this rule.
-//
-// Generalizing to fully data-driven placement (LayerLocations on
-// LayerModel) is tracked in issue #104.
+// are checked). LayerLocations adds protection for additional names such as
+// "controller", "usecase", or "port" without changing the legacy fallback.
 type LayerPlacement struct {
 	severity core.Severity
 }
@@ -97,6 +94,9 @@ func isMisplacedLayerDir(arch core.Architecture, rel, name string) bool {
 	if len(arch.Layers.LayerDirNames) > 0 && !arch.Layers.LayerDirNames[name] {
 		return false
 	}
+	if locations, ok := arch.Layers.LayerLocations[name]; ok {
+		return !matchesAnyLayerLocation(arch, rel, locations)
+	}
 	switch name {
 	case "app", "infra":
 		if name == "app" && arch.Layout.AppDir != "" && rel == filepath.ToSlash(filepath.Join(arch.Layout.InternalRoot, arch.Layout.AppDir)) {
@@ -115,6 +115,47 @@ func isMisplacedLayerDir(arch core.Architecture, rel, name string) bool {
 	default:
 		return false
 	}
+}
+
+func matchesAnyLayerLocation(arch core.Architecture, rel string, locations []string) bool {
+	for _, location := range locations {
+		if matchLayerLocation(arch, rel, location) {
+			return true
+		}
+	}
+	return false
+}
+
+func matchLayerLocation(arch core.Architecture, rel, location string) bool {
+	location = strings.Trim(strings.TrimSpace(location), "/")
+	location = strings.NewReplacer(
+		"{InternalRoot}", arch.Layout.InternalRoot,
+		"{DomainDir}", arch.Layout.DomainDir,
+		"{OrchestrationDir}", arch.Layout.OrchestrationDir,
+		"{SharedDir}", arch.Layout.SharedDir,
+		"{AppDir}", arch.Layout.AppDir,
+		"{ServerDir}", arch.Layout.ServerDir,
+	).Replace(location)
+	patternParts := strings.Split(filepath.ToSlash(location), "/")
+	relParts := strings.Split(strings.Trim(filepath.ToSlash(rel), "/"), "/")
+	return matchLayerLocationParts(patternParts, relParts)
+}
+
+func matchLayerLocationParts(pattern, rel []string) bool {
+	if len(pattern) == 0 {
+		return len(rel) == 0
+	}
+	if pattern[0] == "**" {
+		return len(pattern) == 1 || matchLayerLocationParts(pattern[1:], rel) ||
+			(len(rel) > 0 && matchLayerLocationParts(pattern, rel[1:]))
+	}
+	if len(rel) == 0 {
+		return false
+	}
+	if pattern[0] == "*" {
+		return rel[0] != "" && matchLayerLocationParts(pattern[1:], rel[1:])
+	}
+	return pattern[0] == rel[0] && matchLayerLocationParts(pattern[1:], rel[1:])
 }
 
 func matchesDomainLayer(arch core.Architecture, rel, name string) bool {

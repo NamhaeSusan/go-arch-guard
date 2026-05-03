@@ -45,6 +45,7 @@ truth: every field that names a layer must refer to a value in `Sublayers`.
 | `PkgRestricted` | Layers that must not import the shared package tree. |
 | `InternalTopLevel` | Top-level directories allowed under `internal/`. Structure rules use this to catch accidental directories. |
 | `LayerDirNames` | Basename hints used by placement rules to identify layer-like directories. |
+| `LayerLocations` | Optional basename → allowed path templates for layer placement. Templates support layout placeholders such as `{InternalRoot}` and glob segments `*` / `**`. |
 
 Example:
 
@@ -65,6 +66,11 @@ layers := core.LayerModel{
     },
     LayerDirNames: map[string]bool{
         "api": true, "logic": true, "data": true,
+    },
+    LayerLocations: map[string][]string{
+        "api":   {"{InternalRoot}/{DomainDir}/*/api"},
+        "logic": {"{InternalRoot}/{DomainDir}/*/logic"},
+        "data":  {"{InternalRoot}/{DomainDir}/*/data"},
     },
 }
 ```

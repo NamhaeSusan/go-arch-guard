@@ -54,6 +54,25 @@ func TestValidateRejectsEmptyLayerDirNamesKey(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsMalformedLayerLocations(t *testing.T) {
+	a := validArchitecture()
+	a.Layers.LayerLocations = map[string][]string{
+		"":           {"{InternalRoot}/{DomainDir}/*/adapter"},
+		"controller": {""},
+		"adapter":    nil,
+	}
+	err := a.Validate()
+	if err == nil {
+		t.Fatal("expected malformed LayerLocations to be rejected")
+	}
+	msg := err.Error()
+	for _, want := range []string{"LayerLocations contains empty-string key", "LayerLocations[\"controller\"] contains empty location", "LayerLocations[\"adapter\"] has no locations"} {
+		if !strings.Contains(msg, want) {
+			t.Fatalf("expected %q in %q", want, msg)
+		}
+	}
+}
+
 func TestValidateRejectsEmptyInternalTopLevelKey(t *testing.T) {
 	a := validArchitecture()
 	a.Layers.InternalTopLevel = map[string]bool{"": true}

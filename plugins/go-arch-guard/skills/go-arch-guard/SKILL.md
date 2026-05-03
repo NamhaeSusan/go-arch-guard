@@ -286,8 +286,8 @@ arch := core.Architecture{
 ```
 
 전체 필드: `LayerModel.Sublayers`, `LayerModel.Direction`, `LayerModel.PkgRestricted`,
-`LayerModel.InternalTopLevel`, `LayerModel.LayerDirNames`, `LayerModel.PortLayers`,
-`LayerModel.ContractLayers`, `LayoutModel.InternalRoot` (default `"internal"`,
+`LayerModel.InternalTopLevel`, `LayerModel.LayerDirNames`, `LayerModel.LayerLocations`,
+`LayerModel.PortLayers`, `LayerModel.ContractLayers`, `LayoutModel.InternalRoot` (default `"internal"`,
 `"packages"`/`"src"` 등 비표준 패키지 루트 지원), `LayoutModel.DomainDir`,
 `LayoutModel.OrchestrationDir`, `LayoutModel.SharedDir`, `LayoutModel.AppDir`,
 `LayoutModel.ServerDir`, `NamingPolicy.BannedPkgNames`, `NamingPolicy.LegacyPkgNames`,

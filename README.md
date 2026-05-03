@@ -212,6 +212,7 @@ Architecture fields:
 | `LayerModel.PkgRestricted` | sublayers that must not import shared packages |
 | `LayerModel.InternalTopLevel` | allowed top-level directories under the package root |
 | `LayerModel.LayerDirNames` | layer **basenames** (`"repo"`) recognized by file/directory placement rules; intentionally NOT required to appear in `Sublayers` |
+| `LayerModel.LayerLocations` | optional basename → allowed path templates for `structural.layer-placement`; supports `{InternalRoot}`, `{DomainDir}`, `{AppDir}`, `{ServerDir}`, `*`, and `**` |
 | `LayoutModel.InternalRoot` | project-relative package-root directory; defaults to `"internal"` when empty (set to `"packages"`, `"src"`, etc. for non-default layouts) |
 | `LayoutModel.DomainDir` | top-level directory name for domains; empty for flat layouts |
 | `LayoutModel.OrchestrationDir` | top-level directory name for orchestration |

@@ -195,6 +195,7 @@ arch := core.Architecture{
 | `LayerModel.PkgRestricted` | 공유 패키지 import 금지 서브레이어 |
 | `LayerModel.InternalTopLevel` | 패키지 루트 아래 허용 최상위 디렉토리 |
 | `LayerModel.LayerDirNames` | 파일/디렉토리 배치 룰이 인식하는 레이어 **basename** (`"repo"`); 의도적으로 `Sublayers`에 있을 필요 없음 |
+| `LayerModel.LayerLocations` | `structural.layer-placement`용 basename → 허용 경로 템플릿; `{InternalRoot}`, `{DomainDir}`, `{AppDir}`, `{ServerDir}`, `*`, `**` 지원 |
 | `LayoutModel.InternalRoot` | 프로젝트 상대 패키지 루트 디렉토리; 빈 값은 `"internal"`로 정규화됨 (`"packages"`, `"src"` 등 비표준 레이아웃 지원) |
 | `LayoutModel.DomainDir` | 도메인 최상위 디렉토리명. 플랫 레이아웃은 빈 값 |
 | `LayoutModel.OrchestrationDir` | 오케스트레이션 최상위 디렉토리명 |
