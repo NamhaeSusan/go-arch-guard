@@ -682,6 +682,71 @@ flag된 위치를 고치는 방법은 **어댑터를 orchestration 패키지로 
 - `internal/<OrchestrationDir>/` 안의 모든 패키지 — orchestration은 cross-domain 조정의 지정된 레이어
 - `DomainDir`이 없는 플랫 레이아웃 모델 (ConsumerWorker, Batch, EventPipeline)
 
+## 오케스트레이션 규칙
+
+`orchestration.NewAliasSignatures()`
+
+public orchestration API를 검사하는 opt-in 규칙입니다. 기본 권장 번들에는 포함되지
+않습니다. orchestration package가 domain sub-package 타입을 외부 surface로 노출하지
+않도록 강제하고 싶을 때 custom `RuleSet`에 추가합니다.
+
+### `orchestration.alias-signatures`
+
+`internal/<OrchestrationDir>/` 아래 exported function/method와 exported interface
+method signature의 parameter 또는 return type이 domain sub-package 타입을 노출하면
+감지합니다. 기본 severity는 **Warning**입니다.
+
+```go
+// flagged: orchestration이 domain model을 직접 반환
+package orchestration
+
+import "example.com/shop/internal/domain/order/core/model"
+
+func Place() (model.Order, error) {
+    return model.Order{}, nil
+}
+```
+
+가능한 경우 domain-root alias도 type information으로 추적합니다.
+
+```go
+// internal/domain/order/alias.go
+package order
+
+import "example.com/shop/internal/domain/order/core/model"
+
+type Order = model.Order
+```
+
+```go
+// internal/orchestration/checkout.go
+package orchestration
+
+import "example.com/shop/internal/domain/order"
+
+func Place() (order.Order, error) { // flagged: alias가 core/model로 resolve됨
+    return order.Order{}, nil
+}
+```
+
+대신 orchestration-local DTO를 노출합니다.
+
+```go
+package orchestration
+
+type CheckoutResult struct {
+    OrderID string
+}
+
+func Place(cartID string) (CheckoutResult, error) {
+    return CheckoutResult{OrderID: "order-1"}, nil
+}
+```
+
+DDD orchestration은 domain app service를 조합하는 생성자가 흔하므로, domain-root
+`*Service` alias 형태의 constructor parameter는 기본 허용합니다. 이 예외를 끄려면
+`orchestration.WithConstructorServiceAliases(false)`를 사용합니다.
+
 ### `interfaces.container-only`
 
 패키지 안에서 선언된 named interface가 **struct field 타입으로만** 사용되고 함수 파라미터나 반환 타입으로는 한 번도 사용되지 않는 경우를 감지합니다. 기본 severity: **Warning**.
@@ -859,6 +924,8 @@ go run github.com/NamhaeSusan/go-arch-guard/cmd/tui --preset hexagonal .
 | `structural.NewAlias()` / `NewLayerPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` / `NewRepoFileInterface()` | 구조 규칙 |
 | `structural.WithRepoPortSuffixes(...)` | `structural.NewRepoFileInterface`의 repository-port 인터페이스 이름 suffix 옵션. 기본값은 `Repository`, `Repo`; 빈 suffix는 무시 |
 | `interfaces.NewPattern()` / `NewContainer()` / `NewCrossDomainAnonymous()` / `NewTooManyMethods()` | 인터페이스 규칙 |
+| `orchestration.NewAliasSignatures()` | opt-in orchestration API signature 규칙 |
+| `orchestration.WithConstructorServiceAliases(false)` | `orchestration.NewAliasSignatures`의 기본 constructor `*Service` alias 예외를 끄는 옵션 |
 | `interfaces.WithMaxMethods(n)` | `interfaces.NewTooManyMethods`의 인터페이스 메서드 상한 옵션. 옵션 미지정 시 기본 10; n ≤ 0이면 fallback 10. 다른 interfaces.New*() 룰에 넘기면 silently 무시 |
 | `tx.New(tx.Config{...})` | 트랜잭션 경계 검사 (옵트인) |
 | `types.NewNoSetter()` | setter 규칙 (값 타입의 불변성 강제) |

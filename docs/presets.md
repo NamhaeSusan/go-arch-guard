@@ -51,6 +51,13 @@ DDD cross-layer isolation (composition root and transport):
 | `internal/app/` (composition root) | anything | — |
 | `internal/server/<proto>/` (transport) | `internal/app/`, `internal/pkg/`, sibling transport | `internal/domain/` (direct), `internal/orchestration/`, unclassified internal packages |
 
+`orchestration.alias-signatures` is available as an opt-in complement to the
+orchestration import rules. It checks exported APIs under
+`internal/<OrchestrationDir>/`, including exported interface method signatures,
+for domain sub-package types in parameters and return values. Domain-root
+aliases are also checked when type information resolves them. It is
+intentionally not part of the recommended DDD bundle yet.
+
 ## Clean Architecture Layout
 
 ```text

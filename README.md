@@ -720,6 +720,72 @@ Skipped:
 - Packages inside `internal/<OrchestrationDir>/` — orchestration is the designated cross-domain coordination layer
 - Models with no `DomainDir` (flat layouts like ConsumerWorker, Batch, EventPipeline)
 
+## Orchestration Rules
+
+`orchestration.NewAliasSignatures()`
+
+Opt-in checks for public orchestration APIs. These rules are not part of the
+recommended bundles by default; add them to a custom `RuleSet` when your team
+wants orchestration packages to keep domain sub-package types behind local DTOs.
+
+### `orchestration.alias-signatures`
+
+Exported functions, methods, and exported interface method signatures under
+`internal/<OrchestrationDir>/` must not expose domain sub-package types in
+parameters or return values. Default severity is **Warning**.
+
+```go
+// flagged: orchestration returns a domain model directly
+package orchestration
+
+import "example.com/shop/internal/domain/order/core/model"
+
+func Place() (model.Order, error) {
+    return model.Order{}, nil
+}
+```
+
+Domain-root aliases are traced through type information where possible, so an
+alias-mediated leak is also reported:
+
+```go
+// internal/domain/order/alias.go
+package order
+
+import "example.com/shop/internal/domain/order/core/model"
+
+type Order = model.Order
+```
+
+```go
+// internal/orchestration/checkout.go
+package orchestration
+
+import "example.com/shop/internal/domain/order"
+
+func Place() (order.Order, error) { // flagged: alias resolves to core/model
+    return order.Order{}, nil
+}
+```
+
+Use orchestration-local request/result DTOs instead:
+
+```go
+package orchestration
+
+type CheckoutResult struct {
+    OrderID string
+}
+
+func Place(cartID string) (CheckoutResult, error) {
+    return CheckoutResult{OrderID: "order-1"}, nil
+}
+```
+
+Constructor parameters shaped as domain-root `*Service` aliases are allowed by
+default because DDD orchestration commonly wires domain app services together.
+Disable that exception with `orchestration.WithConstructorServiceAliases(false)`.
+
 ### `interfaces.container-only`
 
 Detects interfaces declared in a package that are used **only as struct field types** —
@@ -907,6 +973,8 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `structural.NewAlias()` / `NewLayerPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` / `NewRepoFileInterface()` | structure rules |
 | `structural.WithRepoPortSuffixes(...)` | option for `structural.NewRepoFileInterface` setting repository-port interface name suffixes. Default is `Repository`, `Repo`; blank suffixes are ignored. |
 | `interfaces.NewPattern()` / `NewContainer()` / `NewCrossDomainAnonymous()` / `NewTooManyMethods()` | interface rules |
+| `orchestration.NewAliasSignatures()` | opt-in orchestration API signature rule |
+| `orchestration.WithConstructorServiceAliases(false)` | option for `orchestration.NewAliasSignatures` disabling the default constructor `*Service` alias exception |
 | `testpolicy.NewNoHandMock()` | test policy rules |
 | `interfaces.WithMaxMethods(n)` | option for `interfaces.NewTooManyMethods` setting the per-interface method cap. Default 10 when the option is omitted; n ≤ 0 also falls back to 10. Silently ignored if passed to other interfaces.New*() rules. |
 | `tx.New(tx.Config{...})` | transaction boundary enforcement (opt-in) |
