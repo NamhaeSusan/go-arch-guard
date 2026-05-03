@@ -2,6 +2,12 @@ package presets
 
 import (
 	"github.com/NamhaeSusan/go-arch-guard/core"
+	"github.com/NamhaeSusan/go-arch-guard/rules/dependency"
+	"github.com/NamhaeSusan/go-arch-guard/rules/interfaces"
+	"github.com/NamhaeSusan/go-arch-guard/rules/naming"
+	"github.com/NamhaeSusan/go-arch-guard/rules/structural"
+	"github.com/NamhaeSusan/go-arch-guard/rules/testpolicy"
+	"github.com/NamhaeSusan/go-arch-guard/rules/types"
 )
 
 func Hexagonal() core.Architecture {
@@ -42,9 +48,31 @@ func Hexagonal() core.Architecture {
 			},
 		},
 	}
-	return mustValidatePreset("Hexagonal", arch)
+	if err := arch.Validate(); err != nil {
+		panic("preset Hexagonal: " + err.Error())
+	}
+	return arch
 }
 
 func RecommendedHexagonal() core.RuleSet {
-	return recommendedRules(true, false, false, true)
+	return core.NewRuleSet(
+		dependency.NewIsolation(),
+		dependency.NewLayerDirection(),
+		dependency.NewBlastRadius(),
+		naming.NewNoStutter(),
+		naming.NewImplSuffix(),
+		naming.NewSnakeCaseFiles(),
+		naming.NewNoLayerSuffix(),
+		testpolicy.NewNoHandMock(),
+		structural.NewRepoFileInterface(),
+		structural.NewLayerPlacement(),
+		structural.NewBannedPackage(),
+		structural.NewInternalTopLevel(),
+		interfaces.NewPattern(),
+		interfaces.NewTooManyMethods(),
+		interfaces.NewContainer(),
+		interfaces.NewCrossDomainAnonymous(),
+		naming.NewTypePattern(),
+		types.NewNoSetter(),
+	)
 }
