@@ -150,3 +150,28 @@ func TestBuildMetricsIndex(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildMetricsIndexForRoot(t *testing.T) {
+	pkgs, err := analyzer.Load("../testdata/custom_root", "packages/...")
+	if err != nil {
+		t.Logf("partial load: %v", err)
+	}
+	if len(pkgs) == 0 {
+		t.Fatal("no packages loaded")
+	}
+
+	module := ""
+	for _, pkg := range pkgs {
+		if pkg.Module != nil {
+			module = pkg.Module.Path
+			break
+		}
+	}
+
+	if metrics := tui.BuildMetricsIndex(pkgs, module); len(metrics) != 0 {
+		t.Fatalf("default metrics must ignore non-internal root, got %d entries", len(metrics))
+	}
+	if metrics := tui.BuildMetricsIndexForRoot(pkgs, module, "packages"); len(metrics) == 0 {
+		t.Fatal("expected metrics for custom internal root packages")
+	}
+}
