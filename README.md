@@ -207,7 +207,7 @@ Architecture fields:
 |-------|-------------|
 | `LayerModel.Sublayers` | authoritative layer-path vocabulary (`"core/repo"`); referenced by direction, port, and contract rules |
 | `LayerModel.Direction` | allowed import direction matrix (keys must be in `Sublayers`) |
-| `LayerModel.PortLayers` | pure interface layers such as repo or gateway (must be in `Sublayers`) |
+| `LayerModel.PortLayers` | pure interface layers such as repo, gateway, or Hexagonal port (must be in `Sublayers`; `port` is not inferred unless listed) |
 | `LayerModel.ContractLayers` | contract layers; must be a superset of `PortLayers` |
 | `LayerModel.PkgRestricted` | sublayers that must not import shared packages |
 | `LayerModel.InternalTopLevel` | allowed top-level directories under the package root |
@@ -524,19 +524,21 @@ order_service.go  correct
 
 ### `structural.repo-file-interface-missing`
 
-Files in `repo/` (or `core/repo/`) must contain an interface matching the filename.
+Files in a configured port layer (`core/repo/`, `gateway/`, Hexagonal `port/`,
+etc.) must contain an interface matching the filename.
 
 ```go
-// order.go in repo/ must define:
+// order.go in a port layer must define:
 type Order interface { ... }  // matches filename
 ```
 
 ### `structural.repo-file-extra-interface`
 
-Each file in `repo/` must define exactly one interface. Extra interfaces should be split into their own files.
+Each file in a configured port layer must define exactly one interface. Extra
+interfaces should be split into their own files.
 
 ```go
-// repo/review.go
+// core/repo/review.go or port/review.go
 type Review interface { Find() }   // correct
 type Helper interface { Assist() } // violation: move to helper.go
 ```
@@ -579,15 +581,18 @@ order_service.go  "_service" suffix is redundant
 order.go          correct
 ```
 
-### `structural.interface-placement` (DDD only)
+### `structural.interface-placement`
 
 Repository-port interfaces — names ending in `Repository` or `Repo` by default
-— must be defined in `core/repo/`, not scattered across layers. Consumer-defined
-interfaces (the Go idiom where a package declares the small interface it
-consumes) are allowed anywhere they are used: `handler/`, `app/`, `svc/`, etc.
+— must be defined in the architecture's configured port layer (`core/repo/` for
+DDD, `gateway/` for Clean Architecture, `port/` for Hexagonal), not scattered
+across layers. Consumer-defined interfaces (the Go idiom where a package
+declares the small interface it consumes) are allowed anywhere they are used:
+`handler/`, `app/`, `usecase/`, `svc/`, etc.
 
 Also flags `type X = otherdomain.Repo` aliases that re-export a repository
-interface across domain boundaries — those belong in `orchestration/`.
+interface from a port layer — cross-domain coordination belongs in
+`orchestration/`.
 
 Pass `structural.WithRepoPortSuffixes("Gateway", "Adapter", ...)` to match a
 different vocabulary; default is `["Repository", "Repo"]`.

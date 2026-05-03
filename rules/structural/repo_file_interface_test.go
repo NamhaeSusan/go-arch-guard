@@ -9,6 +9,7 @@ import (
 
 	"github.com/NamhaeSusan/go-arch-guard/analyzer"
 	"github.com/NamhaeSusan/go-arch-guard/core"
+	"github.com/NamhaeSusan/go-arch-guard/presets"
 	"github.com/NamhaeSusan/go-arch-guard/rules/structural"
 	"golang.org/x/tools/go/packages"
 )
@@ -251,5 +252,130 @@ func TestRepoFileInterfaceFlagsRepositoryPortOutsidePortLayer(t *testing.T) {
 	}
 	if !direct || !alias {
 		t.Fatalf("direct=%v alias=%v, want both true; got %+v", direct, alias, got)
+	}
+}
+
+func TestRepoFileInterfaceHexagonalFlagsRepositoryPortOutsidePortWithoutRequireAlias(t *testing.T) {
+	arch := presets.Hexagonal()
+	if arch.Structure.RequireAlias {
+		t.Fatal("Hexagonal RequireAlias must stay false")
+	}
+	ctx := tempContextForRepoIface(t, map[string]string{
+		"internal/domain/order/port/repository.go": "package port\n\ntype Repository interface { Save() error }\n",
+		"internal/domain/order/usecase/order_repository.go": `package usecase
+
+type OrderRepository interface {
+	Find(id string) error
+}
+`,
+	}, arch)
+
+	got := structural.NewRepoFileInterface().Check(ctx)
+
+	var found bool
+	for _, v := range got {
+		if v.Rule == "meta.rule-disabled-by-config" {
+			t.Fatalf("hexagonal repo-file-interface must be active, got disabled meta: %+v", got)
+		}
+		if v.Rule == "structural.interface-placement" && strings.Contains(v.Message, `"OrderRepository"`) {
+			found = true
+			if !strings.Contains(v.Message, "port/") || strings.Contains(v.Message, "repo/") {
+				t.Fatalf("hexagonal placement message must point to port/, got %q", v.Message)
+			}
+			if !strings.Contains(v.Fix, "port/") {
+				t.Fatalf("hexagonal placement fix must point to port/, got %q", v.Fix)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("expected interface-placement violation for OrderRepository outside port/, got %+v", got)
+	}
+}
+
+func TestRepoFileInterfaceHexagonalValidPortPackageIsActiveAndClean(t *testing.T) {
+	ctx := tempContextForRepoIface(t, map[string]string{
+		"internal/domain/order/port/repository.go": "package port\n\ntype Repository interface { Save() error }\n",
+	}, presets.Hexagonal())
+
+	got := structural.NewRepoFileInterface().Check(ctx)
+	if len(got) != 0 {
+		t.Fatalf("valid hexagonal port package should be clean and not disabled, got %+v", got)
+	}
+}
+
+func TestRepoFileInterfaceHexagonalDoesNotFlagNonRepoOrNonDomainInterfaces(t *testing.T) {
+	ctx := tempContextForRepoIface(t, map[string]string{
+		"internal/domain/order/port/repository.go": "package port\n\ntype Repository interface { Save() error }\n",
+		"internal/domain/order/usecase/service.go": `package usecase
+
+type Service interface {
+	DoSomething() error
+}
+`,
+		"internal/orchestration/repository.go": `package orchestration
+
+type OrderRepository interface {
+	Coordinate() error
+}
+`,
+		"internal/pkg/repository.go": `package pkg
+
+type AuditRepository interface {
+	Write() error
+}
+`,
+		"internal/domain/order/policy/repository.go": `package policy
+
+type PolicyRepository interface {
+	Load() error
+}
+`,
+	}, presets.Hexagonal())
+
+	got := structural.NewRepoFileInterface().Check(ctx)
+	for _, v := range got {
+		if v.Rule == "structural.interface-placement" {
+			t.Fatalf("non-repo, non-domain, and unknown-domain-sublayer interfaces must not be flagged, got %+v", got)
+		}
+		if v.Rule == "meta.rule-disabled-by-config" {
+			t.Fatalf("hexagonal repo-file-interface must be active, got disabled meta: %+v", got)
+		}
+	}
+}
+
+func TestRepoFileInterfaceDoesNotTreatPortNameAsGlobalFallback(t *testing.T) {
+	arch := presets.Hexagonal()
+	arch.Layers.PortLayers = nil
+	arch.Layers.ContractLayers = nil
+	ctx := tempContextForRepoIface(t, map[string]string{
+		"internal/domain/order/port/repository.go": "package port\n\ntype Repository interface { Save() error }\n",
+		"internal/domain/order/usecase/order_repository.go": `package usecase
+
+type OrderRepository interface {
+	Find(id string) error
+}
+`,
+	}, arch)
+
+	got := structural.NewRepoFileInterface().Check(ctx)
+	if len(got) != 1 || got[0].Rule != "meta.rule-disabled-by-config" {
+		t.Fatalf("custom port sublayer without explicit PortLayers must not be activated by fallback, got %+v", got)
+	}
+}
+
+func TestRepoFileInterfaceHexagonalPortDiagnosticsUseMatchedLayer(t *testing.T) {
+	ctx := tempContextForRepoIface(t, map[string]string{
+		"internal/domain/order/port/order_repository.go": "package port\n\nfunc NotAnInterface() {}\n",
+	}, presets.Hexagonal())
+
+	got := structural.NewRepoFileInterface().Check(ctx)
+	if len(got) != 1 || got[0].Rule != "structural.repo-file-interface-missing" {
+		t.Fatalf("expected one missing-interface violation, got %+v", got)
+	}
+	if !strings.Contains(got[0].Message, "port/") {
+		t.Fatalf("hexagonal port diagnostic should name port/, got %q", got[0].Message)
+	}
+	if strings.Contains(got[0].Message, "repo/") {
+		t.Fatalf("hexagonal port diagnostic must not use hard-coded repo/, got %q", got[0].Message)
 	}
 }

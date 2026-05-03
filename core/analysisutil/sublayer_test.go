@@ -29,11 +29,14 @@ func TestPortAndContractSublayers(t *testing.T) {
 
 func TestFallbackSublayerMatching(t *testing.T) {
 	layers := core.LayerModel{
-		Sublayers: []string{"core/repo", "core/svc", "core/model"},
+		Sublayers: []string{"core/repo", "core/svc", "core/model", "port"},
 	}
 
 	if !IsPortSublayer(layers, "core/repo") {
 		t.Fatal("fallback port layer not detected")
+	}
+	if IsPortSublayer(layers, "port") {
+		t.Fatal("fallback port layer must not treat a literal port/ sublayer as a port unless PortLayers opts in")
 	}
 	if !IsContractSublayer(layers, "core/svc") {
 		t.Fatal("fallback contract layer not detected")
@@ -46,6 +49,24 @@ func TestFallbackSublayerMatching(t *testing.T) {
 	}
 	if got := PortSublayerName(layers); got != "core/repo" {
 		t.Fatalf("PortSublayerName() = %q", got)
+	}
+}
+
+func TestExplicitPortSublayerMatching(t *testing.T) {
+	layers := core.LayerModel{
+		Sublayers:      []string{"handler", "usecase", "port", "domain", "adapter"},
+		PortLayers:     []string{"port"},
+		ContractLayers: []string{"port"},
+	}
+
+	if !IsPortSublayer(layers, "port") {
+		t.Fatal("explicit PortLayers entry should mark port as a port sublayer")
+	}
+	if got := MatchPortSublayer(layers, "example.com/app/internal/domain/order/port"); got != "port" {
+		t.Fatalf("MatchPortSublayer() = %q, want port", got)
+	}
+	if got := PortSublayerName(layers); got != "port" {
+		t.Fatalf("PortSublayerName() = %q, want port", got)
 	}
 }
 
