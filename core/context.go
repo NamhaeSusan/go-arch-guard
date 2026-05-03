@@ -3,7 +3,7 @@ package core
 import (
 	"strings"
 
-	"github.com/NamhaeSusan/go-arch-guard/internal/pathmatch"
+	"github.com/NamhaeSusan/go-arch-guard/core/pathmatch"
 	"golang.org/x/tools/go/packages"
 )
 
