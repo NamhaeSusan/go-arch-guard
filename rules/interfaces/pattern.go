@@ -3,6 +3,7 @@ package interfaces
 import (
 	"fmt"
 	"go/ast"
+	"go/token"
 	"go/types"
 	"sort"
 	"strings"
@@ -196,19 +197,11 @@ func collectExportedStructs(pkg *packages.Package) map[string]bool {
 func collectExportedTypeSpecs(pkg *packages.Package) []*ast.TypeSpec {
 	var result []*ast.TypeSpec
 	for _, file := range pkg.Syntax {
-		for _, decl := range file.Decls {
-			gd, ok := decl.(*ast.GenDecl)
-			if !ok {
-				continue
-			}
-			for _, spec := range gd.Specs {
-				ts, ok := spec.(*ast.TypeSpec)
-				if !ok || !ts.Name.IsExported() {
-					continue
-				}
+		analysisutil.WalkTypeSpecs(file, nil, func(ts *ast.TypeSpec, _ token.Position) {
+			if ts.Name.IsExported() {
 				result = append(result, ts)
 			}
-		}
+		})
 	}
 	return result
 }
@@ -228,10 +221,9 @@ func lookupInterface(scope *types.Scope, name string) *types.Interface {
 func (r *Pattern) checkConstructorName(pkg *packages.Package) []core.Violation {
 	var violations []core.Violation
 	for _, file := range pkg.Syntax {
-		for _, decl := range file.Decls {
-			fd, ok := decl.(*ast.FuncDecl)
-			if !ok || fd.Recv != nil || !fd.Name.IsExported() {
-				continue
+		analysisutil.WalkFuncDecls(file, func(fd *ast.FuncDecl) {
+			if fd.Recv != nil || !fd.Name.IsExported() {
+				return
 			}
 			name := fd.Name.Name
 			if strings.HasPrefix(name, "New") && name != "New" {
@@ -239,7 +231,7 @@ func (r *Pattern) checkConstructorName(pkg *packages.Package) []core.Violation {
 					fmt.Sprintf("constructor %q must be named \"New\"; NewXxx variants are not allowed", name),
 					"rename to \"New\""))
 			}
-		}
+		})
 	}
 	return violations
 }
@@ -247,18 +239,17 @@ func (r *Pattern) checkConstructorName(pkg *packages.Package) []core.Violation {
 func (r *Pattern) checkConstructorReturnsInterface(pkg *packages.Package, ifaces map[string]*ast.InterfaceType) []core.Violation {
 	var violations []core.Violation
 	for _, file := range pkg.Syntax {
-		for _, decl := range file.Decls {
-			fd, ok := decl.(*ast.FuncDecl)
-			if !ok || fd.Recv != nil || fd.Name.Name != "New" {
-				continue
+		analysisutil.WalkFuncDecls(file, func(fd *ast.FuncDecl) {
+			if fd.Recv != nil || fd.Name.Name != "New" {
+				return
 			}
 			if fd.Type.Results == nil || len(fd.Type.Results.List) == 0 {
-				continue
+				return
 			}
 
 			firstRet := fd.Type.Results.List[0].Type
 			if ident, ok := firstRet.(*ast.Ident); ok && ifaces[ident.Name] != nil {
-				continue
+				return
 			}
 
 			fix := "return an interface type"
@@ -270,7 +261,7 @@ func (r *Pattern) checkConstructorReturnsInterface(pkg *packages.Package, ifaces
 			violations = append(violations, r.violation(pkg, 0, "interfaces.constructor-returns-interface",
 				fmt.Sprintf("New() returns %s, should return an interface", formatTypeExpr(firstRet)),
 				fix))
-		}
+		})
 	}
 	return violations
 }
