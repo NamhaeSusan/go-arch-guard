@@ -804,6 +804,28 @@ ruleset := presets.RecommendedDDD().With(tx.New(tx.Config{
 
 Emitted rule IDs: `tx.start-outside-allowed-layer`, `tx.type-in-signature`.
 
+### `tx.NewForbiddenCalls` / `tx.NewMandatoryWrapper` (opt-in)
+
+Use these for coarse SDK/client call guards without adding them to preset
+bundles. `AllowedLayers` accepts architecture layer names (`"infra"`, `"app"`)
+and project-relative package prefixes (`"pkg/httpclient"`).
+
+```go
+ruleset = ruleset.With(
+    tx.NewForbiddenCalls([]tx.ForbiddenCall{{
+        Symbols:       []string{"database/sql.Open"},
+        AllowedLayers: []string{"infra"},
+    }}),
+    tx.NewMandatoryWrapper([]tx.MandatoryWrapper{{
+        Symbols:       []string{"net/http.(*Client).Do"},
+        AllowedLayers: []string{"pkg/httpclient"},
+        ReplaceWith:   "pkg/httpclient.Do",
+    }}),
+)
+```
+
+Emitted rule IDs: `tx.forbidden-call`, `tx.mandatory-wrapper`.
+
 ## Setter Pattern
 
 ### `types.NewNoSetter`
@@ -909,7 +931,7 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `interfaces.NewPattern()` / `NewContainer()` / `NewCrossDomainAnonymous()` / `NewTooManyMethods()` | interface rules |
 | `testpolicy.NewNoHandMock()` | test policy rules |
 | `interfaces.WithMaxMethods(n)` | option for `interfaces.NewTooManyMethods` setting the per-interface method cap. Default 10 when the option is omitted; n ≤ 0 also falls back to 10. Silently ignored if passed to other interfaces.New*() rules. |
-| `tx.New(tx.Config{...})` | transaction boundary enforcement (opt-in) |
+| `tx.New(tx.Config{...})` / `tx.NewForbiddenCalls(...)` / `tx.NewMandatoryWrapper(...)` | transaction and symbol-call guards (opt-in) |
 | `types.NewNoSetter()` | setter rule (immutability for value types) |
 
 ## Machine-readable JSON Output
