@@ -3,7 +3,6 @@ package core
 import (
 	"strings"
 
-	"github.com/NamhaeSusan/go-arch-guard/core/pathmatch"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -115,18 +114,6 @@ func matchExcludePattern(pattern, path string) bool {
 	return pattern == path
 }
 
-// normalizeMatchPath canonicalizes both exclude patterns and the file paths
-// rules emit so they match consistently. The supported equivalences are:
-//
-//   - Backslashes are converted to forward slashes (Windows-shell paste).
-//   - Leading "/" is trimmed (absolute-path fallback in analysisutil).
-//   - Leading "./" is trimmed (rule-emitted relative paths).
-//   - Trailing "/" is trimmed for non-recursive patterns; a recursive
-//     pattern keeps its "..." suffix intact since matchExcludePattern
-//     reads it.
-//
-// As a result "internal/foo", "/internal/foo", "./internal/foo",
-// "internal\\foo", and "internal/foo/" are all the same key.
 func normalizeMatchPath(path string) string {
-	return pathmatch.Normalize(path)
+	return NormalizeMatchPath(path)
 }

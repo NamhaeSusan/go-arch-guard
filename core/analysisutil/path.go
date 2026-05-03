@@ -5,12 +5,11 @@ import (
 	"strings"
 
 	"github.com/NamhaeSusan/go-arch-guard/core"
-	"github.com/NamhaeSusan/go-arch-guard/core/pathmatch"
 	"golang.org/x/tools/go/packages"
 )
 
 func NormalizeMatchPath(path string) string {
-	return pathmatch.Normalize(path)
+	return core.NormalizeMatchPath(path)
 }
 
 func RelPathFromRoot(projectRoot, filename string) string {
