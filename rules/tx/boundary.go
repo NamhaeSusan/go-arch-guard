@@ -8,6 +8,7 @@ import (
 
 	"github.com/NamhaeSusan/go-arch-guard/core"
 	"github.com/NamhaeSusan/go-arch-guard/core/analysisutil"
+	"github.com/NamhaeSusan/go-arch-guard/rules/internal/rulemeta"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -217,13 +218,7 @@ func (r *Boundary) violation(rule, file string, line int, message, fix string) c
 // but the supplied core.Architecture configuration prevents it from running.
 // Severity defaults to Warning via the runner's meta.* prefix handling.
 func metaRuleDisabledByConfig(ruleID, reason, fix string) core.Violation {
-	return core.Violation{
-		Rule:              "meta.rule-disabled-by-config",
-		Message:           fmt.Sprintf("%s: %s", ruleID, reason),
-		Fix:               fix,
-		DefaultSeverity:   core.Warning,
-		EffectiveSeverity: core.Warning,
-	}
+	return rulemeta.RuleDisabledByConfig(ruleID, reason, fix)
 }
 
 func packageLayer(arch core.Architecture, pkgPath, internalPrefix string) string {
