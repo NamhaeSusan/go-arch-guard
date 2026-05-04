@@ -804,6 +804,36 @@ ruleset := presets.RecommendedDDD().With(tx.New(tx.Config{
 
 Emitted rule IDs: `tx.start-outside-allowed-layer`, `tx.type-in-signature`.
 
+## Domain Failure Boundaries
+
+### `types.NewNoPanicInDomain` (opt-in)
+
+Flags domain/application layer calls that bypass error returns and terminate
+control flow directly:
+
+- builtin `panic(...)`
+- `log.Fatal`, `log.Fatalf`, `log.Fatalln`
+- `os.Exit(...)`
+
+By default the rule inspects domain/application layers for the active
+architecture, for example DDD `app`, `core/model`, `core/svc`, and `event`;
+Clean Architecture `entity` and `usecase`; Hexagonal `domain` and `usecase`;
+and Modular Monolith `core` and `application`.
+
+```go
+import types "github.com/NamhaeSusan/go-arch-guard/rules/types"
+
+ruleset := presets.RecommendedDDD().With(types.NewNoPanicInDomain(
+    types.WithAllowedFunctions("Must*"),
+    types.WithAllowedPaths("internal/domain/payment/core/model/must.go"),
+))
+```
+
+Prefer returning errors so outer layers can decide whether to recover, retry,
+roll back, or exit.
+
+Emitted rule ID: `errors.no-panic-in-domain`.
+
 ## Setter Pattern
 
 ### `types.NewNoSetter`
@@ -903,6 +933,8 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `presets.Batch()` / `presets.RecommendedBatch()` | Batch flat-layout architecture and ruleset |
 | `presets.EventPipeline()` / `presets.RecommendedEventPipeline()` | event-sourcing / CQRS architecture and ruleset |
 | `dependency.NewIsolation()` / `NewLayerDirection()` / `NewBlastRadius()` | dependency rules |
+| `types.NewNoPanicInDomain()` | domain/application panic, log.Fatal, and os.Exit rule (opt-in) |
+| `types.WithInspectedLayers(...)` / `WithAllowedPaths(...)` / `WithAllowedFunctions(...)` | options for `types.NewNoPanicInDomain` |
 | `naming.NewNoStutter()` / `NewImplSuffix()` / `NewSnakeCaseFiles()` / `NewNoLayerSuffix()` / `NewTypePattern()` | naming rules |
 | `structural.NewAlias()` / `NewLayerPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` / `NewRepoFileInterface()` | structure rules |
 | `structural.WithRepoPortSuffixes(...)` | option for `structural.NewRepoFileInterface` setting repository-port interface name suffixes. Default is `Repository`, `Repo`; blank suffixes are ignored. |
