@@ -772,10 +772,14 @@ the smell as a hard rule.
 Opt-in advisory rule for packages under the configured orchestration directory
 such as `internal/orchestration`. It flags functions whose branch count,
 statement count, or cyclomatic complexity exceeds configurable budgets.
+Default severity is **Warning** with budgets `maxBranches=8`,
+`maxStatements=40`, and `maxCyclomatic=10`.
 
-Simple `if err != nil { return err }` branches are discounted by default so
-ordinary Go error flow does not hide the real signal: orchestration functions
-making business decisions or accumulating too much coordination code.
+Simple `if err != nil { return err }` and `fmt.Errorf("%w", err)` branches are
+discounted by default so ordinary Go error flow does not hide the real signal:
+orchestration functions making business decisions or accumulating too much
+coordination code. For `if err := call(); err != nil { return err }`, the
+branch itself is discounted, but the `call()` init statement still counts.
 
 ```go
 ruleset := core.NewRuleSet(orchestration.NewLogicBudget(

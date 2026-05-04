@@ -117,6 +117,44 @@ func (c *Checkout) Place() error {
 	if len(got) != 0 {
 		t.Fatalf("simple error-handling coordination should pass, got %+v", got)
 	}
+
+	got = orchestration.NewLogicBudget(
+		orchestration.WithMaxBranches(0),
+		orchestration.WithMaxStatements(4),
+		orchestration.WithMaxCyclomatic(1),
+		orchestration.WithCountErrorBranches(),
+	).Check(ctx)
+
+	assertLogicBudgetViolation(t, got, "Place", "branches 3 > 0")
+}
+
+func TestLogicBudgetDoesNotDiscountPolicyReturnsThatMentionErr(t *testing.T) {
+	ctx := orchestrationContext(t, map[string]string{
+		"internal/orchestration/checkout.go": `package orchestration
+
+import (
+	"errors"
+	"io"
+)
+
+func step() error { return nil }
+
+func Place() bool {
+	if err := step(); err != nil {
+		return errors.Is(err, io.EOF)
+	}
+	return true
+}
+`,
+	})
+
+	got := orchestration.NewLogicBudget(
+		orchestration.WithMaxBranches(0),
+		orchestration.WithMaxStatements(100),
+		orchestration.WithMaxCyclomatic(100),
+	).Check(ctx)
+
+	assertLogicBudgetViolation(t, got, "Place", "branches 1 > 0")
 }
 
 func TestLogicBudgetThresholdsAndIgnoredFunctionsAreConfigurable(t *testing.T) {

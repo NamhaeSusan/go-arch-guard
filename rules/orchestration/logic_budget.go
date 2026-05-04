@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"go/types"
 	"slices"
 	"strings"
 
@@ -20,6 +21,11 @@ type functionMetrics struct {
 	branches   int
 	statements int
 	cyclomatic int
+}
+
+type returnContext struct {
+	info        *types.Info
+	resultTypes []types.Type
 }
 
 func NewLogicBudget(opts ...Option) *LogicBudget {
@@ -69,7 +75,7 @@ func (r *LogicBudget) checkPackage(ctx *core.Context, pkg *packages.Package) []c
 			if fd.Body == nil || r.isIgnored(fd.Name.Name) {
 				return
 			}
-			metrics := r.measure(fd.Body)
+			metrics := r.measure(fd, pkg.TypesInfo)
 			reasons := r.exceededReasons(metrics)
 			if len(reasons) == 0 {
 				return
@@ -89,60 +95,60 @@ func (r *LogicBudget) checkPackage(ctx *core.Context, pkg *packages.Package) []c
 	return violations
 }
 
-func (r *LogicBudget) measure(body *ast.BlockStmt) functionMetrics {
+func (r *LogicBudget) measure(fd *ast.FuncDecl, info *types.Info) functionMetrics {
 	metrics := functionMetrics{cyclomatic: 1}
-	r.measureBlock(body, &metrics)
+	r.measureBlock(fd.Body, &metrics, newReturnContext(fd, info))
 	return metrics
 }
 
-func (r *LogicBudget) measureBlock(block *ast.BlockStmt, metrics *functionMetrics) {
+func (r *LogicBudget) measureBlock(block *ast.BlockStmt, metrics *functionMetrics, retCtx returnContext) {
 	if block == nil {
 		return
 	}
 	for _, stmt := range block.List {
-		r.measureStmt(stmt, metrics)
+		r.measureStmt(stmt, metrics, retCtx)
 	}
 }
 
-func (r *LogicBudget) measureStmt(stmt ast.Stmt, metrics *functionMetrics) {
+func (r *LogicBudget) measureStmt(stmt ast.Stmt, metrics *functionMetrics, retCtx returnContext) {
 	if stmt == nil {
 		return
 	}
 	if !r.cfg.countErrorBranches {
-		if ifStmt, ok := stmt.(*ast.IfStmt); ok && isSimpleErrorReturn(ifStmt) {
-			r.measureStmt(ifStmt.Init, metrics)
+		if ifStmt, ok := stmt.(*ast.IfStmt); ok && isSimpleErrorReturn(ifStmt, retCtx) {
+			r.measureStmt(ifStmt.Init, metrics, retCtx)
 			return
 		}
 	}
 	switch s := stmt.(type) {
 	case *ast.BlockStmt:
-		r.measureBlock(s, metrics)
+		r.measureBlock(s, metrics, retCtx)
 	case *ast.IfStmt:
 		metrics.statements++
 		metrics.branches++
 		metrics.cyclomatic++
 		metrics.cyclomatic += booleanComplexity(s.Cond)
-		r.measureStmt(s.Init, metrics)
-		r.measureBlock(s.Body, metrics)
-		r.measureStmt(s.Else, metrics)
+		r.measureStmt(s.Init, metrics, retCtx)
+		r.measureBlock(s.Body, metrics, retCtx)
+		r.measureStmt(s.Else, metrics, retCtx)
 	case *ast.ForStmt:
 		metrics.statements++
 		metrics.branches++
 		metrics.cyclomatic++
 		metrics.cyclomatic += booleanComplexity(s.Cond)
-		r.measureStmt(s.Init, metrics)
-		r.measureStmt(s.Post, metrics)
-		r.measureBlock(s.Body, metrics)
+		r.measureStmt(s.Init, metrics, retCtx)
+		r.measureStmt(s.Post, metrics, retCtx)
+		r.measureBlock(s.Body, metrics, retCtx)
 	case *ast.RangeStmt:
 		metrics.statements++
 		metrics.branches++
 		metrics.cyclomatic++
-		r.measureBlock(s.Body, metrics)
+		r.measureBlock(s.Body, metrics, retCtx)
 	case *ast.SwitchStmt:
 		metrics.statements++
 		metrics.branches++
 		metrics.cyclomatic++
-		r.measureStmt(s.Init, metrics)
+		r.measureStmt(s.Init, metrics, retCtx)
 		for _, stmt := range s.Body.List {
 			cc, ok := stmt.(*ast.CaseClause)
 			if !ok {
@@ -153,14 +159,14 @@ func (r *LogicBudget) measureStmt(stmt ast.Stmt, metrics *functionMetrics) {
 				metrics.cyclomatic++
 			}
 			for _, child := range cc.Body {
-				r.measureStmt(child, metrics)
+				r.measureStmt(child, metrics, retCtx)
 			}
 		}
 	case *ast.TypeSwitchStmt:
 		metrics.statements++
 		metrics.branches++
 		metrics.cyclomatic++
-		r.measureStmt(s.Init, metrics)
+		r.measureStmt(s.Init, metrics, retCtx)
 		for _, stmt := range s.Body.List {
 			cc, ok := stmt.(*ast.CaseClause)
 			if !ok {
@@ -171,7 +177,7 @@ func (r *LogicBudget) measureStmt(stmt ast.Stmt, metrics *functionMetrics) {
 				metrics.cyclomatic++
 			}
 			for _, child := range cc.Body {
-				r.measureStmt(child, metrics)
+				r.measureStmt(child, metrics, retCtx)
 			}
 		}
 	case *ast.SelectStmt:
@@ -188,7 +194,7 @@ func (r *LogicBudget) measureStmt(stmt ast.Stmt, metrics *functionMetrics) {
 				metrics.cyclomatic++
 			}
 			for _, child := range cc.Body {
-				r.measureStmt(child, metrics)
+				r.measureStmt(child, metrics, retCtx)
 			}
 		}
 	default:
@@ -211,7 +217,25 @@ func booleanComplexity(expr ast.Expr) int {
 	return count
 }
 
-func isSimpleErrorReturn(stmt *ast.IfStmt) bool {
+func newReturnContext(fd *ast.FuncDecl, info *types.Info) returnContext {
+	ctx := returnContext{info: info}
+	if fd == nil || fd.Type == nil || fd.Type.Results == nil || info == nil {
+		return ctx
+	}
+	for _, field := range fd.Type.Results.List {
+		t := info.TypeOf(field.Type)
+		count := len(field.Names)
+		if count == 0 {
+			count = 1
+		}
+		for range count {
+			ctx.resultTypes = append(ctx.resultTypes, t)
+		}
+	}
+	return ctx
+}
+
+func isSimpleErrorReturn(stmt *ast.IfStmt, retCtx returnContext) bool {
 	if stmt == nil || stmt.Else != nil || stmt.Body == nil || len(stmt.Body.List) != 1 {
 		return false
 	}
@@ -223,7 +247,7 @@ func isSimpleErrorReturn(stmt *ast.IfStmt) bool {
 	if !ok {
 		return false
 	}
-	return returnIncludesIdent(ret, errName)
+	return isErrorPropagationReturn(ret, errName, retCtx)
 }
 
 func errorNilCheckIdent(expr ast.Expr) (string, bool) {
@@ -245,29 +269,102 @@ func isNilIdent(expr ast.Expr) bool {
 	return ok && ident.Name == "nil"
 }
 
-func returnIncludesIdent(ret *ast.ReturnStmt, name string) bool {
-	for _, expr := range ret.Results {
-		if exprIncludesIdent(expr, name) {
+func isErrorPropagationReturn(ret *ast.ReturnStmt, errName string, retCtx returnContext) bool {
+	if retCtx.info == nil || len(retCtx.resultTypes) == 0 || len(ret.Results) != len(retCtx.resultTypes) {
+		return false
+	}
+	var propagated bool
+	for i, expr := range ret.Results {
+		if isErrorType(retCtx.resultTypes[i]) {
+			if !isErrorPropagationExpr(expr, errName, retCtx.info) {
+				return false
+			}
+			propagated = true
+			continue
+		}
+		if !isZeroReturnExpr(expr) {
+			return false
+		}
+	}
+	return propagated
+}
+
+func isErrorType(t types.Type) bool {
+	if t == nil {
+		return false
+	}
+	errorObj := types.Universe.Lookup("error")
+	if errorObj == nil {
+		return false
+	}
+	iface, ok := errorObj.Type().Underlying().(*types.Interface)
+	return ok && types.Implements(types.Unalias(t), iface)
+}
+
+func isErrorPropagationExpr(expr ast.Expr, errName string, info *types.Info) bool {
+	if ident, ok := expr.(*ast.Ident); ok {
+		return ident.Name == errName
+	}
+	call, ok := expr.(*ast.CallExpr)
+	if !ok {
+		return false
+	}
+	switch qualifiedCallName(call, info) {
+	case "fmt.Errorf":
+		return fmtErrorfWraps(call, errName)
+	case "errors.Join":
+		return callArgIsIdent(call, errName)
+	default:
+		return false
+	}
+}
+
+func qualifiedCallName(call *ast.CallExpr, info *types.Info) string {
+	if call == nil || info == nil {
+		return ""
+	}
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return ""
+	}
+	fn, ok := info.Uses[sel.Sel].(*types.Func)
+	if !ok || fn.Pkg() == nil {
+		return ""
+	}
+	return fn.Pkg().Path() + "." + fn.Name()
+}
+
+func fmtErrorfWraps(call *ast.CallExpr, errName string) bool {
+	if len(call.Args) == 0 {
+		return false
+	}
+	format, ok := call.Args[0].(*ast.BasicLit)
+	if !ok || format.Kind != token.STRING || !strings.Contains(format.Value, "%w") {
+		return false
+	}
+	return callArgIsIdent(call, errName)
+}
+
+func callArgIsIdent(call *ast.CallExpr, name string) bool {
+	for _, arg := range call.Args {
+		if ident, ok := arg.(*ast.Ident); ok && ident.Name == name {
 			return true
 		}
 	}
 	return false
 }
 
-func exprIncludesIdent(expr ast.Expr, name string) bool {
-	var found bool
-	ast.Inspect(expr, func(node ast.Node) bool {
-		if found {
-			return false
-		}
-		ident, ok := node.(*ast.Ident)
-		if ok && ident.Name == name {
-			found = true
-			return false
-		}
-		return true
-	})
-	return found
+func isZeroReturnExpr(expr ast.Expr) bool {
+	switch e := expr.(type) {
+	case *ast.Ident:
+		return e.Name == "nil" || e.Name == "false"
+	case *ast.BasicLit:
+		return e.Value == "0" || e.Value == `""`
+	case *ast.CompositeLit:
+		return len(e.Elts) == 0
+	default:
+		return false
+	}
 }
 
 func (r *LogicBudget) exceededReasons(metrics functionMetrics) []string {
