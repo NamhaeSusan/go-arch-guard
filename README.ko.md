@@ -760,6 +760,63 @@ ruleset := presets.RecommendedDDD().With(tx.New(tx.Config{
 
 발생 가능한 규칙 ID: `tx.start-outside-allowed-layer`, `tx.type-in-signature`.
 
+## 핸들러 응답 DTO 경계
+
+### `handler.NewNoModelResponse` (옵트인)
+
+핸들러와 transport 응답 경계가 configured domain model 타입을 그대로 노출하지
+않도록 검사합니다. 완전 옵트인이며 기본 severity는 **Warning**입니다. 따라서
+프로젝트가 직접 추가하기 전까지 권장 번들 동작은 바뀌지 않습니다.
+
+```go
+ruleset := presets.RecommendedDDD().With(handler.NewNoModelResponse())
+```
+
+검사 대상 패키지:
+- 도메인 handler sublayer: `internal/domain/<name>/handler/...`
+- orchestration handler: `internal/orchestration/handler/...`
+- 최상위 transport: `internal/server/<transport>/...`
+
+검사 대상 형태:
+- exported response/result type alias 및 struct
+- exported 함수/메서드의 result type
+- `OK`, `Created`, `Success`, `Respond`, Gin 스타일 `JSON` 같은 일반적인
+  응답 helper에 넘기는 response body argument
+- pointer, slice, map, alias로 감싼 model 타입
+
+request DTO와 handler parameter는 첫 버전에서 의도적으로 제외합니다.
+
+```go
+// 위반: model.Order가 외부 응답 계약이 됨
+type OrderResponse = model.Order
+
+func (h Handler) GetOrder() (model.Order, error) {
+    return h.service.GetOrder()
+}
+
+func (h Handler) WriteOrder(c *gin.Context, order model.Order) {
+    transporthttp.OK(c, order)
+}
+```
+
+```go
+// 허용: 명시적 transport DTO
+type OrderResponse struct {
+    ID         string `json:"id"`
+    TotalCents int64  `json:"total_cents"`
+}
+```
+
+내부 API에서 특정 model 타입 노출을 의도적으로 허용해야 한다면 명시적 예외를 둡니다:
+
+```go
+ruleset := presets.RecommendedDDD().With(handler.NewNoModelResponse(
+    handler.WithAllowedModelTypes("example.com/shop/internal/domain/order/core/model.Order"),
+))
+```
+
+발생 가능한 규칙 ID: `handler.no-model-response`.
+
 ## 세터 패턴
 
 ### `types.NewNoSetter`
@@ -860,6 +917,8 @@ go run github.com/NamhaeSusan/go-arch-guard/cmd/tui --preset hexagonal .
 | `structural.WithRepoPortSuffixes(...)` | `structural.NewRepoFileInterface`의 repository-port 인터페이스 이름 suffix 옵션. 기본값은 `Repository`, `Repo`; 빈 suffix는 무시 |
 | `interfaces.NewPattern()` / `NewContainer()` / `NewCrossDomainAnonymous()` / `NewTooManyMethods()` | 인터페이스 규칙 |
 | `interfaces.WithMaxMethods(n)` | `interfaces.NewTooManyMethods`의 인터페이스 메서드 상한 옵션. 옵션 미지정 시 기본 10; n ≤ 0이면 fallback 10. 다른 interfaces.New*() 룰에 넘기면 silently 무시 |
+| `handler.NewNoModelResponse()` | 핸들러/transport 응답 DTO 경계 검사 (옵트인) |
+| `handler.WithAllowedModelTypes(...)` | `handler.NewNoModelResponse`에서 특정 fully-qualified model 타입을 허용하는 옵션 |
 | `tx.New(tx.Config{...})` | 트랜잭션 경계 검사 (옵트인) |
 | `types.NewNoSetter()` | setter 규칙 (값 타입의 불변성 강제) |
 

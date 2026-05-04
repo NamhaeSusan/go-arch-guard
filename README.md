@@ -804,6 +804,65 @@ ruleset := presets.RecommendedDDD().With(tx.New(tx.Config{
 
 Emitted rule IDs: `tx.start-outside-allowed-layer`, `tx.type-in-signature`.
 
+## Handler Response DTO Boundary
+
+### `handler.NewNoModelResponse` (opt-in)
+
+Prevents handler and transport response boundaries from exposing configured
+domain model types directly. The rule is opt-in and defaults to **Warning**,
+so recommended bundles are unchanged until a project explicitly adds it.
+
+```go
+ruleset := presets.RecommendedDDD().With(handler.NewNoModelResponse())
+```
+
+Checked packages:
+- Domain handler sublayers, e.g. `internal/domain/<name>/handler/...`
+- Orchestration handler packages, e.g. `internal/orchestration/handler/...`
+- Top-level transport packages, e.g. `internal/server/<transport>/...`
+
+Checked shapes:
+- Exported response/result type aliases and structs
+- Exported function and method result types
+- Response body arguments passed to common helpers such as `OK`, `Created`,
+  `Success`, `Respond`, and Gin-style `JSON`
+- Direct model types plus wrappers such as pointers, slices, maps, and aliases
+
+Request DTOs and handler parameters are intentionally out of scope for this
+first rule.
+
+```go
+// flagged: model.Order becomes part of the external response contract
+type OrderResponse = model.Order
+
+func (h Handler) GetOrder() (model.Order, error) {
+    return h.service.GetOrder()
+}
+
+func (h Handler) WriteOrder(c *gin.Context, order model.Order) {
+    transporthttp.OK(c, order)
+}
+```
+
+```go
+// allowed: explicit transport DTO
+type OrderResponse struct {
+    ID         string `json:"id"`
+    TotalCents int64  `json:"total_cents"`
+}
+```
+
+If a project intentionally allows a specific model type on an internal API,
+configure an explicit exception:
+
+```go
+ruleset := presets.RecommendedDDD().With(handler.NewNoModelResponse(
+    handler.WithAllowedModelTypes("example.com/shop/internal/domain/order/core/model.Order"),
+))
+```
+
+Emitted rule ID: `handler.no-model-response`.
+
 ## Setter Pattern
 
 ### `types.NewNoSetter`
@@ -909,6 +968,8 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `interfaces.NewPattern()` / `NewContainer()` / `NewCrossDomainAnonymous()` / `NewTooManyMethods()` | interface rules |
 | `testpolicy.NewNoHandMock()` | test policy rules |
 | `interfaces.WithMaxMethods(n)` | option for `interfaces.NewTooManyMethods` setting the per-interface method cap. Default 10 when the option is omitted; n ≤ 0 also falls back to 10. Silently ignored if passed to other interfaces.New*() rules. |
+| `handler.NewNoModelResponse()` | handler/transport response DTO boundary enforcement (opt-in) |
+| `handler.WithAllowedModelTypes(...)` | option for `handler.NewNoModelResponse` allowing selected fully-qualified model types |
 | `tx.New(tx.Config{...})` | transaction boundary enforcement (opt-in) |
 | `types.NewNoSetter()` | setter rule (immutability for value types) |
 
