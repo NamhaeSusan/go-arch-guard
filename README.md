@@ -765,6 +765,29 @@ The rule does **not** prescribe a fix. It only points at the smell. Two common r
 Severity can be upgraded to Error via `interfaces.WithSeverity(core.Error)` if a project wants to enforce
 the smell as a hard rule.
 
+## Orchestration Rules
+
+`orchestration.NewLogicBudget()`
+
+Opt-in advisory rule for packages under the configured orchestration directory
+such as `internal/orchestration`. It flags functions whose branch count,
+statement count, or cyclomatic complexity exceeds configurable budgets.
+
+Simple `if err != nil { return err }` branches are discounted by default so
+ordinary Go error flow does not hide the real signal: orchestration functions
+making business decisions or accumulating too much coordination code.
+
+```go
+ruleset := core.NewRuleSet(orchestration.NewLogicBudget(
+    orchestration.WithMaxBranches(6),
+    orchestration.WithMaxStatements(30),
+    orchestration.WithMaxCyclomatic(8),
+))
+```
+
+Use `orchestration.WithCountErrorBranches()` for stricter accounting, and
+`orchestration.WithIgnoredFunctions(...)` for known exceptional functions.
+
 ## Blast Radius
 
 `dependency.NewBlastRadius()`
@@ -903,6 +926,7 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `presets.Batch()` / `presets.RecommendedBatch()` | Batch flat-layout architecture and ruleset |
 | `presets.EventPipeline()` / `presets.RecommendedEventPipeline()` | event-sourcing / CQRS architecture and ruleset |
 | `dependency.NewIsolation()` / `NewLayerDirection()` / `NewBlastRadius()` | dependency rules |
+| `orchestration.NewLogicBudget()` | opt-in orchestration complexity budget rule |
 | `naming.NewNoStutter()` / `NewImplSuffix()` / `NewSnakeCaseFiles()` / `NewNoLayerSuffix()` / `NewTypePattern()` | naming rules |
 | `structural.NewAlias()` / `NewLayerPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` / `NewRepoFileInterface()` | structure rules |
 | `structural.WithRepoPortSuffixes(...)` | option for `structural.NewRepoFileInterface` setting repository-port interface name suffixes. Default is `Repository`, `Repo`; blank suffixes are ignored. |
