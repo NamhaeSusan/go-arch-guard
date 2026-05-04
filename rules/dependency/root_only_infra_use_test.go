@@ -120,6 +120,25 @@ func New() *Store { return &Store{} }
 	assertNoRule(t, violations, rootOnlyInfraUseRule)
 }
 
+func TestRootOnlyInfraUseFlagsNonAliasDomainRootInfraImports(t *testing.T) {
+	module := "example.com/shop"
+	root := writeFixture(t, module, map[string]string{
+		"internal/domain/order/bootstrap.go": `package order
+
+import _ "example.com/shop/internal/domain/order/infra/memory"
+`,
+		"internal/domain/order/infra/memory/store.go": `package memory
+
+type Store struct{}
+`,
+	})
+
+	violations := dependency.NewRootOnlyInfraUse().Check(loadRootOnlyInfraContext(t, root, module, false))
+
+	assertViolationCount(t, violations, rootOnlyInfraUseRule, 1)
+	assertViolationAt(t, violations, "internal/domain/order/bootstrap.go")
+}
+
 func TestRootOnlyInfraUseAllowsConfiguredExtraRoot(t *testing.T) {
 	module := "example.com/shop"
 	root := writeFixture(t, module, map[string]string{

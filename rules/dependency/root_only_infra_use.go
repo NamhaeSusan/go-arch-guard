@@ -3,6 +3,7 @@ package dependency
 import (
 	"fmt"
 	"go/ast"
+	"path"
 	"strings"
 
 	"github.com/NamhaeSusan/go-arch-guard/core"
@@ -100,7 +101,7 @@ func (c infraImportChecker) checkPackage(pkg *packages.Package) []core.Violation
 		for _, imp := range file.Imports {
 			importPath := strings.Trim(imp.Path.Value, `"`)
 			targetDomain, ok := c.domainInfraTarget(importPath)
-			if !ok || c.isAllowedImporter(pkg.PkgPath, targetDomain) {
+			if !ok || c.isAllowedImporter(pkg.PkgPath, filePath, targetDomain) {
 				continue
 			}
 			pos := pkg.Fset.Position(imp.Pos())
@@ -118,16 +119,23 @@ func (c infraImportChecker) domainInfraTarget(pkgPath string) (string, bool) {
 	return domain, layer == "infra" || strings.HasPrefix(layer, "infra/")
 }
 
-func (c infraImportChecker) isAllowedImporter(pkgPath, targetDomain string) bool {
+func (c infraImportChecker) isAllowedImporter(pkgPath, filePath, targetDomain string) bool {
 	rel := analysisutil.ProjectRelativePackagePath(pkgPath, c.projectModule)
 	if rel != "" && matchesAnyRoot(rel, c.roots) {
 		return true
 	}
-	if domain, ok := c.domainRoot(rel); ok && domain == targetDomain {
+	if domain, ok := c.domainRoot(rel); ok && domain == targetDomain && path.Base(filePath) == aliasFacadeFileName(c.arch) {
 		return true
 	}
 	domain, layer, ok := c.domainLayer(pkgPath)
 	return ok && domain == targetDomain && (layer == "infra" || strings.HasPrefix(layer, "infra/"))
+}
+
+func aliasFacadeFileName(arch core.Architecture) string {
+	if arch.Naming.AliasFileName != "" {
+		return arch.Naming.AliasFileName
+	}
+	return "alias.go"
 }
 
 func (c infraImportChecker) domainRoot(rel string) (string, bool) {
