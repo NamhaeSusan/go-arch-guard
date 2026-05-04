@@ -1,4 +1,4 @@
-package infra
+package naming
 
 import (
 	"fmt"
@@ -57,7 +57,7 @@ func (r *ConstructorName) checkPackage(ctx *core.Context, pkg *packages.Package)
 			continue
 		}
 		analysisutil.WalkFuncDecls(file, func(fd *ast.FuncDecl) {
-			if !looksLikeConstructor(fd) || !returnsSamePackageNamedType(pkg, fd) || r.isAllowed(fd.Name.Name) {
+			if !looksLikeConstructor(fd) || !returnsSamePackageStruct(pkg, fd) || r.isAllowed(fd.Name.Name) {
 				return
 			}
 			pos := pkg.Fset.Position(fd.Name.Pos())
@@ -66,7 +66,7 @@ func (r *ConstructorName) checkPackage(ctx *core.Context, pkg *packages.Package)
 				Line:              pos.Line,
 				Rule:              "infra.constructor-name",
 				Message:           fmt.Sprintf("infra constructor %q must use one of: %s", fd.Name.Name, strings.Join(r.cfg.allowedConstructorNames, ", ")),
-				Fix:               "rename the constructor or configure infra.WithAllowedConstructorNames",
+				Fix:               "rename the constructor or configure naming.WithAllowedConstructorNames",
 				DefaultSeverity:   r.cfg.severity,
 				EffectiveSeverity: r.cfg.severity,
 			})
@@ -83,31 +83,33 @@ func looksLikeConstructor(fd *ast.FuncDecl) bool {
 		strings.HasPrefix(fd.Name.Name, "New")
 }
 
-func returnsSamePackageNamedType(pkg *packages.Package, fd *ast.FuncDecl) bool {
+func returnsSamePackageStruct(pkg *packages.Package, fd *ast.FuncDecl) bool {
 	if pkg == nil || pkg.TypesInfo == nil || fd == nil || fd.Type == nil || fd.Type.Results == nil {
 		return false
 	}
 	for _, result := range fd.Type.Results.List {
-		if namedTypePackagePath(pkg.TypesInfo.TypeOf(result.Type)) == pkg.PkgPath {
+		if samePackageStruct(pkg.TypesInfo.TypeOf(result.Type), pkg.PkgPath) {
 			return true
 		}
 	}
 	return false
 }
 
-func namedTypePackagePath(t types.Type) string {
+func samePackageStruct(t types.Type, pkgPath string) bool {
 	for {
-		if ptr, ok := types.Unalias(t).(*types.Pointer); ok {
+		t = types.Unalias(t)
+		if ptr, ok := t.(*types.Pointer); ok {
 			t = ptr.Elem()
 			continue
 		}
 		break
 	}
-	named, ok := types.Unalias(t).(*types.Named)
-	if !ok || named.Obj() == nil || named.Obj().Pkg() == nil {
-		return ""
+	named, ok := t.(*types.Named)
+	if !ok || named.Obj() == nil || named.Obj().Pkg() == nil || named.Obj().Pkg().Path() != pkgPath {
+		return false
 	}
-	return named.Obj().Pkg().Path()
+	_, ok = named.Underlying().(*types.Struct)
+	return ok
 }
 
 func (r *ConstructorName) isAllowed(name string) bool {

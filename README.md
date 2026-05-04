@@ -767,7 +767,7 @@ the smell as a hard rule.
 
 ## Infra Rules
 
-`infra.NewConstructorName()`
+`naming.NewConstructorName()`
 
 Opt-in advisory rule for adapter packages under configured infra-like sublayers
 such as `infra`, `adapter`, or `repository`. It flags package-level `NewXxx`
@@ -780,7 +780,7 @@ func New() *Store                  // concise constructor name
 ```
 
 Allowed constructor names and checked sublayers are configurable with
-`infra.WithAllowedConstructorNames(...)` and `infra.WithInfraSublayers(...)`.
+`naming.WithAllowedConstructorNames(...)` and `naming.WithInfraSublayers(...)`.
 
 ## Blast Radius
 
@@ -920,7 +920,7 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `presets.Batch()` / `presets.RecommendedBatch()` | Batch flat-layout architecture and ruleset |
 | `presets.EventPipeline()` / `presets.RecommendedEventPipeline()` | event-sourcing / CQRS architecture and ruleset |
 | `dependency.NewIsolation()` / `NewLayerDirection()` / `NewBlastRadius()` | dependency rules |
-| `infra.NewConstructorName()` | opt-in infra adapter constructor naming rule |
+| `naming.NewConstructorName()` | opt-in infra adapter constructor naming rule |
 | `naming.NewNoStutter()` / `NewImplSuffix()` / `NewSnakeCaseFiles()` / `NewNoLayerSuffix()` / `NewTypePattern()` | naming rules |
 | `structural.NewAlias()` / `NewLayerPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` / `NewRepoFileInterface()` | structure rules |
 | `structural.WithRepoPortSuffixes(...)` | option for `structural.NewRepoFileInterface` setting repository-port interface name suffixes. Default is `Repository`, `Repo`; blank suffixes are ignored. |

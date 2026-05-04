@@ -1,4 +1,4 @@
-package infra_test
+package naming_test
 
 import (
 	"os"
@@ -9,11 +9,11 @@ import (
 	"github.com/NamhaeSusan/go-arch-guard/analyzer"
 	"github.com/NamhaeSusan/go-arch-guard/core"
 	"github.com/NamhaeSusan/go-arch-guard/presets"
-	"github.com/NamhaeSusan/go-arch-guard/rules/infra"
+	"github.com/NamhaeSusan/go-arch-guard/rules/naming"
 )
 
 func TestConstructorNameSpec(t *testing.T) {
-	spec := infra.NewConstructorName(infra.WithSeverity(core.Error)).Spec()
+	spec := naming.NewConstructorName(naming.WithSeverity(core.Error)).Spec()
 
 	if spec.ID != "infra.constructor-name" {
 		t.Fatalf("ID = %q, want infra.constructor-name", spec.ID)
@@ -35,7 +35,7 @@ func NewOrderMemoryStore() (*Store, error) { return &Store{}, nil }
 `,
 	})
 
-	got := infra.NewConstructorName().Check(ctx)
+	got := naming.NewConstructorName().Check(ctx)
 
 	for _, name := range []string{"NewStore", "NewRepository", "NewOrderMemoryStore"} {
 		assertConstructorViolation(t, got, name)
@@ -47,14 +47,16 @@ func TestConstructorNameAllowsNewAndNonConstructors(t *testing.T) {
 		"internal/domain/order/infra/memory/store.go": `package memory
 
 type Store struct{}
+type Repository interface{ Save() error }
 
 func New() *Store { return &Store{} }
+func NewRepository() Repository { return nil }
 func NewMetricName() string { return "" }
 func BuildStore() *Store { return &Store{} }
 `,
 	})
 
-	got := infra.NewConstructorName().Check(ctx)
+	got := naming.NewConstructorName().Check(ctx)
 	if len(got) != 0 {
 		t.Fatalf("expected no constructor-name violations, got %+v", got)
 	}
@@ -70,7 +72,7 @@ func NewStore() *Store { return &Store{} }
 `,
 	})
 
-	got := infra.NewConstructorName(infra.WithAllowedConstructorNames("New", "NewStore")).Check(ctx)
+	got := naming.NewConstructorName(naming.WithAllowedConstructorNames("New", "NewStore")).Check(ctx)
 	if len(got) != 0 {
 		t.Fatalf("configured constructor name should be allowed, got %+v", got)
 	}
@@ -86,7 +88,7 @@ func NewService() *Service { return &Service{} }
 `,
 	})
 
-	got := infra.NewConstructorName().Check(ctx)
+	got := naming.NewConstructorName().Check(ctx)
 	if len(got) != 0 {
 		t.Fatalf("non-infra package should not be checked, got %+v", got)
 	}
