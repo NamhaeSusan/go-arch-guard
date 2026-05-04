@@ -835,6 +835,71 @@ ruleset := presets.RecommendedDDD().With(tx.New(tx.Config{
 
 Emitted rule IDs: `tx.start-outside-allowed-layer`, `tx.type-in-signature`.
 
+## Domain Failure Boundaries
+
+### `types.NewNoPanicInDomain` (opt-in)
+
+Flags domain/application layer calls that bypass error returns and terminate
+control flow directly:
+
+- builtin `panic(...)`
+- `log.Fatal`, `log.Fatalf`, `log.Fatalln`
+- `os.Exit(...)`
+
+By default the rule inspects domain/application layers for the active
+architecture, for example DDD `app`, `core/model`, `core/svc`, and `event`;
+Clean Architecture `entity` and `usecase`; Hexagonal `domain` and `usecase`;
+and Modular Monolith `core` and `application`.
+
+```go
+import types "github.com/NamhaeSusan/go-arch-guard/rules/types"
+
+ruleset := presets.RecommendedDDD().With(types.NewNoPanicInDomain(
+    types.WithAllowedFunctions("Must*"),
+    types.WithAllowedPaths("internal/domain/payment/core/model/must.go"),
+))
+```
+
+Prefer returning errors so outer layers can decide whether to recover, retry,
+roll back, or exit.
+
+Emitted rule ID: `errors.no-panic-in-domain`.
+
+## Domain Core Purity
+
+### `dependency.NewNoSideEffectCallInCore` (opt-in)
+
+Flags side-effectful runtime calls from configured domain inner layers such as
+`core/model`, `event`, `entity`, or other `Architecture.Layers.PkgRestricted`
+sublayers. This is call-based, so type-only imports such as `time.Time` pass
+while direct calls such as `time.Now()` or `os.Getenv(...)` are reported.
+
+Default denied calls include clock reads, environment/file access, logging,
+random generation, and network shortcut helpers:
+
+- `time.Now`, `time.Since`, `time.Until`, `time.After`
+- `os.Getenv`, `os.LookupEnv`, file create/read/write/remove helpers
+- `log.Print*`, `log.Fatal*`, `log.Panic*`
+- `math/rand.*`, `crypto/rand.Read`
+- `net/http.Get`, `Head`, `Post`, `PostForm`, and `(*http.Client).*`
+
+```go
+ruleset := presets.RecommendedDDD().With(dependency.NewNoSideEffectCallInCore(
+    dependency.WithAllowedCalls("time.Now"),        // intentional migration exception
+    dependency.WithInspectedLayers("core/model"),   // override inspected layers
+))
+```
+
+Prefer passing runtime values from outer layers:
+
+```go
+func NewOrder(id string, now time.Time) Order {
+    return Order{ID: id, CreatedAt: now}
+}
+```
+
+Emitted rule ID: `purity.no-side-effect-call-in-core`.
+
 ## Setter Pattern
 
 ### `types.NewNoSetter`
@@ -935,6 +1000,10 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `presets.EventPipeline()` / `presets.RecommendedEventPipeline()` | event-sourcing / CQRS architecture and ruleset |
 | `dependency.NewIsolation()` / `NewLayerDirection()` / `NewBlastRadius()` | dependency rules |
 | `structural.NewLogicBudget()` | opt-in orchestration complexity budget rule |
+| `types.NewNoPanicInDomain()` | domain/application panic, log.Fatal, and os.Exit rule (opt-in) |
+| `types.WithInspectedLayers(...)` / `WithAllowedPaths(...)` / `WithAllowedFunctions(...)` | options for `types.NewNoPanicInDomain` |
+| `dependency.NewNoSideEffectCallInCore()` | domain core side-effect call rule (opt-in) |
+| `dependency.WithInspectedLayers(...)` / `WithDeniedCalls(...)` / `WithAllowedCalls(...)` | options for `dependency.NewNoSideEffectCallInCore` |
 | `naming.NewNoStutter()` / `NewImplSuffix()` / `NewSnakeCaseFiles()` / `NewNoLayerSuffix()` / `NewTypePattern()` | naming rules |
 | `structural.NewAlias()` / `NewLayerPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` / `NewRepoFileInterface()` | structure rules |
 | `structural.WithRepoPortSuffixes(...)` | option for `structural.NewRepoFileInterface` setting repository-port interface name suffixes. Default is `Repository`, `Repo`; blank suffixes are ignored. |

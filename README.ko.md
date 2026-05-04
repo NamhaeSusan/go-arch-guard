@@ -791,6 +791,72 @@ ruleset := presets.RecommendedDDD().With(tx.New(tx.Config{
 
 발생 가능한 규칙 ID: `tx.start-outside-allowed-layer`, `tx.type-in-signature`.
 
+## 도메인 실패 경계
+
+### `types.NewNoPanicInDomain` (옵트인)
+
+도메인/애플리케이션 레이어에서 error 반환 경계를 우회하고 제어 흐름을 직접
+종료하는 호출을 검출합니다.
+
+- builtin `panic(...)`
+- `log.Fatal`, `log.Fatalf`, `log.Fatalln`
+- `os.Exit(...)`
+
+기본적으로 활성 아키텍처의 도메인/애플리케이션 레이어를 검사합니다. 예를 들어
+DDD는 `app`, `core/model`, `core/svc`, `event`, Clean Architecture는
+`entity`, `usecase`, Hexagonal은 `domain`, `usecase`, Modular Monolith는
+`core`, `application`을 검사합니다.
+
+```go
+import types "github.com/NamhaeSusan/go-arch-guard/rules/types"
+
+ruleset := presets.RecommendedDDD().With(types.NewNoPanicInDomain(
+    types.WithAllowedFunctions("Must*"),
+    types.WithAllowedPaths("internal/domain/payment/core/model/must.go"),
+))
+```
+
+권장 수정은 error를 반환하고, 복구/재시도/롤백/프로세스 종료 같은 정책 결정은
+바깥 레이어가 소유하게 만드는 것입니다.
+
+발생 가능한 규칙 ID: `errors.no-panic-in-domain`.
+
+## 도메인 코어 순수성
+
+### `dependency.NewNoSideEffectCallInCore` (옵트인)
+
+`core/model`, `event`, `entity` 또는 `Architecture.Layers.PkgRestricted`에
+설정된 도메인 내부 레이어에서 런타임 부수효과 API를 직접 호출하면 위반으로
+보고합니다. import 기반이 아니라 call 기반 검사이므로 `time.Time` 같은
+타입-only 사용은 통과하고, `time.Now()`나 `os.Getenv(...)` 같은 직접 호출만
+잡습니다.
+
+기본 denylist는 clock read, 환경/파일 접근, 로깅, 난수 생성, 네트워크 shortcut을
+포함합니다:
+
+- `time.Now`, `time.Since`, `time.Until`, `time.After`
+- `os.Getenv`, `os.LookupEnv`, 파일 생성/읽기/쓰기/삭제 helper
+- `log.Print*`, `log.Fatal*`, `log.Panic*`
+- `math/rand.*`, `crypto/rand.Read`
+- `net/http.Get`, `Head`, `Post`, `PostForm`, `(*http.Client).*`
+
+```go
+ruleset := presets.RecommendedDDD().With(dependency.NewNoSideEffectCallInCore(
+    dependency.WithAllowedCalls("time.Now"),      // 마이그레이션 예외
+    dependency.WithInspectedLayers("core/model"), // 검사 레이어 override
+))
+```
+
+런타임 값은 바깥 레이어에서 명시적으로 주입하는 쪽을 권장합니다:
+
+```go
+func NewOrder(id string, now time.Time) Order {
+    return Order{ID: id, CreatedAt: now}
+}
+```
+
+발생 가능한 규칙 ID: `purity.no-side-effect-call-in-core`.
+
 ## 세터 패턴
 
 ### `types.NewNoSetter`
@@ -886,6 +952,10 @@ go run github.com/NamhaeSusan/go-arch-guard/cmd/tui --preset hexagonal .
 | `presets.EventPipeline()` / `presets.RecommendedEventPipeline()` | 이벤트 소싱 / CQRS 아키텍처와 ruleset |
 | `dependency.NewIsolation()` / `NewLayerDirection()` / `NewBlastRadius()` | 의존성 규칙 |
 | `structural.NewLogicBudget()` | 옵트인 orchestration 복잡도 예산 규칙 |
+| `types.NewNoPanicInDomain()` | domain/application 레이어의 panic, log.Fatal, os.Exit 검사 (옵트인) |
+| `types.WithInspectedLayers(...)` / `WithAllowedPaths(...)` / `WithAllowedFunctions(...)` | `types.NewNoPanicInDomain` 옵션 |
+| `dependency.NewNoSideEffectCallInCore()` | 도메인 코어 부수효과 호출 검사 (옵트인) |
+| `dependency.WithInspectedLayers(...)` / `WithDeniedCalls(...)` / `WithAllowedCalls(...)` | `dependency.NewNoSideEffectCallInCore` 옵션 |
 | `naming.NewNoStutter()` / `NewImplSuffix()` / `NewSnakeCaseFiles()` / `NewNoLayerSuffix()` / `NewTypePattern()` | 네이밍 규칙 |
 | `testpolicy.NewNoHandMock()` | 테스트 정책 규칙 |
 | `structural.NewAlias()` / `NewLayerPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` / `NewRepoFileInterface()` | 구조 규칙 |

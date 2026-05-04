@@ -217,3 +217,24 @@ if err := core.Validate(arch); err != nil {
 Use `presets.Recommended...()` as the matching rule bundle for a preset. For a
 custom architecture, start with `core.NewRuleSet(...)` and include only the
 rules whose assumptions match your layout.
+
+Opt-in policy rules can use the same architecture vocabulary without changing
+the recommended bundles. For example, `types.NewNoPanicInDomain()` inspects
+the domain/application sublayers that exist in the active preset and flags
+`panic`, `log.Fatal*`, or `os.Exit` calls while staying out of
+`presets.Recommended...()` until a team explicitly adds it.
+
+## Opt-in Domain Purity Guard
+
+`dependency.NewNoSideEffectCallInCore()` is intentionally outside recommended
+bundles. Teams can enable it when they want deterministic domain inner layers:
+
+- It inspects configured inner layers such as `core/model`, `event`, or
+  `Architecture.Layers.PkgRestricted` entries.
+- It flags direct calls to side-effectful APIs such as `time.Now`,
+  `os.Getenv`, logging, random generation, file I/O, and `net/http` shortcuts.
+- It allows type-only imports and injected runtime values, for example passing
+  `now time.Time` into a constructor.
+
+The rule defaults to Warning and can be promoted with
+`dependency.WithSeverity(core.Error)` or `core.WithSeverityOverride(...)`.
