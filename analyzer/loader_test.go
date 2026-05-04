@@ -1,11 +1,13 @@
 package analyzer_test
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/NamhaeSusan/go-arch-guard/analyzer"
+	"golang.org/x/tools/go/packages"
 )
 
 func TestLoad(t *testing.T) {
@@ -157,4 +159,54 @@ func TestLoad(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestLoadWithTestsIncludesTestFiles(t *testing.T) {
+	root := t.TempDir()
+	writeLoaderFile(t, filepath.Join(root, "go.mod"), "module example.com/shop\n\ngo 1.26.1\n")
+	writeLoaderFile(t, filepath.Join(root, "internal/domain/order/handler/http/handler.go"), "package http\n")
+	writeLoaderFile(t, filepath.Join(root, "internal/domain/order/handler/http/handler_test.go"), "package http\n\nimport \"testing\"\n\nfunc TestHandler(t *testing.T) {}\n")
+
+	defaultPkgs, err := analyzer.Load(root, "internal/...")
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if containsFile(defaultPkgs, "handler_test.go") {
+		t.Fatal("Load should not include _test.go files")
+	}
+
+	withTests, err := analyzer.LoadWithTests(root, "internal/...")
+	if err != nil {
+		t.Fatalf("LoadWithTests returned error: %v", err)
+	}
+	if !containsFile(withTests, "handler_test.go") {
+		t.Fatal("LoadWithTests should include _test.go files")
+	}
+}
+
+func writeLoaderFile(t *testing.T, path, content string) {
+	t.Helper()
+
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("mkdir %s: %v", filepath.Dir(path), err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write %s: %v", path, err)
+	}
+}
+
+func containsFile(pkgs []*packages.Package, name string) bool {
+	for _, pkg := range pkgs {
+		for _, file := range pkg.GoFiles {
+			if filepath.Base(file) == name {
+				return true
+			}
+		}
+		for _, file := range pkg.CompiledGoFiles {
+			if filepath.Base(file) == name {
+				return true
+			}
+		}
+	}
+	return false
 }

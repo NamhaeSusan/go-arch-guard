@@ -760,6 +760,55 @@ ruleset := presets.RecommendedDDD().With(tx.New(tx.Config{
 
 발생 가능한 규칙 ID: `tx.start-outside-allowed-layer`, `tx.type-in-signature`.
 
+## Composition Root Infra Import
+
+### `dependency.NewRootOnlyInfraUse` (옵트인)
+
+domain `infra` adapter 직접 import를 composition root로 제한합니다. 기본 severity는
+**Warning**이며 권장 번들은 바뀌지 않습니다.
+
+기본 허용 root:
+- `cmd/...`
+- `internal/<AppDir>/...` (DDD에서는 `internal/app/...`)
+- `dependency.WithCompositionRoots(...)`로 추가한 root
+
+같은 도메인의 `infra/...` 내부 import는 허용됩니다. adapter 구현끼리 세부
+패키지를 나눠 쓸 수 있게 하기 위한 예외입니다. 같은 도메인의 domain root
+alias도 허용합니다. 팀에 따라 `alias.go`를 composition wiring을 위한 도메인
+전체 bootstrap facade로 쓰기 때문입니다.
+
+```go
+ruleset := presets.RecommendedDDD().With(dependency.NewRootOnlyInfraUse(
+    dependency.WithCompositionRoots("internal/bootstrap/..."),
+))
+```
+
+기본적으로 `_test.go` 파일은 제외합니다. 테스트 파일까지 검사하려면
+`analyzer.LoadWithTests(...)`로 패키지를 로드하고
+`dependency.WithTestFiles(true)`를 함께 사용합니다.
+
+발생 가능한 규칙 ID: `composition.root-only-infra-use`.
+
+## Domain Alias Surface
+
+### `structural.NewNonEmptyAlias` (옵트인)
+
+app package가 있는 도메인의 root `alias.go`에 exported declaration이 하나도 없으면
+위반으로 보고합니다. `structural.NewAlias()`가 alias 파일의 존재를 보장한다면,
+이 룰은 그 alias 파일이 실제 public surface를 제공하는지 봅니다. 기본 severity는
+**Warning**입니다.
+
+```go
+ruleset := presets.RecommendedDDD().With(structural.NewNonEmptyAlias())
+```
+
+exported type declaration, var, const, function을 surface로 계산합니다.
+app package가 없는 placeholder/model-only 도메인은 기본적으로 허용합니다.
+모든 도메인에 public alias surface를 요구하려면
+`structural.WithRequirePlaceholderAliases(true)`를 사용합니다.
+
+발생 가능한 규칙 ID: `domain.non-empty-alias`.
+
 ## 세터 패턴
 
 ### `types.NewNoSetter`
@@ -834,6 +883,7 @@ go run github.com/NamhaeSusan/go-arch-guard/cmd/tui --preset hexagonal .
 | 함수 | 설명 |
 |------|------|
 | `analyzer.Load(dir, patterns...)` | 분석용 Go 패키지 로드 |
+| `analyzer.LoadWithTests(dir, patterns...)` | `_test.go`를 검사하는 룰을 위해 테스트 variant까지 포함해 패키지 로드 |
 | `core.NewContext(pkgs, module, root, arch, exclude)` | 불변 분석 컨텍스트 생성 |
 | `core.Run(ctx, ruleset, opts...)` | ruleset 실행 후 `[]core.Violation` 반환; rule panic은 `meta.rule-panic` Error violation으로 변환 |
 | `core.RuleSet` | rule과 violation 필터를 담는 불변 컬렉션 |
@@ -854,6 +904,10 @@ go run github.com/NamhaeSusan/go-arch-guard/cmd/tui --preset hexagonal .
 | `presets.Batch()` / `presets.RecommendedBatch()` | Batch 플랫 레이아웃 아키텍처와 ruleset |
 | `presets.EventPipeline()` / `presets.RecommendedEventPipeline()` | 이벤트 소싱 / CQRS 아키텍처와 ruleset |
 | `dependency.NewIsolation()` / `NewLayerDirection()` / `NewBlastRadius()` | 의존성 규칙 |
+| `dependency.NewRootOnlyInfraUse()` | domain infra adapter import를 composition root로 제한하는 규칙 (옵트인) |
+| `dependency.WithCompositionRoots(...)` / `WithTestFiles(true)` | `dependency.NewRootOnlyInfraUse` 옵션 |
+| `structural.NewNonEmptyAlias()` | 비어 있는 domain alias surface 검사 (옵트인) |
+| `structural.WithRequirePlaceholderAliases(true)` | placeholder 도메인도 `structural.NewNonEmptyAlias` 검사 대상으로 포함하는 옵션 |
 | `naming.NewNoStutter()` / `NewImplSuffix()` / `NewSnakeCaseFiles()` / `NewNoLayerSuffix()` / `NewTypePattern()` | 네이밍 규칙 |
 | `testpolicy.NewNoHandMock()` | 테스트 정책 규칙 |
 | `structural.NewAlias()` / `NewLayerPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` / `NewRepoFileInterface()` | 구조 규칙 |

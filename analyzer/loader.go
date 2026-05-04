@@ -19,6 +19,18 @@ import (
 // non-nil error describing what was skipped. Callers that want partial
 // analysis should check len(pkgs) rather than treating err as fatal.
 func Load(dir string, patterns ...string) ([]*packages.Package, error) {
+	return load(dir, false, patterns...)
+}
+
+// LoadWithTests parses Go packages matching the given patterns and includes
+// package test variants so rules can inspect _test.go files when configured to
+// do so. It otherwise follows the same pattern handling and error policy as
+// Load.
+func LoadWithTests(dir string, patterns ...string) ([]*packages.Package, error) {
+	return load(dir, true, patterns...)
+}
+
+func load(dir string, includeTests bool, patterns ...string) ([]*packages.Package, error) {
 	absDir, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, fmt.Errorf("resolve dir: %w", err)
@@ -56,7 +68,8 @@ func Load(dir string, patterns ...string) ([]*packages.Package, error) {
 		Mode: packages.NeedName | packages.NeedImports | packages.NeedFiles |
 			packages.NeedSyntax | packages.NeedModule |
 			packages.NeedTypes | packages.NeedTypesInfo | packages.NeedDeps,
-		Dir: absDir,
+		Dir:   absDir,
+		Tests: includeTests,
 	}
 	pkgs, err := packages.Load(cfg, prefixed...)
 	if err != nil {

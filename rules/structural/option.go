@@ -9,8 +9,9 @@ import (
 type Option func(*ruleConfig)
 
 type ruleConfig struct {
-	severity         core.Severity
-	repoPortSuffixes []string
+	severity                  core.Severity
+	repoPortSuffixes          []string
+	requirePlaceholderAliases bool
 }
 
 func WithSeverity(severity core.Severity) Option {
@@ -30,6 +31,18 @@ func WithSeverity(severity core.Severity) Option {
 func WithRepoPortSuffixes(suffixes ...string) Option {
 	return func(cfg *ruleConfig) {
 		cfg.repoPortSuffixes = nonBlankStrings(suffixes)
+	}
+}
+
+// WithRequirePlaceholderAliases also flags empty alias files for domains
+// without an app package when using structural.NewNonEmptyAlias. By default,
+// placeholder/model-only domains are allowed until they grow an app package.
+//
+// Other structural.New*() rules silently ignore this option to keep the
+// option API uniform across the package.
+func WithRequirePlaceholderAliases(require bool) Option {
+	return func(cfg *ruleConfig) {
+		cfg.requirePlaceholderAliases = require
 	}
 }
 
