@@ -437,7 +437,7 @@ func metaRuleDisabledByConfig(ruleID, reason, fix string) core.Violation {
 func hasInternalPackages(pkgs []*packages.Package, projectModule, internalRoot string) bool {
 	prefix := projectModule + "/" + internalRoot + "/"
 	for _, pkg := range pkgs {
-		if strings.HasPrefix(pkg.PkgPath, prefix) {
+		if pkg != nil && strings.HasPrefix(pkg.PkgPath, prefix) {
 			return true
 		}
 	}

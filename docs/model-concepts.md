@@ -223,9 +223,9 @@ rules whose assumptions match your layout.
 Some DDD checks are intentionally not part of recommended bundles because teams
 adopt them at different strictness levels:
 
-- `composition.NewRootOnlyInfraUse()` keeps concrete domain `infra` adapters
+- `dependency.NewRootOnlyInfraUse()` keeps concrete domain `infra` adapters
   behind configured composition roots such as `internal/app/...` and `cmd/...`.
-- `domain.NewNonEmptyAlias()` requires a domain root `alias.go` to expose at
+- `structural.NewNonEmptyAlias()` requires a domain root `alias.go` to expose at
   least one exported public surface when that domain has an app package.
 
 Both default to Warning and can be promoted with `core.WithSeverityOverride(...)`

@@ -1,4 +1,4 @@
-package composition
+package dependency
 
 import (
 	"fmt"
@@ -48,7 +48,7 @@ func (r *RootOnlyInfraUse) Check(ctx *core.Context) []core.Violation {
 	if arch.Layout.DomainDir == "" {
 		return []core.Violation{metaRuleDisabledByConfig(ruleRootOnlyInfraUse,
 			"Layout.DomainDir is empty (flat layout); infra adapter import detection requires a domain directory",
-			"set Layout.DomainDir to your domain root, or remove composition.NewRootOnlyInfraUse() from your RuleSet")}
+			"set Layout.DomainDir to your domain root, or remove dependency.NewRootOnlyInfraUse() from your RuleSet")}
 	}
 
 	checker := infraImportChecker{

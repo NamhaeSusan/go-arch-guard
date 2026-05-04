@@ -353,12 +353,12 @@ ruleset := presets.RecommendedDDD().With(tx.New(tx.Config{
 
 domain `infra` adapter 직접 import를 composition root로 제한한다. 기본 허용 root는
 `cmd/...`와 `internal/<AppDir>/...`이며, 추가 root는
-`composition.WithCompositionRoots(...)`로 지정한다. 같은 도메인의 domain root
+`dependency.WithCompositionRoots(...)`로 지정한다. 같은 도메인의 domain root
 alias는 bootstrap facade로 보고 허용한다. 기본적으로 `_test.go`는 제외하고,
-필요하면 `composition.WithTestFiles(true)`로 포함한다.
+필요하면 `dependency.WithTestFiles(true)`로 포함한다.
 
 ```go
-ruleset := presets.RecommendedDDD().With(composition.NewRootOnlyInfraUse())
+ruleset := presets.RecommendedDDD().With(dependency.NewRootOnlyInfraUse())
 ```
 
 위반 규칙 ID: `composition.root-only-infra-use`.
@@ -367,11 +367,11 @@ ruleset := presets.RecommendedDDD().With(composition.NewRootOnlyInfraUse())
 
 app package가 있는 도메인의 root `alias.go`가 exported declaration을 하나도
 노출하지 않으면 잡는다. placeholder/model-only 도메인은 기본 허용이며,
-`domain.WithRequirePlaceholderAliases(true)`로 모든 도메인에 alias surface를
+`structural.WithRequirePlaceholderAliases(true)`로 모든 도메인에 alias surface를
 요구할 수 있다.
 
 ```go
-ruleset := presets.RecommendedDDD().With(domain.NewNonEmptyAlias())
+ruleset := presets.RecommendedDDD().With(structural.NewNonEmptyAlias())
 ```
 
 위반 규칙 ID: `domain.non-empty-alias`.

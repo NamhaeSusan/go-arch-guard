@@ -1,4 +1,4 @@
-package composition_test
+package dependency_test
 
 import (
 	"os"
@@ -9,14 +9,14 @@ import (
 	"github.com/NamhaeSusan/go-arch-guard/analyzer"
 	"github.com/NamhaeSusan/go-arch-guard/core"
 	"github.com/NamhaeSusan/go-arch-guard/presets"
-	"github.com/NamhaeSusan/go-arch-guard/rules/composition"
+	"github.com/NamhaeSusan/go-arch-guard/rules/dependency"
 	"golang.org/x/tools/go/packages"
 )
 
 const rootOnlyInfraUseRule = "composition.root-only-infra-use"
 
 func TestRootOnlyInfraUseSpec(t *testing.T) {
-	rule := composition.NewRootOnlyInfraUse()
+	rule := dependency.NewRootOnlyInfraUse()
 	spec := rule.Spec()
 
 	if spec.ID != rootOnlyInfraUseRule {
@@ -30,7 +30,7 @@ func TestRootOnlyInfraUseSpec(t *testing.T) {
 		t.Fatalf("ViolationIDs() = %v, want [%s]", got, rootOnlyInfraUseRule)
 	}
 
-	strict := composition.NewRootOnlyInfraUse(composition.WithSeverity(core.Error))
+	strict := dependency.NewRootOnlyInfraUse(dependency.WithSeverity(core.Error))
 	if strict.Spec().DefaultSeverity != core.Error {
 		t.Fatalf("WithSeverity(Error) default = %v, want Error", strict.Spec().DefaultSeverity)
 	}
@@ -61,7 +61,7 @@ import _ "example.com/shop/internal/domain/order/infra/memory"
 `,
 	})
 
-	violations := composition.NewRootOnlyInfraUse().Check(loadContext(t, root, module, false))
+	violations := dependency.NewRootOnlyInfraUse().Check(loadRootOnlyInfraContext(t, root, module, false))
 
 	assertViolationCount(t, violations, rootOnlyInfraUseRule, 4)
 	assertViolationAt(t, violations, "internal/domain/order/handler/http/handler.go")
@@ -93,7 +93,7 @@ import _ "example.com/shop/internal/domain/order/infra/sql"
 `,
 	})
 
-	violations := composition.NewRootOnlyInfraUse().Check(loadContext(t, root, module, false))
+	violations := dependency.NewRootOnlyInfraUse().Check(loadRootOnlyInfraContext(t, root, module, false))
 
 	assertNoRule(t, violations, rootOnlyInfraUseRule)
 }
@@ -115,7 +115,7 @@ func New() *Store { return &Store{} }
 `,
 	})
 
-	violations := composition.NewRootOnlyInfraUse().Check(loadContext(t, root, module, false))
+	violations := dependency.NewRootOnlyInfraUse().Check(loadRootOnlyInfraContext(t, root, module, false))
 
 	assertNoRule(t, violations, rootOnlyInfraUseRule)
 }
@@ -133,9 +133,9 @@ import _ "example.com/shop/internal/domain/order/infra/memory"
 `,
 	})
 
-	violations := composition.NewRootOnlyInfraUse(
-		composition.WithCompositionRoots("internal/bootstrap/..."),
-	).Check(loadContext(t, root, module, false))
+	violations := dependency.NewRootOnlyInfraUse(
+		dependency.WithCompositionRoots("internal/bootstrap/..."),
+	).Check(loadRootOnlyInfraContext(t, root, module, false))
 
 	assertNoRule(t, violations, rootOnlyInfraUseRule)
 }
@@ -155,11 +155,11 @@ import _ "example.com/shop/internal/domain/order/infra/memory"
 `,
 	})
 
-	defaultViolations := composition.NewRootOnlyInfraUse().Check(loadContext(t, root, module, true))
+	defaultViolations := dependency.NewRootOnlyInfraUse().Check(loadRootOnlyInfraContext(t, root, module, true))
 	assertNoRule(t, defaultViolations, rootOnlyInfraUseRule)
 
-	includeTests := composition.NewRootOnlyInfraUse(composition.WithTestFiles(true)).
-		Check(loadContext(t, root, module, true))
+	includeTests := dependency.NewRootOnlyInfraUse(dependency.WithTestFiles(true)).
+		Check(loadRootOnlyInfraContext(t, root, module, true))
 	assertViolationCount(t, includeTests, rootOnlyInfraUseRule, 1)
 	assertViolationAt(t, includeTests, "internal/domain/order/handler/http/handler_test.go")
 }
@@ -194,7 +194,7 @@ func writeFixtureFile(t *testing.T, path, content string) {
 	}
 }
 
-func loadContext(t *testing.T, root, module string, includeTests bool) *core.Context {
+func loadRootOnlyInfraContext(t *testing.T, root, module string, includeTests bool) *core.Context {
 	t.Helper()
 
 	var pkgs []*packages.Package

@@ -1,4 +1,4 @@
-package domain
+package structural
 
 import (
 	"fmt"
@@ -46,13 +46,13 @@ func (r *NonEmptyAlias) Check(ctx *core.Context) []core.Violation {
 	if root == "" {
 		root = ctx.Root()
 	}
-	if !hasDir(filepath.Join(root, arch.Layout.InternalRoot)) {
-		return []core.Violation{metaLayoutNotSupported(ruleNonEmptyAlias, root, arch.Layout.InternalRoot)}
+	if !hasInternalDir(root, arch.Layout.InternalRoot) {
+		return []core.Violation{metaLayoutNotSupported(ruleNonEmptyAlias)}
 	}
 	if arch.Layout.DomainDir == "" {
 		return []core.Violation{metaRuleDisabledByConfig(ruleNonEmptyAlias,
 			"Layout.DomainDir is empty (flat layout); alias surface detection requires a domain directory",
-			"set Layout.DomainDir to your domain root, or remove domain.NewNonEmptyAlias() from your RuleSet")}
+			"set Layout.DomainDir to your domain root, or remove structural.NewNonEmptyAlias() from your RuleSet")}
 	}
 
 	domainRoot := filepath.Join(root, arch.Layout.InternalRoot, filepath.FromSlash(arch.Layout.DomainDir))
@@ -143,36 +143,9 @@ func exportedSurface(path string) (int, int, bool) {
 	return count, line, true
 }
 
-func aliasFileName(arch core.Architecture) string {
-	if arch.Naming.AliasFileName != "" {
-		return arch.Naming.AliasFileName
-	}
-	return "alias.go"
-}
-
-func hasDir(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && info.IsDir()
-}
-
 func hasFile(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && !info.IsDir()
-}
-
-func hasNonTestGoFiles(dir string) bool {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return false
-	}
-	for _, entry := range entries {
-		name := entry.Name()
-		if entry.IsDir() || filepath.Ext(name) != ".go" || len(name) >= len("_test.go") && name[len(name)-len("_test.go"):] == "_test.go" {
-			continue
-		}
-		return true
-	}
-	return false
 }
 
 var _ core.Rule = (*NonEmptyAlias)(nil)

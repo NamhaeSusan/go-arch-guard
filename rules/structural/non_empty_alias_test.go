@@ -1,4 +1,4 @@
-package domain_test
+package structural_test
 
 import (
 	"os"
@@ -8,13 +8,13 @@ import (
 
 	"github.com/NamhaeSusan/go-arch-guard/core"
 	"github.com/NamhaeSusan/go-arch-guard/presets"
-	"github.com/NamhaeSusan/go-arch-guard/rules/domain"
+	"github.com/NamhaeSusan/go-arch-guard/rules/structural"
 )
 
 const nonEmptyAliasRule = "domain.non-empty-alias"
 
 func TestNonEmptyAliasSpec(t *testing.T) {
-	rule := domain.NewNonEmptyAlias()
+	rule := structural.NewNonEmptyAlias()
 	spec := rule.Spec()
 
 	if spec.ID != nonEmptyAliasRule {
@@ -28,7 +28,7 @@ func TestNonEmptyAliasSpec(t *testing.T) {
 		t.Fatalf("ViolationIDs() = %v, want [%s]", got, nonEmptyAliasRule)
 	}
 
-	strict := domain.NewNonEmptyAlias(domain.WithSeverity(core.Error))
+	strict := structural.NewNonEmptyAlias(structural.WithSeverity(core.Error))
 	if strict.Spec().DefaultSeverity != core.Error {
 		t.Fatalf("WithSeverity(Error) default = %v, want Error", strict.Spec().DefaultSeverity)
 	}
@@ -40,7 +40,7 @@ func TestNonEmptyAliasFlagsAppDomainWithEmptyAlias(t *testing.T) {
 		"internal/domain/order/app/service.go": "package app\n\ntype Service struct{}\n",
 	})
 
-	violations := domain.NewNonEmptyAlias().Check(ctx(root))
+	violations := structural.NewNonEmptyAlias().Check(ctx(root))
 
 	assertViolationCount(t, violations, nonEmptyAliasRule, 1)
 	assertViolationAt(t, violations, "internal/domain/order/alias.go")
@@ -64,7 +64,7 @@ func NewService() *Service { return &Service{} }
 `,
 	})
 
-	violations := domain.NewNonEmptyAlias().Check(ctx(root))
+	violations := structural.NewNonEmptyAlias().Check(ctx(root))
 
 	assertNoRule(t, violations, nonEmptyAliasRule)
 }
@@ -91,7 +91,7 @@ func NewService() *Service { return &Service{} }
 `,
 			})
 
-			violations := domain.NewNonEmptyAlias().Check(ctx(root))
+			violations := structural.NewNonEmptyAlias().Check(ctx(root))
 			assertNoRule(t, violations, nonEmptyAliasRule)
 		})
 	}
@@ -103,10 +103,10 @@ func TestNonEmptyAliasPlaceholderDomainsAreConfigurable(t *testing.T) {
 		"internal/domain/placeholder/core/model/item.go": "package model\n\ntype Item struct{}\n",
 	})
 
-	defaultViolations := domain.NewNonEmptyAlias().Check(ctx(root))
+	defaultViolations := structural.NewNonEmptyAlias().Check(ctx(root))
 	assertNoRule(t, defaultViolations, nonEmptyAliasRule)
 
-	requireAll := domain.NewNonEmptyAlias(domain.WithRequirePlaceholderAliases(true)).
+	requireAll := structural.NewNonEmptyAlias(structural.WithRequirePlaceholderAliases(true)).
 		Check(ctx(root))
 	assertViolationCount(t, requireAll, nonEmptyAliasRule, 1)
 	assertViolationAt(t, requireAll, "internal/domain/placeholder/alias.go")
