@@ -217,3 +217,9 @@ if err := core.Validate(arch); err != nil {
 Use `presets.Recommended...()` as the matching rule bundle for a preset. For a
 custom architecture, start with `core.NewRuleSet(...)` and include only the
 rules whose assumptions match your layout.
+
+Opt-in policy rules can use the same architecture vocabulary without changing
+the recommended bundles. For example, `types.NewNoPanicInDomain()` inspects
+the domain/application sublayers that exist in the active preset and flags
+`panic`, `log.Fatal*`, or `os.Exit` calls while staying out of
+`presets.Recommended...()` until a team explicitly adds it.
