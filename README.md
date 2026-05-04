@@ -283,7 +283,7 @@ import _ "myapp/internal/domain/user/app"  // violation
 
 ```go
 // use orchestration for cross-domain coordination
-package orchestration
+package structural
 
 import (
     "myapp/internal/domain/order"
@@ -699,7 +699,7 @@ type adapter struct {
 ```go
 // not flagged: same shape but inside the orchestration layer where
 // cross-domain coordination is by design
-package orchestration
+package structural
 
 import "example.com/p/internal/domain/user"
 
@@ -782,6 +782,37 @@ func New() *Store                  // concise constructor name
 Allowed constructor names and checked sublayers are configurable with
 `naming.WithAllowedConstructorNames(...)` and `naming.WithInfraSublayers(...)`.
 
+## Orchestration Rules
+
+`structural.NewLogicBudget()`
+
+Opt-in advisory rule for packages under the configured orchestration directory
+such as `internal/orchestration`. It flags functions whose branch count,
+statement count, or cyclomatic complexity exceeds configurable budgets.
+Default severity is **Warning** with budgets `maxBranches=8`,
+`maxStatements=40`, and `maxCyclomatic=10`.
+
+Simple `if err != nil { return err }` and `fmt.Errorf("%w", err)` branches are
+discounted by default so ordinary Go error flow does not hide the real signal:
+orchestration functions making business decisions or accumulating too much
+coordination code. For `if err := call(); err != nil { return err }`, the
+branch itself is discounted, but the `call()` init statement still counts.
+Function literal bodies passed to transactions, retries, or callbacks are
+included in the enclosing function's budget.
+
+```go
+ruleset := core.NewRuleSet(structural.NewLogicBudget(
+    structural.WithMaxBranches(6),
+    structural.WithMaxStatements(30),
+    structural.WithMaxCyclomatic(8),
+))
+```
+
+Use `structural.WithCountErrorBranches()` for stricter accounting,
+`structural.WithIgnoredFunctions(...)` for known exceptional functions, and
+`structural.WithIgnoredPaths(...)` for subtrees such as transport handlers
+that a team wants to govern separately.
+
 ## Blast Radius
 
 `dependency.NewBlastRadius()`
@@ -820,6 +851,71 @@ ruleset := presets.RecommendedDDD().With(tx.New(tx.Config{
 ```
 
 Emitted rule IDs: `tx.start-outside-allowed-layer`, `tx.type-in-signature`.
+
+## Domain Failure Boundaries
+
+### `types.NewNoPanicInDomain` (opt-in)
+
+Flags domain/application layer calls that bypass error returns and terminate
+control flow directly:
+
+- builtin `panic(...)`
+- `log.Fatal`, `log.Fatalf`, `log.Fatalln`
+- `os.Exit(...)`
+
+By default the rule inspects domain/application layers for the active
+architecture, for example DDD `app`, `core/model`, `core/svc`, and `event`;
+Clean Architecture `entity` and `usecase`; Hexagonal `domain` and `usecase`;
+and Modular Monolith `core` and `application`.
+
+```go
+import types "github.com/NamhaeSusan/go-arch-guard/rules/types"
+
+ruleset := presets.RecommendedDDD().With(types.NewNoPanicInDomain(
+    types.WithAllowedFunctions("Must*"),
+    types.WithAllowedPaths("internal/domain/payment/core/model/must.go"),
+))
+```
+
+Prefer returning errors so outer layers can decide whether to recover, retry,
+roll back, or exit.
+
+Emitted rule ID: `errors.no-panic-in-domain`.
+
+## Domain Core Purity
+
+### `dependency.NewNoSideEffectCallInCore` (opt-in)
+
+Flags side-effectful runtime calls from configured domain inner layers such as
+`core/model`, `event`, `entity`, or other `Architecture.Layers.PkgRestricted`
+sublayers. This is call-based, so type-only imports such as `time.Time` pass
+while direct calls such as `time.Now()` or `os.Getenv(...)` are reported.
+
+Default denied calls include clock reads, environment/file access, logging,
+random generation, and network shortcut helpers:
+
+- `time.Now`, `time.Since`, `time.Until`, `time.After`
+- `os.Getenv`, `os.LookupEnv`, file create/read/write/remove helpers
+- `log.Print*`, `log.Fatal*`, `log.Panic*`
+- `math/rand.*`, `crypto/rand.Read`
+- `net/http.Get`, `Head`, `Post`, `PostForm`, and `(*http.Client).*`
+
+```go
+ruleset := presets.RecommendedDDD().With(dependency.NewNoSideEffectCallInCore(
+    dependency.WithAllowedCalls("time.Now"),        // intentional migration exception
+    dependency.WithInspectedLayers("core/model"),   // override inspected layers
+))
+```
+
+Prefer passing runtime values from outer layers:
+
+```go
+func NewOrder(id string, now time.Time) Order {
+    return Order{ID: id, CreatedAt: now}
+}
+```
+
+Emitted rule ID: `purity.no-side-effect-call-in-core`.
 
 ## Setter Pattern
 
@@ -921,6 +1017,11 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `presets.EventPipeline()` / `presets.RecommendedEventPipeline()` | event-sourcing / CQRS architecture and ruleset |
 | `dependency.NewIsolation()` / `NewLayerDirection()` / `NewBlastRadius()` | dependency rules |
 | `naming.NewConstructorName()` | opt-in infra adapter constructor naming rule |
+| `structural.NewLogicBudget()` | opt-in orchestration complexity budget rule |
+| `types.NewNoPanicInDomain()` | domain/application panic, log.Fatal, and os.Exit rule (opt-in) |
+| `types.WithInspectedLayers(...)` / `WithAllowedPaths(...)` / `WithAllowedFunctions(...)` | options for `types.NewNoPanicInDomain` |
+| `dependency.NewNoSideEffectCallInCore()` | domain core side-effect call rule (opt-in) |
+| `dependency.WithInspectedLayers(...)` / `WithDeniedCalls(...)` / `WithAllowedCalls(...)` | options for `dependency.NewNoSideEffectCallInCore` |
 | `naming.NewNoStutter()` / `NewImplSuffix()` / `NewSnakeCaseFiles()` / `NewNoLayerSuffix()` / `NewTypePattern()` | naming rules |
 | `structural.NewAlias()` / `NewLayerPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` / `NewRepoFileInterface()` | structure rules |
 | `structural.WithRepoPortSuffixes(...)` | option for `structural.NewRepoFileInterface` setting repository-port interface name suffixes. Default is `Repository`, `Repo`; blank suffixes are ignored. |
