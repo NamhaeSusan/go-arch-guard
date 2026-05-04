@@ -765,6 +765,23 @@ The rule does **not** prescribe a fix. It only points at the smell. Two common r
 Severity can be upgraded to Error via `interfaces.WithSeverity(core.Error)` if a project wants to enforce
 the smell as a hard rule.
 
+## Infra Rules
+
+`naming.NewConstructorName()`
+
+Opt-in advisory rule for adapter packages under configured infra-like sublayers
+such as `infra`, `adapter`, or `repository`. It flags package-level `NewXxx`
+constructors that return same-package concrete adapter types when the accepted
+constructor name is `New`.
+
+```go
+func NewOrderMemoryStore() *Store  // repeats package/domain context
+func New() *Store                  // concise constructor name
+```
+
+Allowed constructor names and checked sublayers are configurable with
+`naming.WithAllowedConstructorNames(...)` and `naming.WithInfraSublayers(...)`.
+
 ## Orchestration Rules
 
 `structural.NewLogicBudget()`
@@ -999,6 +1016,7 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `presets.Batch()` / `presets.RecommendedBatch()` | Batch flat-layout architecture and ruleset |
 | `presets.EventPipeline()` / `presets.RecommendedEventPipeline()` | event-sourcing / CQRS architecture and ruleset |
 | `dependency.NewIsolation()` / `NewLayerDirection()` / `NewBlastRadius()` | dependency rules |
+| `naming.NewConstructorName()` | opt-in infra adapter constructor naming rule |
 | `structural.NewLogicBudget()` | opt-in orchestration complexity budget rule |
 | `types.NewNoPanicInDomain()` | domain/application panic, log.Fatal, and os.Exit rule (opt-in) |
 | `types.WithInspectedLayers(...)` / `WithAllowedPaths(...)` / `WithAllowedFunctions(...)` | options for `types.NewNoPanicInDomain` |
