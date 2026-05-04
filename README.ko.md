@@ -790,6 +790,42 @@ ruleset := presets.RecommendedDDD().With(types.NewNoPanicInDomain(
 
 발생 가능한 규칙 ID: `errors.no-panic-in-domain`.
 
+## 도메인 코어 순수성
+
+### `dependency.NewNoSideEffectCallInCore` (옵트인)
+
+`core/model`, `event`, `entity` 또는 `Architecture.Layers.PkgRestricted`에
+설정된 도메인 내부 레이어에서 런타임 부수효과 API를 직접 호출하면 위반으로
+보고합니다. import 기반이 아니라 call 기반 검사이므로 `time.Time` 같은
+타입-only 사용은 통과하고, `time.Now()`나 `os.Getenv(...)` 같은 직접 호출만
+잡습니다.
+
+기본 denylist는 clock read, 환경/파일 접근, 로깅, 난수 생성, 네트워크 shortcut을
+포함합니다:
+
+- `time.Now`, `time.Since`, `time.Until`, `time.After`
+- `os.Getenv`, `os.LookupEnv`, 파일 생성/읽기/쓰기/삭제 helper
+- `log.Print*`, `log.Fatal*`, `log.Panic*`
+- `math/rand.*`, `crypto/rand.Read`
+- `net/http.Get`, `Head`, `Post`, `PostForm`, `(*http.Client).*`
+
+```go
+ruleset := presets.RecommendedDDD().With(dependency.NewNoSideEffectCallInCore(
+    dependency.WithAllowedCalls("time.Now"),      // 마이그레이션 예외
+    dependency.WithInspectedLayers("core/model"), // 검사 레이어 override
+))
+```
+
+런타임 값은 바깥 레이어에서 명시적으로 주입하는 쪽을 권장합니다:
+
+```go
+func NewOrder(id string, now time.Time) Order {
+    return Order{ID: id, CreatedAt: now}
+}
+```
+
+발생 가능한 규칙 ID: `purity.no-side-effect-call-in-core`.
+
 ## 세터 패턴
 
 ### `types.NewNoSetter`
@@ -886,6 +922,8 @@ go run github.com/NamhaeSusan/go-arch-guard/cmd/tui --preset hexagonal .
 | `dependency.NewIsolation()` / `NewLayerDirection()` / `NewBlastRadius()` | 의존성 규칙 |
 | `types.NewNoPanicInDomain()` | domain/application 레이어의 panic, log.Fatal, os.Exit 검사 (옵트인) |
 | `types.WithInspectedLayers(...)` / `WithAllowedPaths(...)` / `WithAllowedFunctions(...)` | `types.NewNoPanicInDomain` 옵션 |
+| `dependency.NewNoSideEffectCallInCore()` | 도메인 코어 부수효과 호출 검사 (옵트인) |
+| `dependency.WithInspectedLayers(...)` / `WithDeniedCalls(...)` / `WithAllowedCalls(...)` | `dependency.NewNoSideEffectCallInCore` 옵션 |
 | `naming.NewNoStutter()` / `NewImplSuffix()` / `NewSnakeCaseFiles()` / `NewNoLayerSuffix()` / `NewTypePattern()` | 네이밍 규칙 |
 | `testpolicy.NewNoHandMock()` | 테스트 정책 규칙 |
 | `structural.NewAlias()` / `NewLayerPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` / `NewRepoFileInterface()` | 구조 규칙 |
