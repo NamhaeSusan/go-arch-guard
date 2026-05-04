@@ -1,4 +1,4 @@
-package orchestration_test
+package structural_test
 
 import (
 	"os"
@@ -9,11 +9,11 @@ import (
 	"github.com/NamhaeSusan/go-arch-guard/analyzer"
 	"github.com/NamhaeSusan/go-arch-guard/core"
 	"github.com/NamhaeSusan/go-arch-guard/presets"
-	"github.com/NamhaeSusan/go-arch-guard/rules/orchestration"
+	"github.com/NamhaeSusan/go-arch-guard/rules/structural"
 )
 
 func TestLogicBudgetSpec(t *testing.T) {
-	spec := orchestration.NewLogicBudget(orchestration.WithSeverity(core.Error)).Spec()
+	spec := structural.NewLogicBudget(structural.WithSeverity(core.Error)).Spec()
 
 	if spec.ID != "orchestration.logic-budget" {
 		t.Fatalf("ID = %q, want orchestration.logic-budget", spec.ID)
@@ -46,10 +46,10 @@ func (c *Checkout) Place(total int, country string, stock int, quantity int) err
 `,
 	})
 
-	got := orchestration.NewLogicBudget(
-		orchestration.WithMaxBranches(2),
-		orchestration.WithMaxStatements(100),
-		orchestration.WithMaxCyclomatic(100),
+	got := structural.NewLogicBudget(
+		structural.WithMaxBranches(2),
+		structural.WithMaxStatements(100),
+		structural.WithMaxCyclomatic(100),
 	).Check(ctx)
 
 	assertLogicBudgetViolation(t, got, "Place", "branches 3 > 2")
@@ -70,10 +70,10 @@ func Place() {
 `,
 	})
 
-	got := orchestration.NewLogicBudget(
-		orchestration.WithMaxBranches(100),
-		orchestration.WithMaxStatements(3),
-		orchestration.WithMaxCyclomatic(100),
+	got := structural.NewLogicBudget(
+		structural.WithMaxBranches(100),
+		structural.WithMaxStatements(3),
+		structural.WithMaxCyclomatic(100),
 	).Check(ctx)
 
 	assertLogicBudgetViolation(t, got, "Place", "statements 4 > 3")
@@ -108,21 +108,21 @@ func (c *Checkout) Place() error {
 `,
 	})
 
-	got := orchestration.NewLogicBudget(
-		orchestration.WithMaxBranches(0),
-		orchestration.WithMaxStatements(4),
-		orchestration.WithMaxCyclomatic(1),
+	got := structural.NewLogicBudget(
+		structural.WithMaxBranches(0),
+		structural.WithMaxStatements(4),
+		structural.WithMaxCyclomatic(1),
 	).Check(ctx)
 
 	if len(got) != 0 {
 		t.Fatalf("simple error-handling coordination should pass, got %+v", got)
 	}
 
-	got = orchestration.NewLogicBudget(
-		orchestration.WithMaxBranches(0),
-		orchestration.WithMaxStatements(4),
-		orchestration.WithMaxCyclomatic(1),
-		orchestration.WithCountErrorBranches(),
+	got = structural.NewLogicBudget(
+		structural.WithMaxBranches(0),
+		structural.WithMaxStatements(4),
+		structural.WithMaxCyclomatic(1),
+		structural.WithCountErrorBranches(),
 	).Check(ctx)
 
 	assertLogicBudgetViolation(t, got, "Place", "branches 3 > 0")
@@ -148,10 +148,10 @@ func Place() bool {
 `,
 	})
 
-	got := orchestration.NewLogicBudget(
-		orchestration.WithMaxBranches(0),
-		orchestration.WithMaxStatements(100),
-		orchestration.WithMaxCyclomatic(100),
+	got := structural.NewLogicBudget(
+		structural.WithMaxBranches(0),
+		structural.WithMaxStatements(100),
+		structural.WithMaxCyclomatic(100),
 	).Check(ctx)
 
 	assertLogicBudgetViolation(t, got, "Place", "branches 1 > 0")
@@ -179,10 +179,41 @@ func Place() error {
 `,
 	})
 
-	got := orchestration.NewLogicBudget(
-		orchestration.WithMaxBranches(0),
-		orchestration.WithMaxStatements(100),
-		orchestration.WithMaxCyclomatic(100),
+	got := structural.NewLogicBudget(
+		structural.WithMaxBranches(0),
+		structural.WithMaxStatements(100),
+		structural.WithMaxCyclomatic(100),
+	).Check(ctx)
+
+	assertLogicBudgetViolation(t, got, "Place", "branches 1 > 0")
+}
+
+func TestLogicBudgetDoesNotDiscountFmtErrorfWithPolicyWrap(t *testing.T) {
+	ctx := orchestrationContext(t, map[string]string{
+		"internal/orchestration/checkout.go": `package orchestration
+
+import (
+	"errors"
+	"fmt"
+)
+
+var ErrPolicy = errors.New("policy")
+
+func step() error { return nil }
+
+func Place() error {
+	if err := step(); err != nil {
+		return fmt.Errorf("validation failed: %w: %w", err, ErrPolicy)
+	}
+	return nil
+}
+`,
+	})
+
+	got := structural.NewLogicBudget(
+		structural.WithMaxBranches(0),
+		structural.WithMaxStatements(100),
+		structural.WithMaxCyclomatic(100),
 	).Check(ctx)
 
 	assertLogicBudgetViolation(t, got, "Place", "branches 1 > 0")
@@ -207,10 +238,10 @@ func Place() error {
 `,
 	})
 
-	got := orchestration.NewLogicBudget(
-		orchestration.WithMaxBranches(0),
-		orchestration.WithMaxStatements(100),
-		orchestration.WithMaxCyclomatic(100),
+	got := structural.NewLogicBudget(
+		structural.WithMaxBranches(0),
+		structural.WithMaxStatements(100),
+		structural.WithMaxCyclomatic(100),
 	).Check(ctx)
 
 	assertLogicBudgetViolation(t, got, "Place", "branches 1 > 0")
@@ -236,10 +267,10 @@ func Place(total int, country string) error {
 `,
 	})
 
-	got := orchestration.NewLogicBudget(
-		orchestration.WithMaxBranches(1),
-		orchestration.WithMaxStatements(100),
-		orchestration.WithMaxCyclomatic(100),
+	got := structural.NewLogicBudget(
+		structural.WithMaxBranches(1),
+		structural.WithMaxStatements(100),
+		structural.WithMaxCyclomatic(100),
 	).Check(ctx)
 
 	assertLogicBudgetViolation(t, got, "Place", "branches 2 > 1")
@@ -268,10 +299,10 @@ func Place(total int, country string) error {
 `,
 	})
 
-	got := orchestration.NewLogicBudget(
-		orchestration.WithMaxBranches(2),
-		orchestration.WithMaxStatements(100),
-		orchestration.WithMaxCyclomatic(100),
+	got := structural.NewLogicBudget(
+		structural.WithMaxBranches(2),
+		structural.WithMaxStatements(100),
+		structural.WithMaxCyclomatic(100),
 	).Check(ctx)
 
 	assertLogicBudgetViolation(t, got, "Place", "branches 3 > 2")
@@ -296,18 +327,18 @@ func Place(total int, country string, stock int, quantity int) error {
 `,
 	})
 
-	got := orchestration.NewLogicBudget(
-		orchestration.WithMaxBranches(3),
-		orchestration.WithMaxStatements(100),
-		orchestration.WithMaxCyclomatic(4),
+	got := structural.NewLogicBudget(
+		structural.WithMaxBranches(3),
+		structural.WithMaxStatements(100),
+		structural.WithMaxCyclomatic(4),
 	).Check(ctx)
 	if len(got) != 0 {
 		t.Fatalf("custom thresholds should allow Place, got %+v", got)
 	}
 
-	got = orchestration.NewLogicBudget(
-		orchestration.WithMaxBranches(0),
-		orchestration.WithIgnoredFunctions("Place"),
+	got = structural.NewLogicBudget(
+		structural.WithMaxBranches(0),
+		structural.WithIgnoredFunctions("Place"),
 	).Check(ctx)
 	if len(got) != 0 {
 		t.Fatalf("ignored function should pass, got %+v", got)
@@ -333,9 +364,9 @@ func Place(total int, country string, stock int, quantity int) error {
 `,
 	})
 
-	got := orchestration.NewLogicBudget(
-		orchestration.WithMaxBranches(0),
-		orchestration.WithIgnoredPaths("internal/orchestration/handler/..."),
+	got := structural.NewLogicBudget(
+		structural.WithMaxBranches(0),
+		structural.WithIgnoredPaths("internal/orchestration/handler/..."),
 	).Check(ctx)
 	if len(got) != 0 {
 		t.Fatalf("ignored path should pass, got %+v", got)
@@ -361,7 +392,7 @@ func Place(total int, country string, stock int, quantity int) error {
 `,
 	})
 
-	got := orchestration.NewLogicBudget(orchestration.WithMaxBranches(0)).Check(ctx)
+	got := structural.NewLogicBudget(structural.WithMaxBranches(0)).Check(ctx)
 	if len(got) != 0 {
 		t.Fatalf("non-orchestration package should not be checked, got %+v", got)
 	}

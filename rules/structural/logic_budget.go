@@ -1,4 +1,4 @@
-package orchestration
+package structural
 
 import (
 	"fmt"
@@ -378,16 +378,19 @@ func fmtErrorfWraps(call *ast.CallExpr, errName string) bool {
 	if err != nil {
 		return false
 	}
+	hasWrap := false
 	for _, idx := range fmtWrapArgIndexes(formatValue) {
 		argPos := idx + 1
 		if argPos >= len(call.Args) {
-			continue
+			return false
 		}
-		if ident, ok := call.Args[argPos].(*ast.Ident); ok && ident.Name == errName {
-			return true
+		ident, ok := call.Args[argPos].(*ast.Ident)
+		if !ok || ident.Name != errName {
+			return false
 		}
+		hasWrap = true
 	}
-	return false
+	return hasWrap
 }
 
 func fmtWrapArgIndexes(format string) []int {

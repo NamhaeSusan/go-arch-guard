@@ -283,7 +283,7 @@ import _ "myapp/internal/domain/user/app"  // violation
 
 ```go
 // use orchestration for cross-domain coordination
-package orchestration
+package structural
 
 import (
     "myapp/internal/domain/order"
@@ -699,7 +699,7 @@ type adapter struct {
 ```go
 // not flagged: same shape but inside the orchestration layer where
 // cross-domain coordination is by design
-package orchestration
+package structural
 
 import "example.com/p/internal/domain/user"
 
@@ -767,7 +767,7 @@ the smell as a hard rule.
 
 ## Orchestration Rules
 
-`orchestration.NewLogicBudget()`
+`structural.NewLogicBudget()`
 
 Opt-in advisory rule for packages under the configured orchestration directory
 such as `internal/orchestration`. It flags functions whose branch count,
@@ -784,16 +784,16 @@ Function literal bodies passed to transactions, retries, or callbacks are
 included in the enclosing function's budget.
 
 ```go
-ruleset := core.NewRuleSet(orchestration.NewLogicBudget(
-    orchestration.WithMaxBranches(6),
-    orchestration.WithMaxStatements(30),
-    orchestration.WithMaxCyclomatic(8),
+ruleset := core.NewRuleSet(structural.NewLogicBudget(
+    structural.WithMaxBranches(6),
+    structural.WithMaxStatements(30),
+    structural.WithMaxCyclomatic(8),
 ))
 ```
 
-Use `orchestration.WithCountErrorBranches()` for stricter accounting,
-`orchestration.WithIgnoredFunctions(...)` for known exceptional functions, and
-`orchestration.WithIgnoredPaths(...)` for subtrees such as transport handlers
+Use `structural.WithCountErrorBranches()` for stricter accounting,
+`structural.WithIgnoredFunctions(...)` for known exceptional functions, and
+`structural.WithIgnoredPaths(...)` for subtrees such as transport handlers
 that a team wants to govern separately.
 
 ## Blast Radius
@@ -934,7 +934,7 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `presets.Batch()` / `presets.RecommendedBatch()` | Batch flat-layout architecture and ruleset |
 | `presets.EventPipeline()` / `presets.RecommendedEventPipeline()` | event-sourcing / CQRS architecture and ruleset |
 | `dependency.NewIsolation()` / `NewLayerDirection()` / `NewBlastRadius()` | dependency rules |
-| `orchestration.NewLogicBudget()` | opt-in orchestration complexity budget rule |
+| `structural.NewLogicBudget()` | opt-in orchestration complexity budget rule |
 | `naming.NewNoStutter()` / `NewImplSuffix()` / `NewSnakeCaseFiles()` / `NewNoLayerSuffix()` / `NewTypePattern()` | naming rules |
 | `structural.NewAlias()` / `NewLayerPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` / `NewRepoFileInterface()` | structure rules |
 | `structural.WithRepoPortSuffixes(...)` | option for `structural.NewRepoFileInterface` setting repository-port interface name suffixes. Default is `Repository`, `Repo`; blank suffixes are ignored. |
