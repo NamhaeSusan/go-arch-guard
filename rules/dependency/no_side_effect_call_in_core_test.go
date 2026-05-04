@@ -220,12 +220,17 @@ func Now() time.Time {
 	assertPurityViolation(t, got, "time.Now")
 }
 
-func TestNoSideEffectCallInCoreIsOptInForRecommendedDDD(t *testing.T) {
+func TestNoSideEffectCallInCoreIsInRecommendedDDD(t *testing.T) {
 	for _, rule := range presets.RecommendedDDD().Rules() {
-		if rule.Spec().ID == "purity.no-side-effect-call-in-core" {
-			t.Fatalf("purity.no-side-effect-call-in-core must stay opt-in, found in RecommendedDDD()")
+		spec := rule.Spec()
+		if spec.ID == "purity.no-side-effect-call-in-core" {
+			if spec.DefaultSeverity != core.Error {
+				t.Fatalf("DefaultSeverity = %v, want Error", spec.DefaultSeverity)
+			}
+			return
 		}
 	}
+	t.Fatal("purity.no-side-effect-call-in-core missing from RecommendedDDD()")
 }
 
 func purityContext(t *testing.T, files map[string]string) *core.Context {

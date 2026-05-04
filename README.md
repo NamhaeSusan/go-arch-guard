@@ -769,10 +769,11 @@ the smell as a hard rule.
 
 `naming.NewConstructorName()`
 
-Opt-in advisory rule for adapter packages under configured infra-like sublayers
-such as `infra`, `adapter`, or `repository`. It flags package-level `NewXxx`
-constructors that return same-package concrete adapter types when the accepted
-constructor name is `New`.
+Included in `presets.RecommendedDDD()` as an Error rule for adapter packages
+under configured infra-like sublayers such as `infra`, `adapter`, or
+`repository`. It flags package-level `NewXxx` constructors that return
+same-package concrete adapter types when the accepted constructor name is
+`New`.
 
 ```go
 func NewOrderMemoryStore() *Store  // repeats package/domain context
@@ -786,10 +787,10 @@ Allowed constructor names and checked sublayers are configurable with
 
 `structural.NewLogicBudget()`
 
-Opt-in advisory rule for packages under the configured orchestration directory
-such as `internal/orchestration`. It flags functions whose branch count,
-statement count, or cyclomatic complexity exceeds configurable budgets.
-Default severity is **Warning** with budgets `maxBranches=8`,
+Included in `presets.RecommendedDDD()` as a Warning rule for packages under
+the configured orchestration directory such as `internal/orchestration`. It
+flags functions whose branch count, statement count, or cyclomatic complexity
+exceeds configurable budgets. Default budgets are `maxBranches=8`,
 `maxStatements=40`, and `maxCyclomatic=10`.
 
 Simple `if err != nil { return err }` and `fmt.Errorf("%w", err)` branches are
@@ -854,10 +855,11 @@ Emitted rule IDs: `tx.start-outside-allowed-layer`, `tx.type-in-signature`.
 
 ## Domain Failure Boundaries
 
-### `types.NewNoPanicInDomain` (opt-in)
+### `types.NewNoPanicInDomain`
 
-Flags domain/application layer calls that bypass error returns and terminate
-control flow directly:
+Included in `presets.RecommendedDDD()` as an Error rule. It flags
+domain/application layer calls that bypass error returns and terminate control
+flow directly:
 
 - builtin `panic(...)`
 - `log.Fatal`, `log.Fatalf`, `log.Fatalln`
@@ -871,7 +873,7 @@ and Modular Monolith `core` and `application`.
 ```go
 import types "github.com/NamhaeSusan/go-arch-guard/rules/types"
 
-ruleset := presets.RecommendedDDD().With(types.NewNoPanicInDomain(
+ruleset := core.NewRuleSet(types.NewNoPanicInDomain(
     types.WithAllowedFunctions("Must*"),
     types.WithAllowedPaths("internal/domain/payment/core/model/must.go"),
 ))
@@ -884,9 +886,10 @@ Emitted rule ID: `errors.no-panic-in-domain`.
 
 ## Domain Core Purity
 
-### `dependency.NewNoSideEffectCallInCore` (opt-in)
+### `dependency.NewNoSideEffectCallInCore`
 
-Flags side-effectful runtime calls from configured domain inner layers such as
+Included in `presets.RecommendedDDD()` as an Error rule. It flags
+side-effectful runtime calls from configured domain inner layers such as
 `core/model`, `event`, `entity`, or other `Architecture.Layers.PkgRestricted`
 sublayers. This is call-based, so type-only imports such as `time.Time` pass
 while direct calls such as `time.Now()` or `os.Getenv(...)` are reported.
@@ -901,7 +904,7 @@ random generation, and network shortcut helpers:
 - `net/http.Get`, `Head`, `Post`, `PostForm`, and `(*http.Client).*`
 
 ```go
-ruleset := presets.RecommendedDDD().With(dependency.NewNoSideEffectCallInCore(
+ruleset := core.NewRuleSet(dependency.NewNoSideEffectCallInCore(
     dependency.WithAllowedCalls("time.Now"),        // intentional migration exception
     dependency.WithInspectedLayers("core/model"),   // override inspected layers
 ))
@@ -1016,11 +1019,11 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `presets.Batch()` / `presets.RecommendedBatch()` | Batch flat-layout architecture and ruleset |
 | `presets.EventPipeline()` / `presets.RecommendedEventPipeline()` | event-sourcing / CQRS architecture and ruleset |
 | `dependency.NewIsolation()` / `NewLayerDirection()` / `NewBlastRadius()` | dependency rules |
-| `naming.NewConstructorName()` | opt-in infra adapter constructor naming rule |
-| `structural.NewLogicBudget()` | opt-in orchestration complexity budget rule |
-| `types.NewNoPanicInDomain()` | domain/application panic, log.Fatal, and os.Exit rule (opt-in) |
+| `naming.NewConstructorName()` | infra adapter constructor naming rule (RecommendedDDD: Error) |
+| `structural.NewLogicBudget()` | orchestration complexity budget rule (RecommendedDDD: Warning) |
+| `types.NewNoPanicInDomain()` | domain/application panic, log.Fatal, and os.Exit rule (RecommendedDDD: Error) |
 | `types.WithInspectedLayers(...)` / `WithAllowedPaths(...)` / `WithAllowedFunctions(...)` | options for `types.NewNoPanicInDomain` |
-| `dependency.NewNoSideEffectCallInCore()` | domain core side-effect call rule (opt-in) |
+| `dependency.NewNoSideEffectCallInCore()` | domain core side-effect call rule (RecommendedDDD: Error) |
 | `dependency.WithInspectedLayers(...)` / `WithDeniedCalls(...)` / `WithAllowedCalls(...)` | options for `dependency.NewNoSideEffectCallInCore` |
 | `naming.NewNoStutter()` / `NewImplSuffix()` / `NewSnakeCaseFiles()` / `NewNoLayerSuffix()` / `NewTypePattern()` | naming rules |
 | `structural.NewAlias()` / `NewLayerPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` / `NewRepoFileInterface()` | structure rules |
