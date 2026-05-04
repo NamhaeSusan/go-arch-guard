@@ -156,6 +156,34 @@ func Place(total int, country string, stock int, quantity int) error {
 	}
 }
 
+func TestLogicBudgetIgnoredPathsAreConfigurable(t *testing.T) {
+	ctx := orchestrationContext(t, map[string]string{
+		"internal/orchestration/handler/http/checkout.go": `package http
+
+func Place(total int, country string, stock int, quantity int) error {
+	if total > 10000 {
+		total -= total / 10
+	}
+	if country == "KR" {
+		total = total
+	}
+	if stock < quantity {
+		return nil
+	}
+	return nil
+}
+`,
+	})
+
+	got := orchestration.NewLogicBudget(
+		orchestration.WithMaxBranches(0),
+		orchestration.WithIgnoredPaths("internal/orchestration/handler/..."),
+	).Check(ctx)
+	if len(got) != 0 {
+		t.Fatalf("ignored path should pass, got %+v", got)
+	}
+}
+
 func TestLogicBudgetOnlyChecksOrchestrationPackages(t *testing.T) {
 	ctx := orchestrationContext(t, map[string]string{
 		"internal/domain/order/app/service.go": `package app

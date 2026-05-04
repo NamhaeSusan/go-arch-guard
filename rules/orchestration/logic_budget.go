@@ -62,7 +62,7 @@ func (r *LogicBudget) checkPackage(ctx *core.Context, pkg *packages.Package) []c
 			continue
 		}
 		filePath := analysisutil.RelativePathForPackage(pkg, pkg.Fset.Position(file.Pos()).Filename)
-		if ctx.IsExcluded(filePath) {
+		if ctx.IsExcluded(filePath) || r.isIgnoredPath(filePath) {
 			continue
 		}
 		analysisutil.WalkFuncDecls(file, func(fd *ast.FuncDecl) {
@@ -286,6 +286,24 @@ func (r *LogicBudget) exceededReasons(metrics functionMetrics) []string {
 
 func (r *LogicBudget) isIgnored(name string) bool {
 	return slices.Contains(r.cfg.ignoredFunctions, name)
+}
+
+func (r *LogicBudget) isIgnoredPath(path string) bool {
+	path = analysisutil.NormalizeMatchPath(path)
+	for _, pattern := range r.cfg.ignoredPaths {
+		if matchPathPattern(analysisutil.NormalizeMatchPath(pattern), path) {
+			return true
+		}
+	}
+	return false
+}
+
+func matchPathPattern(pattern, path string) bool {
+	if strings.HasSuffix(pattern, "...") {
+		prefix := strings.TrimRight(strings.TrimSuffix(pattern, "..."), "/")
+		return path == prefix || strings.HasPrefix(path, prefix+"/")
+	}
+	return pattern == path
 }
 
 func (r *LogicBudget) orchestrationDirs(layout core.LayoutModel) []string {

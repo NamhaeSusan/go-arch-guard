@@ -15,6 +15,7 @@ type ruleConfig struct {
 	maxCyclomatic      int
 	countErrorBranches bool
 	ignoredFunctions   []string
+	ignoredPaths       []string
 	orchestrationDirs  []string
 }
 
@@ -58,6 +59,14 @@ func WithIgnoredFunctions(names ...string) Option {
 	}
 }
 
+// WithIgnoredPaths excludes project-relative files or directories from this
+// rule. Patterns ending in "..." match the base path and descendants.
+func WithIgnoredPaths(paths ...string) Option {
+	return func(cfg *ruleConfig) {
+		cfg.ignoredPaths = nonBlankStrings(paths)
+	}
+}
+
 // WithOrchestrationDirs sets project-relative directories checked by the
 // rule. Values may be full paths such as "internal/orchestration" or layout
 // names such as "orchestration". Blank names are ignored.
@@ -78,6 +87,7 @@ func newConfig(opts []Option, severity core.Severity) ruleConfig {
 		opt(&cfg)
 	}
 	cfg.ignoredFunctions = slices.Clip(cfg.ignoredFunctions)
+	cfg.ignoredPaths = slices.Clip(cfg.ignoredPaths)
 	cfg.orchestrationDirs = slices.Clip(cfg.orchestrationDirs)
 	return cfg
 }

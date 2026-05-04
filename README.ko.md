@@ -743,7 +743,9 @@ ruleset := core.NewRuleSet(orchestration.NewLogicBudget(
 ```
 
 더 엄격하게 계산하려면 `orchestration.WithCountErrorBranches()`를 쓰고,
-예외 함수는 `orchestration.WithIgnoredFunctions(...)`로 지정할 수 있습니다.
+예외 함수는 `orchestration.WithIgnoredFunctions(...)`, 별도 정책으로 관리할
+transport handler 같은 하위 트리는 `orchestration.WithIgnoredPaths(...)`로
+지정할 수 있습니다.
 
 ## 블래스트 반경
 

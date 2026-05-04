@@ -785,8 +785,10 @@ ruleset := core.NewRuleSet(orchestration.NewLogicBudget(
 ))
 ```
 
-Use `orchestration.WithCountErrorBranches()` for stricter accounting, and
-`orchestration.WithIgnoredFunctions(...)` for known exceptional functions.
+Use `orchestration.WithCountErrorBranches()` for stricter accounting,
+`orchestration.WithIgnoredFunctions(...)` for known exceptional functions, and
+`orchestration.WithIgnoredPaths(...)` for subtrees such as transport handlers
+that a team wants to govern separately.
 
 ## Blast Radius
 
