@@ -217,3 +217,16 @@ if err := core.Validate(arch); err != nil {
 Use `presets.Recommended...()` as the matching rule bundle for a preset. For a
 custom architecture, start with `core.NewRuleSet(...)` and include only the
 rules whose assumptions match your layout.
+
+## Opt-in DDD Boundary Guards
+
+Some DDD checks are intentionally not part of recommended bundles because teams
+adopt them at different strictness levels:
+
+- `dependency.NewRootOnlyInfraUse()` keeps concrete domain `infra` adapters
+  behind configured composition roots such as `internal/app/...` and `cmd/...`.
+- `structural.NewNonEmptyAlias()` requires a domain root `alias.go` to expose at
+  least one exported public surface when that domain has an app package.
+
+Both default to Warning and can be promoted with `core.WithSeverityOverride(...)`
+or package-level `WithSeverity(core.Error)` options.
