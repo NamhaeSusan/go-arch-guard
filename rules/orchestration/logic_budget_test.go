@@ -188,6 +188,34 @@ func Place() error {
 	assertLogicBudgetViolation(t, got, "Place", "branches 1 > 0")
 }
 
+func TestLogicBudgetDoesNotDiscountErrorsJoinWithPolicyError(t *testing.T) {
+	ctx := orchestrationContext(t, map[string]string{
+		"internal/orchestration/checkout.go": `package orchestration
+
+import "errors"
+
+var ErrPolicy = errors.New("policy")
+
+func step() error { return nil }
+
+func Place() error {
+	if err := step(); err != nil {
+		return errors.Join(ErrPolicy, err)
+	}
+	return nil
+}
+`,
+	})
+
+	got := orchestration.NewLogicBudget(
+		orchestration.WithMaxBranches(0),
+		orchestration.WithMaxStatements(100),
+		orchestration.WithMaxCyclomatic(100),
+	).Check(ctx)
+
+	assertLogicBudgetViolation(t, got, "Place", "branches 1 > 0")
+}
+
 func TestLogicBudgetCountsFunctionLiteralBodies(t *testing.T) {
 	ctx := orchestrationContext(t, map[string]string{
 		"internal/orchestration/checkout.go": `package orchestration
@@ -215,6 +243,38 @@ func Place(total int, country string) error {
 	).Check(ctx)
 
 	assertLogicBudgetViolation(t, got, "Place", "branches 2 > 1")
+}
+
+func TestLogicBudgetCountsFunctionLiteralBodiesInControlExpressions(t *testing.T) {
+	ctx := orchestrationContext(t, map[string]string{
+		"internal/orchestration/checkout.go": `package orchestration
+
+func run(fn func() bool) bool { return fn() }
+
+func Place(total int, country string) error {
+	if run(func() bool {
+		if total > 10000 {
+			total -= total / 10
+		}
+		if country == "KR" {
+			total = total
+		}
+		return true
+	}) {
+		return nil
+	}
+	return nil
+}
+`,
+	})
+
+	got := orchestration.NewLogicBudget(
+		orchestration.WithMaxBranches(2),
+		orchestration.WithMaxStatements(100),
+		orchestration.WithMaxCyclomatic(100),
+	).Check(ctx)
+
+	assertLogicBudgetViolation(t, got, "Place", "branches 3 > 2")
 }
 
 func TestLogicBudgetThresholdsAndIgnoredFunctionsAreConfigurable(t *testing.T) {

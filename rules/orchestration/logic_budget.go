@@ -129,6 +129,7 @@ func (r *LogicBudget) measureStmt(stmt ast.Stmt, metrics *functionMetrics, retCt
 		metrics.branches++
 		metrics.cyclomatic++
 		metrics.cyclomatic += booleanComplexity(s.Cond)
+		r.measureExpr(s.Cond, metrics, retCtx)
 		r.measureStmt(s.Init, metrics, retCtx)
 		r.measureBlock(s.Body, metrics, retCtx)
 		r.measureStmt(s.Else, metrics, retCtx)
@@ -137,6 +138,7 @@ func (r *LogicBudget) measureStmt(stmt ast.Stmt, metrics *functionMetrics, retCt
 		metrics.branches++
 		metrics.cyclomatic++
 		metrics.cyclomatic += booleanComplexity(s.Cond)
+		r.measureExpr(s.Cond, metrics, retCtx)
 		r.measureStmt(s.Init, metrics, retCtx)
 		r.measureStmt(s.Post, metrics, retCtx)
 		r.measureBlock(s.Body, metrics, retCtx)
@@ -144,11 +146,13 @@ func (r *LogicBudget) measureStmt(stmt ast.Stmt, metrics *functionMetrics, retCt
 		metrics.statements++
 		metrics.branches++
 		metrics.cyclomatic++
+		r.measureExpr(s.X, metrics, retCtx)
 		r.measureBlock(s.Body, metrics, retCtx)
 	case *ast.SwitchStmt:
 		metrics.statements++
 		metrics.branches++
 		metrics.cyclomatic++
+		r.measureExpr(s.Tag, metrics, retCtx)
 		r.measureStmt(s.Init, metrics, retCtx)
 		for _, stmt := range s.Body.List {
 			cc, ok := stmt.(*ast.CaseClause)
@@ -158,6 +162,9 @@ func (r *LogicBudget) measureStmt(stmt ast.Stmt, metrics *functionMetrics, retCt
 			if len(cc.List) > 0 {
 				metrics.branches++
 				metrics.cyclomatic++
+			}
+			for _, expr := range cc.List {
+				r.measureExpr(expr, metrics, retCtx)
 			}
 			for _, child := range cc.Body {
 				r.measureStmt(child, metrics, retCtx)
@@ -168,6 +175,7 @@ func (r *LogicBudget) measureStmt(stmt ast.Stmt, metrics *functionMetrics, retCt
 		metrics.branches++
 		metrics.cyclomatic++
 		r.measureStmt(s.Init, metrics, retCtx)
+		r.measureFuncLits(s.Assign, metrics, retCtx)
 		for _, stmt := range s.Body.List {
 			cc, ok := stmt.(*ast.CaseClause)
 			if !ok {
@@ -176,6 +184,9 @@ func (r *LogicBudget) measureStmt(stmt ast.Stmt, metrics *functionMetrics, retCt
 			if len(cc.List) > 0 {
 				metrics.branches++
 				metrics.cyclomatic++
+			}
+			for _, expr := range cc.List {
+				r.measureExpr(expr, metrics, retCtx)
 			}
 			for _, child := range cc.Body {
 				r.measureStmt(child, metrics, retCtx)
@@ -193,6 +204,7 @@ func (r *LogicBudget) measureStmt(stmt ast.Stmt, metrics *functionMetrics, retCt
 			if cc.Comm != nil {
 				metrics.branches++
 				metrics.cyclomatic++
+				r.measureFuncLits(cc.Comm, metrics, retCtx)
 			}
 			for _, child := range cc.Body {
 				r.measureStmt(child, metrics, retCtx)
@@ -204,7 +216,14 @@ func (r *LogicBudget) measureStmt(stmt ast.Stmt, metrics *functionMetrics, retCt
 	}
 }
 
+func (r *LogicBudget) measureExpr(expr ast.Expr, metrics *functionMetrics, retCtx returnContext) {
+	r.measureFuncLits(expr, metrics, retCtx)
+}
+
 func (r *LogicBudget) measureFuncLits(node ast.Node, metrics *functionMetrics, retCtx returnContext) {
+	if node == nil {
+		return
+	}
 	ast.Inspect(node, func(n ast.Node) bool {
 		lit, ok := n.(*ast.FuncLit)
 		if !ok {
@@ -326,7 +345,7 @@ func isErrorPropagationExpr(expr ast.Expr, errName string, info *types.Info) boo
 	case "fmt.Errorf":
 		return fmtErrorfWraps(call, errName)
 	case "errors.Join":
-		return callArgIsIdent(call, errName)
+		return errorsJoinPropagatesOnlyCheckedErr(call, errName)
 	default:
 		return false
 	}
@@ -458,13 +477,22 @@ func verbConsumesArg(verb byte) bool {
 	return verb != '%'
 }
 
-func callArgIsIdent(call *ast.CallExpr, name string) bool {
+func errorsJoinPropagatesOnlyCheckedErr(call *ast.CallExpr, errName string) bool {
+	var hasErr bool
 	for _, arg := range call.Args {
-		if ident, ok := arg.(*ast.Ident); ok && ident.Name == name {
-			return true
+		ident, ok := arg.(*ast.Ident)
+		if !ok {
+			return false
+		}
+		switch ident.Name {
+		case errName:
+			hasErr = true
+		case "nil":
+		default:
+			return false
 		}
 	}
-	return false
+	return hasErr
 }
 
 func isZeroReturnExpr(expr ast.Expr) bool {
