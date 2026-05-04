@@ -804,6 +804,54 @@ ruleset := presets.RecommendedDDD().With(tx.New(tx.Config{
 
 Emitted rule IDs: `tx.start-outside-allowed-layer`, `tx.type-in-signature`.
 
+## Composition Root Infra Imports
+
+### `composition.NewRootOnlyInfraUse` (opt-in)
+
+Restricts direct imports of domain `infra` adapters to composition roots.
+Default severity is **Warning** and recommended bundles are unchanged.
+
+Default allowed roots:
+- `cmd/...`
+- `internal/<AppDir>/...` (for DDD, `internal/app/...`)
+- any extra roots passed through `composition.WithCompositionRoots(...)`
+
+Same-domain imports from inside `infra/...` are allowed so an adapter package
+can share implementation details with sibling adapter packages. Same-domain
+domain root aliases are also allowed because teams may use `alias.go` as a
+domain-wide bootstrap facade for composition wiring.
+
+```go
+ruleset := presets.RecommendedDDD().With(composition.NewRootOnlyInfraUse(
+    composition.WithCompositionRoots("internal/bootstrap/..."),
+))
+```
+
+By default `_test.go` files are skipped. Enable test checking with
+`composition.WithTestFiles(true)`.
+
+Emitted rule ID: `composition.root-only-infra-use`.
+
+## Domain Alias Surface
+
+### `domain.NewNonEmptyAlias` (opt-in)
+
+Flags a domain root `alias.go` with no exported declarations when that domain
+has an app package. This complements `structural.NewAlias()`: the structural
+rule ensures the alias file exists, while this rule ensures it exposes a usable
+public surface. Default severity is **Warning**.
+
+```go
+ruleset := presets.RecommendedDDD().With(domain.NewNonEmptyAlias())
+```
+
+The rule counts exported type declarations, vars, consts, and functions.
+Placeholder/model-only domains without an app package are allowed by default;
+use `domain.WithRequirePlaceholderAliases(true)` to require a public alias
+surface for every domain.
+
+Emitted rule ID: `domain.non-empty-alias`.
+
 ## Setter Pattern
 
 ### `types.NewNoSetter`
@@ -903,6 +951,10 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `presets.Batch()` / `presets.RecommendedBatch()` | Batch flat-layout architecture and ruleset |
 | `presets.EventPipeline()` / `presets.RecommendedEventPipeline()` | event-sourcing / CQRS architecture and ruleset |
 | `dependency.NewIsolation()` / `NewLayerDirection()` / `NewBlastRadius()` | dependency rules |
+| `composition.NewRootOnlyInfraUse()` | composition-root-only domain infra adapter import rule (opt-in) |
+| `composition.WithCompositionRoots(...)` / `WithTestFiles(true)` | options for `composition.NewRootOnlyInfraUse` |
+| `domain.NewNonEmptyAlias()` | non-empty domain alias surface rule (opt-in) |
+| `domain.WithRequirePlaceholderAliases(true)` | option for `domain.NewNonEmptyAlias` to flag placeholder domains too |
 | `naming.NewNoStutter()` / `NewImplSuffix()` / `NewSnakeCaseFiles()` / `NewNoLayerSuffix()` / `NewTypePattern()` | naming rules |
 | `structural.NewAlias()` / `NewLayerPlacement()` / `NewBannedPackage()` / `NewModelRequired()` / `NewInternalTopLevel()` / `NewRepoFileInterface()` | structure rules |
 | `structural.WithRepoPortSuffixes(...)` | option for `structural.NewRepoFileInterface` setting repository-port interface name suffixes. Default is `Repository`, `Repo`; blank suffixes are ignored. |
