@@ -349,15 +349,16 @@ ruleset := presets.RecommendedDDD().With(tx.New(tx.Config{
 
 위반 규칙 ID: `tx.start-outside-allowed-layer`, `tx.type-in-signature`.
 
-### No Panic In Domain (opt-in)
+### No Panic In Domain
 
-도메인/애플리케이션 레이어에서 `panic`, `log.Fatal*`, `os.Exit`로 error
-경계를 우회하고 프로세스 제어를 직접 가져가는 코드를 잡습니다.
+`presets.RecommendedDDD()`에 Error 규칙으로 포함된다. 도메인/애플리케이션
+레이어에서 `panic`, `log.Fatal*`, `os.Exit`로 error 경계를 우회하고 프로세스
+제어를 직접 가져가는 코드를 잡습니다.
 
 ```go
 import types "github.com/NamhaeSusan/go-arch-guard/rules/types"
 
-ruleset := presets.RecommendedDDD().With(types.NewNoPanicInDomain(
+ruleset := core.NewRuleSet(types.NewNoPanicInDomain(
     types.WithAllowedFunctions("Must*"),
     types.WithAllowedPaths("internal/domain/payment/core/model/must.go"),
 ))
@@ -365,16 +366,17 @@ ruleset := presets.RecommendedDDD().With(types.NewNoPanicInDomain(
 
 위반 규칙 ID: `errors.no-panic-in-domain`.
 
-### Domain Core Purity (opt-in)
+### Domain Core Purity
 
-도메인 내부 레이어(`core/model`, `event`, `Architecture.Layers.PkgRestricted`
-등)에서 `time.Now`, `os.Getenv`, 파일 create/read/write/remove helper,
-`log.Print*`, `math/rand.*`, `crypto/rand.Read`, `net/http.Get`,
-`(*http.Client).*` 같은 런타임 부수효과 API를 직접 호출하는 패턴을 잡는다.
+`presets.RecommendedDDD()`에 Error 규칙으로 포함된다. 도메인 내부 레이어
+(`core/model`, `event`, `Architecture.Layers.PkgRestricted` 등)에서 `time.Now`,
+`os.Getenv`, 파일 create/read/write/remove helper, `log.Print*`, `math/rand.*`,
+`crypto/rand.Read`, `net/http.Get`, `(*http.Client).*` 같은 런타임 부수효과 API를
+직접 호출하는 패턴을 잡는다.
 타입-only 사용(`time.Time`)은 허용하고 call expression만 검사한다.
 
 ```go
-ruleset := presets.RecommendedDDD().With(dependency.NewNoSideEffectCallInCore())
+ruleset := core.NewRuleSet(dependency.NewNoSideEffectCallInCore())
 ```
 
 필요하면 `dependency.WithInspectedLayers(...)`, `dependency.WithDeniedCalls(...)`,

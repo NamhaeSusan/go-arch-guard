@@ -233,12 +233,17 @@ func Pay() { panic("bad") }
 	assertNoRule(t, got, noPanicRule)
 }
 
-func TestNoPanicInDomainIsOptInForRecommendedDDD(t *testing.T) {
+func TestNoPanicInDomainIsInRecommendedDDD(t *testing.T) {
 	for _, rule := range presets.RecommendedDDD().Rules() {
-		if rule.Spec().ID == noPanicRule {
-			t.Fatalf("%s must stay opt-in, found in RecommendedDDD()", noPanicRule)
+		spec := rule.Spec()
+		if spec.ID == noPanicRule {
+			if spec.DefaultSeverity != core.Error {
+				t.Fatalf("DefaultSeverity = %v, want Error", spec.DefaultSeverity)
+			}
+			return
 		}
 	}
+	t.Fatalf("%s missing from RecommendedDDD()", noPanicRule)
 }
 
 func panicContext(t *testing.T, files map[string]string) *core.Context {

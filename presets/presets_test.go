@@ -163,3 +163,25 @@ func TestRecommendedRuleSetsContainCoreRules(t *testing.T) {
 		})
 	}
 }
+
+func TestRecommendedDDDIncludesStrictOptInQualityRules(t *testing.T) {
+	want := map[string]core.Severity{
+		"infra.constructor-name":             core.Error,
+		"orchestration.logic-budget":         core.Warning,
+		"errors.no-panic-in-domain":          core.Error,
+		"purity.no-side-effect-call-in-core": core.Error,
+	}
+	got := make(map[string]core.Severity)
+	for _, rule := range presets.RecommendedDDD().Rules() {
+		spec := rule.Spec()
+		got[spec.ID] = spec.DefaultSeverity
+	}
+
+	for id, severity := range want {
+		if gotSeverity, ok := got[id]; !ok {
+			t.Errorf("RecommendedDDD missing rule %q", id)
+		} else if gotSeverity != severity {
+			t.Errorf("RecommendedDDD rule %q severity = %v, want %v", id, gotSeverity, severity)
+		}
+	}
+}

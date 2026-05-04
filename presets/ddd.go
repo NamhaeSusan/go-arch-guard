@@ -83,6 +83,7 @@ func RecommendedDDD() core.RuleSet {
 		naming.NewImplSuffix(),
 		naming.NewSnakeCaseFiles(),
 		naming.NewNoLayerSuffix(),
+		naming.NewConstructorName(naming.WithSeverity(core.Error)),
 		testpolicy.NewNoHandMock(),
 		structural.NewRepoFileInterface(),
 		structural.NewAlias(),
@@ -90,11 +91,14 @@ func RecommendedDDD() core.RuleSet {
 		structural.NewBannedPackage(),
 		structural.NewModelRequired(),
 		structural.NewInternalTopLevel(),
+		structural.NewLogicBudget(),
 		interfaces.NewPattern(),
 		interfaces.NewTooManyMethods(),
 		interfaces.NewContainer(),
 		interfaces.NewCrossDomainAnonymous(),
 		naming.NewTypePattern(),
 		types.NewNoSetter(),
+		types.NewNoPanicInDomain(types.WithSeverity(core.Error)),
+		dependency.NewNoSideEffectCallInCore(dependency.WithSeverity(core.Error)),
 	)
 }
