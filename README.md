@@ -824,6 +824,8 @@ Checked packages:
 Checked shapes:
 - Exported response/result type aliases and structs
 - Exported function and method result types
+- Response body arguments passed to common helpers such as `OK`, `Created`,
+  `Success`, `Respond`, and Gin-style `JSON`
 - Direct model types plus wrappers such as pointers, slices, maps, and aliases
 
 Request DTOs and handler parameters are intentionally out of scope for this
@@ -835,6 +837,10 @@ type OrderResponse = model.Order
 
 func (h Handler) GetOrder() (model.Order, error) {
     return h.service.GetOrder()
+}
+
+func (h Handler) WriteOrder(c *gin.Context, order model.Order) {
+    transporthttp.OK(c, order)
 }
 ```
 

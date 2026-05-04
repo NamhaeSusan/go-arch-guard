@@ -177,6 +177,45 @@ func GetOrder() (model.Order, error) {
 	assertViolationAt(t, violations, "internal/server/http/handler.go", "GetOrder")
 }
 
+func TestNoModelResponseDetectsModelWrittenToResponseHelpers(t *testing.T) {
+	module := "example.com/shop"
+	root := writeFixture(t, module, map[string]string{
+		"internal/domain/order/core/model/order.go": `package model
+
+type Order struct {
+	ID string
+}
+`,
+		"internal/domain/order/app/types.go": `package app
+
+import "example.com/shop/internal/domain/order/core/model"
+
+type Order = model.Order
+`,
+		"internal/domain/order/handler/http/handler.go": `package http
+
+import "example.com/shop/internal/domain/order/app"
+
+type Context struct{}
+
+func (Context) JSON(code int, data any) {}
+func OK(c any, data any) {}
+
+type Handler struct{}
+
+func (h Handler) WriteOrder(c Context, order app.Order) {
+	OK(c, order)
+	c.JSON(200, order)
+}
+`,
+	})
+
+	violations := handler.NewNoModelResponse().Check(loadContext(t, root, module, presets.DDD()))
+
+	assertViolationCount(t, violations, noModelResponseRule, 2)
+	assertViolationAt(t, violations, "internal/domain/order/handler/http/handler.go", "response body")
+}
+
 func TestNoModelResponseDetectsOrchestrationHandlerModelResponses(t *testing.T) {
 	module := "example.com/shop"
 	root := writeFixture(t, module, map[string]string{

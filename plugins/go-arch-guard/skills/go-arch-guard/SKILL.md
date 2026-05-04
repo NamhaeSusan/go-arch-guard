@@ -365,6 +365,8 @@ ruleset := presets.RecommendedDDD().With(handler.NewNoModelResponse())
 - `internal/server/<transport>/...`
 - exported response/result alias 및 struct
 - exported 함수/메서드 result type
+- `OK`, `Created`, `Success`, `Respond`, Gin 스타일 `JSON` 같은 일반적인
+  응답 helper에 넘기는 response body argument
 
 제외 대상:
 - request DTO와 handler parameter

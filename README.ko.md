@@ -780,6 +780,8 @@ ruleset := presets.RecommendedDDD().With(handler.NewNoModelResponse())
 검사 대상 형태:
 - exported response/result type alias 및 struct
 - exported 함수/메서드의 result type
+- `OK`, `Created`, `Success`, `Respond`, Gin 스타일 `JSON` 같은 일반적인
+  응답 helper에 넘기는 response body argument
 - pointer, slice, map, alias로 감싼 model 타입
 
 request DTO와 handler parameter는 첫 버전에서 의도적으로 제외합니다.
@@ -790,6 +792,10 @@ type OrderResponse = model.Order
 
 func (h Handler) GetOrder() (model.Order, error) {
     return h.service.GetOrder()
+}
+
+func (h Handler) WriteOrder(c *gin.Context, order model.Order) {
+    transporthttp.OK(c, order)
 }
 ```
 

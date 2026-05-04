@@ -119,7 +119,32 @@ func (c responseChecker) checkPackage(pkg *packages.Package) []core.Violation {
 				}
 			}
 		})
+		violations = append(violations, c.checkResponseCalls(file, pkg, filePath)...)
 	}
+	return violations
+}
+
+func (c responseChecker) checkResponseCalls(file *ast.File, pkg *packages.Package, filePath string) []core.Violation {
+	var violations []core.Violation
+	ast.Inspect(file, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		bodyArgIndex := responseBodyArgIndex(call)
+		if bodyArgIndex < 0 || bodyArgIndex >= len(call.Args) {
+			return true
+		}
+		typ := pkg.TypesInfo.TypeOf(call.Args[bodyArgIndex])
+		if typ == nil {
+			return true
+		}
+		if ref, ok := c.findModelRef(typ, pkg.PkgPath, true); ok {
+			pos := pkg.Fset.Position(call.Pos())
+			violations = append(violations, c.violation(filePath, pos.Line, "response body "+quote(responseCallName(call)), ref))
+		}
+		return true
+	})
 	return violations
 }
 
@@ -280,6 +305,42 @@ func isResponseTypeName(name string) bool {
 		return false
 	}
 	return strings.HasSuffix(name, "Response") || strings.HasSuffix(name, "Result")
+}
+
+func responseBodyArgIndex(call *ast.CallExpr) int {
+	if call == nil {
+		return -1
+	}
+	name := responseCallName(call)
+	switch name {
+	case "JSON", "IndentedJSON", "PureJSON", "SecureJSON", "XML", "YAML", "ProtoBuf":
+		if len(call.Args) >= 2 {
+			return 1
+		}
+	case "OK", "Created", "Success":
+		if len(call.Args) >= 2 {
+			return 1
+		}
+	case "Respond":
+		if len(call.Args) >= 3 {
+			return 2
+		}
+	}
+	return -1
+}
+
+func responseCallName(call *ast.CallExpr) string {
+	if call == nil {
+		return ""
+	}
+	switch fun := call.Fun.(type) {
+	case *ast.SelectorExpr:
+		return fun.Sel.Name
+	case *ast.Ident:
+		return fun.Name
+	default:
+		return ""
+	}
 }
 
 func funcName(fd *ast.FuncDecl) string {
