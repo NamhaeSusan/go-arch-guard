@@ -780,6 +780,8 @@ discounted by default so ordinary Go error flow does not hide the real signal:
 orchestration functions making business decisions or accumulating too much
 coordination code. For `if err := call(); err != nil { return err }`, the
 branch itself is discounted, but the `call()` init statement still counts.
+Function literal bodies passed to transactions, retries, or callbacks are
+included in the enclosing function's budget.
 
 ```go
 ruleset := core.NewRuleSet(orchestration.NewLogicBudget(

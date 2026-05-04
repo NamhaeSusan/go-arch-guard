@@ -6,6 +6,7 @@ import (
 	"go/token"
 	"go/types"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/NamhaeSusan/go-arch-guard/core"
@@ -97,7 +98,7 @@ func (r *LogicBudget) checkPackage(ctx *core.Context, pkg *packages.Package) []c
 
 func (r *LogicBudget) measure(fd *ast.FuncDecl, info *types.Info) functionMetrics {
 	metrics := functionMetrics{cyclomatic: 1}
-	r.measureBlock(fd.Body, &metrics, newReturnContext(fd, info))
+	r.measureBlock(fd.Body, &metrics, newReturnContextFromFuncType(fd.Type, info))
 	return metrics
 }
 
@@ -199,7 +200,19 @@ func (r *LogicBudget) measureStmt(stmt ast.Stmt, metrics *functionMetrics, retCt
 		}
 	default:
 		metrics.statements++
+		r.measureFuncLits(stmt, metrics, retCtx)
 	}
+}
+
+func (r *LogicBudget) measureFuncLits(node ast.Node, metrics *functionMetrics, retCtx returnContext) {
+	ast.Inspect(node, func(n ast.Node) bool {
+		lit, ok := n.(*ast.FuncLit)
+		if !ok {
+			return true
+		}
+		r.measureBlock(lit.Body, metrics, newReturnContextFromFuncType(lit.Type, retCtx.info))
+		return false
+	})
 }
 
 func booleanComplexity(expr ast.Expr) int {
@@ -217,12 +230,12 @@ func booleanComplexity(expr ast.Expr) int {
 	return count
 }
 
-func newReturnContext(fd *ast.FuncDecl, info *types.Info) returnContext {
+func newReturnContextFromFuncType(funcType *ast.FuncType, info *types.Info) returnContext {
 	ctx := returnContext{info: info}
-	if fd == nil || fd.Type == nil || fd.Type.Results == nil || info == nil {
+	if funcType == nil || funcType.Results == nil || info == nil {
 		return ctx
 	}
-	for _, field := range fd.Type.Results.List {
+	for _, field := range funcType.Results.List {
 		t := info.TypeOf(field.Type)
 		count := len(field.Names)
 		if count == 0 {
@@ -339,10 +352,110 @@ func fmtErrorfWraps(call *ast.CallExpr, errName string) bool {
 		return false
 	}
 	format, ok := call.Args[0].(*ast.BasicLit)
-	if !ok || format.Kind != token.STRING || !strings.Contains(format.Value, "%w") {
+	if !ok || format.Kind != token.STRING {
 		return false
 	}
-	return callArgIsIdent(call, errName)
+	formatValue, err := strconv.Unquote(format.Value)
+	if err != nil {
+		return false
+	}
+	for _, idx := range fmtWrapArgIndexes(formatValue) {
+		argPos := idx + 1
+		if argPos >= len(call.Args) {
+			continue
+		}
+		if ident, ok := call.Args[argPos].(*ast.Ident); ok && ident.Name == errName {
+			return true
+		}
+	}
+	return false
+}
+
+func fmtWrapArgIndexes(format string) []int {
+	var indexes []int
+	nextArg := 0
+	for i := 0; i < len(format); i++ {
+		if format[i] != '%' {
+			continue
+		}
+		i++
+		if i >= len(format) {
+			break
+		}
+		if format[i] == '%' {
+			continue
+		}
+
+		verbArg := -1
+		if idx, next, ok := parseFmtIndex(format, i); ok {
+			verbArg = idx
+			i = next
+		}
+		for i < len(format) && strings.ContainsRune("#0+- ", rune(format[i])) {
+			i++
+		}
+		i, nextArg = consumeFmtWidthOrPrecisionArg(format, i, nextArg)
+		if i < len(format) && format[i] == '.' {
+			i, nextArg = consumeFmtWidthOrPrecisionArg(format, i+1, nextArg)
+		}
+		if idx, next, ok := parseFmtIndex(format, i); ok {
+			verbArg = idx
+			i = next
+		}
+		if i >= len(format) {
+			break
+		}
+
+		arg := verbArg
+		if arg < 0 {
+			arg = nextArg
+		}
+		if format[i] == 'w' {
+			indexes = append(indexes, arg)
+		}
+		if verbConsumesArg(format[i]) {
+			nextArg = arg + 1
+		}
+	}
+	return indexes
+}
+
+func consumeFmtWidthOrPrecisionArg(format string, i, nextArg int) (int, int) {
+	if idx, next, ok := parseFmtIndex(format, i); ok {
+		if next < len(format) && format[next] == '*' {
+			return next + 1, idx + 1
+		}
+		return i, nextArg
+	}
+	if i < len(format) && format[i] == '*' {
+		return i + 1, nextArg + 1
+	}
+	for i < len(format) && format[i] >= '0' && format[i] <= '9' {
+		i++
+	}
+	return i, nextArg
+}
+
+func parseFmtIndex(format string, i int) (int, int, bool) {
+	if i >= len(format) || format[i] != '[' {
+		return 0, i, false
+	}
+	j := i + 1
+	for j < len(format) && format[j] >= '0' && format[j] <= '9' {
+		j++
+	}
+	if j == i+1 || j >= len(format) || format[j] != ']' {
+		return 0, i, false
+	}
+	n, err := strconv.Atoi(format[i+1 : j])
+	if err != nil || n <= 0 {
+		return 0, i, false
+	}
+	return n - 1, j + 1, true
+}
+
+func verbConsumesArg(verb byte) bool {
+	return verb != '%'
 }
 
 func callArgIsIdent(call *ast.CallExpr, name string) bool {

@@ -157,6 +157,66 @@ func Place() bool {
 	assertLogicBudgetViolation(t, got, "Place", "branches 1 > 0")
 }
 
+func TestLogicBudgetOnlyDiscountsFmtErrorfWhenCheckedErrIsWrapped(t *testing.T) {
+	ctx := orchestrationContext(t, map[string]string{
+		"internal/orchestration/checkout.go": `package orchestration
+
+import (
+	"errors"
+	"fmt"
+)
+
+var ErrPolicy = errors.New("policy")
+
+func step() error { return nil }
+
+func Place() error {
+	if err := step(); err != nil {
+		return fmt.Errorf("validation failed: %v: %w", err, ErrPolicy)
+	}
+	return nil
+}
+`,
+	})
+
+	got := orchestration.NewLogicBudget(
+		orchestration.WithMaxBranches(0),
+		orchestration.WithMaxStatements(100),
+		orchestration.WithMaxCyclomatic(100),
+	).Check(ctx)
+
+	assertLogicBudgetViolation(t, got, "Place", "branches 1 > 0")
+}
+
+func TestLogicBudgetCountsFunctionLiteralBodies(t *testing.T) {
+	ctx := orchestrationContext(t, map[string]string{
+		"internal/orchestration/checkout.go": `package orchestration
+
+func run(fn func() error) error { return fn() }
+
+func Place(total int, country string) error {
+	return run(func() error {
+		if total > 10000 {
+			total -= total / 10
+		}
+		if country == "KR" {
+			total = total
+		}
+		return nil
+	})
+}
+`,
+	})
+
+	got := orchestration.NewLogicBudget(
+		orchestration.WithMaxBranches(1),
+		orchestration.WithMaxStatements(100),
+		orchestration.WithMaxCyclomatic(100),
+	).Check(ctx)
+
+	assertLogicBudgetViolation(t, got, "Place", "branches 2 > 1")
+}
+
 func TestLogicBudgetThresholdsAndIgnoredFunctionsAreConfigurable(t *testing.T) {
 	ctx := orchestrationContext(t, map[string]string{
 		"internal/orchestration/checkout.go": `package orchestration
