@@ -283,7 +283,7 @@ import _ "myapp/internal/domain/user/app"  // violation
 
 ```go
 // use orchestration for cross-domain coordination
-package orchestration
+package structural
 
 import (
     "myapp/internal/domain/order"
@@ -699,7 +699,7 @@ type adapter struct {
 ```go
 // not flagged: same shape but inside the orchestration layer where
 // cross-domain coordination is by design
-package orchestration
+package structural
 
 import "example.com/p/internal/domain/user"
 
@@ -764,6 +764,37 @@ The rule does **not** prescribe a fix. It only points at the smell. Two common r
 
 Severity can be upgraded to Error via `interfaces.WithSeverity(core.Error)` if a project wants to enforce
 the smell as a hard rule.
+
+## Orchestration Rules
+
+`structural.NewLogicBudget()`
+
+Opt-in advisory rule for packages under the configured orchestration directory
+such as `internal/orchestration`. It flags functions whose branch count,
+statement count, or cyclomatic complexity exceeds configurable budgets.
+Default severity is **Warning** with budgets `maxBranches=8`,
+`maxStatements=40`, and `maxCyclomatic=10`.
+
+Simple `if err != nil { return err }` and `fmt.Errorf("%w", err)` branches are
+discounted by default so ordinary Go error flow does not hide the real signal:
+orchestration functions making business decisions or accumulating too much
+coordination code. For `if err := call(); err != nil { return err }`, the
+branch itself is discounted, but the `call()` init statement still counts.
+Function literal bodies passed to transactions, retries, or callbacks are
+included in the enclosing function's budget.
+
+```go
+ruleset := core.NewRuleSet(structural.NewLogicBudget(
+    structural.WithMaxBranches(6),
+    structural.WithMaxStatements(30),
+    structural.WithMaxCyclomatic(8),
+))
+```
+
+Use `structural.WithCountErrorBranches()` for stricter accounting,
+`structural.WithIgnoredFunctions(...)` for known exceptional functions, and
+`structural.WithIgnoredPaths(...)` for subtrees such as transport handlers
+that a team wants to govern separately.
 
 ## Blast Radius
 
@@ -968,6 +999,7 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 | `presets.Batch()` / `presets.RecommendedBatch()` | Batch flat-layout architecture and ruleset |
 | `presets.EventPipeline()` / `presets.RecommendedEventPipeline()` | event-sourcing / CQRS architecture and ruleset |
 | `dependency.NewIsolation()` / `NewLayerDirection()` / `NewBlastRadius()` | dependency rules |
+| `structural.NewLogicBudget()` | opt-in orchestration complexity budget rule |
 | `types.NewNoPanicInDomain()` | domain/application panic, log.Fatal, and os.Exit rule (opt-in) |
 | `types.WithInspectedLayers(...)` / `WithAllowedPaths(...)` / `WithAllowedFunctions(...)` | options for `types.NewNoPanicInDomain` |
 | `dependency.NewNoSideEffectCallInCore()` | domain core side-effect call rule (opt-in) |
