@@ -19,7 +19,17 @@ type MetricsIndex map[string]*PkgMetrics
 
 // BuildMetricsIndex computes coupling metrics for internal packages.
 func BuildMetricsIndex(pkgs []*packages.Package, module string) MetricsIndex {
-	internalPrefix := module + "/internal/"
+	return BuildMetricsIndexForRoot(pkgs, module, "internal")
+}
+
+// BuildMetricsIndexForRoot computes coupling metrics for packages under the
+// configured architecture internal root.
+func BuildMetricsIndexForRoot(pkgs []*packages.Package, module, internalRoot string) MetricsIndex {
+	internalRoot = strings.Trim(strings.TrimSpace(internalRoot), "/")
+	if internalRoot == "" {
+		internalRoot = "internal"
+	}
+	internalPrefix := module + "/" + internalRoot + "/"
 
 	internalPkgs := make(map[string]bool)
 	for _, pkg := range pkgs {
