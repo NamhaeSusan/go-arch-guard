@@ -439,6 +439,12 @@ Repository 포트 interface(기본값: 이름이 `Repository`/`Repo`로 끝나�
 |----|----------|
 | `interfaces.cross-domain-anonymous` | 도메인 외부 *그리고 orchestration 외부*에서 선언된 anonymous interface가 method signature에 다른 도메인 타입을 참조하면 위반. cmd/ 또는 internal/pkg/ 같은 wiring 코드가 도메인 타입에 대해 inline ad-hoc 추상화를 선언하는 패턴을 잡는다. **Severity: Error** — cross-domain 추상화는 orchestration 패키지가 소유한다는 컨벤션을 강제. **fix: 어댑터를 `internal/orchestration/`으로 이동하고 wiring 코드는 orchestration 생성자를 호출**. orchestration 패키지(서브패키지 포함)는 by-design exempt. |
 
+## Orchestration Signature Rule (Opt-in, Warning)
+
+| 룰 | 잡는 패턴 |
+|----|----------|
+| `orchestration.alias-signatures` | `internal/<OrchestrationDir>/` 아래 exported function/method와 exported interface method signature가 `core/model`, `app`, `event`, `infra`, `core/repo`, `core/svc` 같은 domain sub-package 타입을 parameter/return으로 노출하면 위반. domain-root alias도 type information으로 추적 가능한 경우 감지한다. orchestration-local DTO는 허용. DDD에서 흔한 constructor parameter `*order.Service` 같은 domain-root `*Service` alias는 기본 허용하며, `orchestration.WithConstructorServiceAliases(false)`로 끌 수 있다. `orchestration.NewAliasSignatures()`. |
+
 ---
 
 ## Existing Project with Violations
