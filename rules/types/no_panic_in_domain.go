@@ -137,7 +137,10 @@ func failureCallID(info *gotypes.Info, call *ast.CallExpr) string {
 
 func isDeniedFailureCall(callID string) bool {
 	switch callID {
-	case "panic", "log.Fatal", "log.Fatalf", "log.Fatalln", "os.Exit":
+	case "panic", "log.Fatal", "log.Fatalf", "log.Fatalln", "os.Exit",
+		"log.Panic", "log.Panicf", "log.Panicln",
+		"log.(*Logger).Fatal", "log.(*Logger).Fatalf", "log.(*Logger).Fatalln",
+		"log.(*Logger).Panic", "log.(*Logger).Panicf", "log.(*Logger).Panicln":
 		return true
 	default:
 		return false

@@ -124,7 +124,7 @@ func TestArchitectureTestDefaultsInternalRoot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `analyzer.Load(".", "internal/...", "cmd/...")`
+	want := `patterns := []string{"internal/..."}`
 	if !strings.Contains(src, want) {
 		t.Fatalf("default scaffold must emit %q\n%s", want, src)
 	}
@@ -143,7 +143,7 @@ func TestArchitectureTestCustomInternalRoot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantLoad := `analyzer.Load(".", "packages/...", "cmd/...")`
+	wantLoad := `patterns := []string{"packages/..."}`
 	if !strings.Contains(src, wantLoad) {
 		t.Fatalf("custom InternalRoot must emit %q\n%s", wantLoad, src)
 	}

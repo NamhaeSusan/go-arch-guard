@@ -5,6 +5,7 @@ import (
 	"go/parser"
 	"go/token"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/NamhaeSusan/go-arch-guard/core"
@@ -44,49 +45,53 @@ func (r *NoHandMock) Check(ctx *core.Context) []core.Violation {
 		if err != nil {
 			continue
 		}
-		for _, file := range testFiles {
-			relPath := analysisutil.RelativePathForPackage(pkg, file)
-			if ctx.IsExcluded(relPath) {
+		// Test packages may split a receiver declaration and its methods over
+		// multiple files. Keep internal and external test packages separate.
+		fset := token.NewFileSet()
+		type mockDecl struct {
+			path string
+			line int
+		}
+		structs := make(map[string]mockDecl)
+		methods := make(map[string]bool)
+		for _, path := range testFiles {
+			rel := analysisutil.RelativePathForPackage(pkg, path)
+			if ctx.IsExcluded(rel) {
 				continue
 			}
-			violations = append(violations, r.checkFile(file, relPath)...)
+			file, err := parser.ParseFile(fset, path, nil, 0)
+			if err != nil {
+				continue
+			}
+			prefix := file.Name.Name + "."
+			for name, line := range collectMockStructs(fset, file) {
+				structs[prefix+name] = mockDecl{rel, line}
+			}
+			analysisutil.WalkFuncDecls(file, func(fd *ast.FuncDecl) {
+				if fd.Recv != nil && len(fd.Recv.List) > 0 {
+					methods[prefix+analysisutil.ReceiverTypeName(fd.Recv.List[0].Type)] = true
+				}
+			})
+		}
+		keys := make([]string, 0, len(structs))
+		for key := range structs {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			decl := structs[key]
+			if !methods[key] {
+				continue
+			}
+			name := key[strings.IndexByte(key, '.')+1:]
+			violations = append(violations, core.Violation{
+				File: decl.path, Line: decl.line, Rule: r.Spec().ID,
+				Message:         `test file "` + filepath.Base(decl.path) + `" defines hand-rolled mock "` + name + `" with methods - use a mock generator instead`,
+				Fix:             "generate the mock with your project's mock generator and import from the dedicated mocks package",
+				DefaultSeverity: r.severity, EffectiveSeverity: r.severity,
+			})
 		}
 	}
-	return violations
-}
-
-func (r *NoHandMock) checkFile(path, relPath string) []core.Violation {
-	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, path, nil, 0)
-	if err != nil {
-		return nil
-	}
-	structs := collectMockStructs(fset, file)
-	if len(structs) == 0 {
-		return nil
-	}
-	var violations []core.Violation
-	base := filepath.Base(path)
-	analysisutil.WalkFuncDecls(file, func(fd *ast.FuncDecl) {
-		if fd.Recv == nil || len(fd.Recv.List) == 0 {
-			return
-		}
-		recvName := analysisutil.ReceiverTypeName(fd.Recv.List[0].Type)
-		line, ok := structs[recvName]
-		if !ok {
-			return
-		}
-		violations = append(violations, core.Violation{
-			File:              relPath,
-			Line:              line,
-			Rule:              "testpolicy.no-handmock",
-			Message:           `test file "` + base + `" defines hand-rolled mock "` + recvName + `" with methods - use a mock generator instead`,
-			Fix:               "generate the mock with your project's mock generator and import from the dedicated mocks package",
-			DefaultSeverity:   r.severity,
-			EffectiveSeverity: r.severity,
-		})
-		delete(structs, recvName)
-	})
 	return violations
 }
 

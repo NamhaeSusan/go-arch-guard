@@ -13,7 +13,7 @@ func AssertNoViolations(t testing.TB, violations []core.Violation) {
 	errorCount := 0
 	for _, v := range violations {
 		t.Log(v.String())
-		if v.EffectiveSeverity == core.Error {
+		if v.EffectiveSeverity != core.Warning {
 			errorCount++
 		}
 	}

@@ -138,20 +138,17 @@ func isInspectedLayerPackage(pkg *packages.Package, module string, layout core.L
 	if rel == "" || rel == "." {
 		return false
 	}
-	parts := strings.Split(rel, "/")
-	internalRoot := layout.InternalRoot
-	if internalRoot == "" {
-		internalRoot = "internal"
+	root := strings.Trim(layout.InternalRoot, "/")
+	if root == "" {
+		root = "internal"
 	}
-	for i := 0; i < len(parts); i++ {
-		if parts[i] != internalRoot {
-			continue
-		}
-		afterInternal := parts[i+1:]
-		for _, layer := range layers {
-			if matchesLayer(afterInternal, layout.DomainDir, layer) {
-				return true
-			}
+	after, ok := strings.CutPrefix(rel, root+"/")
+	if !ok {
+		return false
+	}
+	for _, layer := range layers {
+		if matchesLayer(strings.Split(after, "/"), layout.DomainDir, layer) {
+			return true
 		}
 	}
 	return false

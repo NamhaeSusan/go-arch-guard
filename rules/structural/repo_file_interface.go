@@ -136,7 +136,7 @@ func (r *RepoFileInterface) checkInterfacePlacement(ctx *core.Context, pkg *pack
 		if ctx.IsExcluded(filePath) {
 			continue
 		}
-		for _, info := range analysisutil.InspectTypeSpecs(file, pkg.Fset) {
+		for _, info := range analysisutil.InspectTypeSpecs(file, pkg.Fset, pkg.TypesInfo) {
 			if info.IsInterface && r.isRepoPortName(info.Name) {
 				violations = append(violations, r.violation(
 					filePath,

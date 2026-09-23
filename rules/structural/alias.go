@@ -3,6 +3,7 @@ package structural
 import (
 	"go/parser"
 	"go/token"
+	"go/types"
 	"os"
 	"path/filepath"
 	"strings"
@@ -136,8 +137,19 @@ func (r *Alias) checkAliasTypes(ctx *core.Context, aliasPath, aliasRel, aliasNam
 	if err != nil {
 		return nil
 	}
+	aliasAbs, _ := filepath.Abs(aliasPath)
+	var typed *types.Info
+	for _, pkg := range ctx.Pkgs() {
+		for _, loaded := range pkg.Syntax {
+			if filepath.Clean(pkg.Fset.Position(loaded.Pos()).Filename) == filepath.Clean(aliasAbs) {
+				file = loaded
+				fset = pkg.Fset
+				typed = pkg.TypesInfo
+			}
+		}
+	}
 	var violations []core.Violation
-	for _, info := range analysisutil.InspectTypeSpecs(file, fset) {
+	for _, info := range analysisutil.InspectTypeSpecs(file, fset, typed) {
 		if info.IsInterface {
 			v := violation(r.severity, aliasNoInterface, aliasRel,
 				aliasName+` re-exports interface "`+info.Name+`" - suspected cross-domain dependency; use `+arch.Layout.OrchestrationDir+`/ instead`,

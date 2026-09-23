@@ -33,6 +33,10 @@ type ArchitectureTestOptions struct {
 	// the canonical pattern. Set to "packages", "src", etc. to match a
 	// non-standard layout. Must be a single forward-slash-free segment.
 	InternalRoot string
+	// BuildFlags selects the build analyzed by the generated test, for example
+	// []string{"-tags=integration"}. Explicit flags override inherited build
+	// flags of the same name.
+	BuildFlags []string
 }
 
 // ArchitectureTest returns a ready-to-copy architecture_test.go source file
@@ -60,7 +64,7 @@ func ArchitectureTest(preset Preset, opts ArchitectureTestOptions) (string, erro
 		return "", err
 	}
 
-	src := renderArchitectureTest(packageName, funcs, internalRoot)
+	src := renderArchitectureTest(packageName, funcs, internalRoot, opts.BuildFlags)
 	formatted, err := format.Source([]byte(src))
 	if err != nil {
 		return "", fmt.Errorf("format generated template: %w", err)
@@ -96,10 +100,11 @@ func presetFunctions(preset Preset) (presetFuncs, error) {
 	}
 }
 
-func renderArchitectureTest(packageName string, funcs presetFuncs, internalRoot string) string {
+func renderArchitectureTest(packageName string, funcs presetFuncs, internalRoot string, buildFlags []string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "package %s\n\n", packageName)
 	b.WriteString(`import (
+	"os"
 	"testing"
 
 	"github.com/NamhaeSusan/go-arch-guard/analyzer"
@@ -110,12 +115,35 @@ func renderArchitectureTest(packageName string, funcs presetFuncs, internalRoot 
 
 func TestArchitecture(t *testing.T) {
 `)
-	fmt.Fprintf(&b, "\tpkgs, err := analyzer.Load(\".\", %q, \"cmd/...\")\n", internalRoot+"/...")
-	b.WriteString(`	if err != nil {
-		t.Log(err)
+	fmt.Fprintf(&b, "\tpatterns := []string{%q}\n", internalRoot+"/...")
+	b.WriteString(`	if info, err := os.Stat("cmd"); err == nil {
+		if !info.IsDir() {
+			t.Fatal("cmd must be a directory")
+		}
+		patterns = append(patterns, "cmd/...")
+	} else if !os.IsNotExist(err) {
+		t.Fatal(err)
 	}
-	if len(pkgs) == 0 {
-		t.Fatalf("no packages loaded: %v", err)
+`)
+	if len(buildFlags) == 0 {
+		b.WriteString("\tpkgs, err := analyzer.Load(\".\", patterns...)\n")
+	} else {
+		fmt.Fprintf(&b, "\tpkgs, err := analyzer.LoadWithOptions(\".\", analyzer.LoadOptions{BuildFlags: %#v}, patterns...)\n", buildFlags)
+	}
+	b.WriteString(`	if err != nil {
+		t.Fatal(err)
+	}
+	productionPackages := 0
+	for _, pkg := range pkgs {
+		if pkg.IllTyped || len(pkg.Errors) != 0 {
+			t.Fatalf("cannot check package %s: type/load errors: %v", pkg.PkgPath, pkg.Errors)
+		}
+		if len(pkg.GoFiles) > 0 {
+			productionPackages++
+		}
+	}
+	if productionPackages == 0 {
+		t.Fatal("no production packages loaded for architecture checks")
 	}
 `)
 	fmt.Fprintf(&b, "\n\tarch := presets.%s()\n", funcs.architecture)
@@ -126,6 +154,7 @@ func TestArchitecture(t *testing.T) {
 		fmt.Fprintf(&b, "\tarch.Layout.InternalRoot = %q\n", internalRoot)
 	}
 	b.WriteString("\tctx := core.NewContext(pkgs, \"\", \"\", arch, nil)\n")
+	b.WriteString("\tif ctx.Module() == \"\" || ctx.Root() == \"\" {\n\t\tt.Fatal(\"missing module metadata for architecture checks\")\n\t}\n")
 	fmt.Fprintf(&b, "\trules := presets.%s()\n\n", funcs.rules)
 	b.WriteString("\treport.AssertNoViolations(t, core.Run(ctx, rules))\n")
 	b.WriteString("}\n")

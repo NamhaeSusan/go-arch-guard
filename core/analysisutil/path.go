@@ -2,6 +2,7 @@ package analysisutil
 
 import (
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/NamhaeSusan/go-arch-guard/core"
@@ -28,7 +29,10 @@ func FindImportPosition(pkg *packages.Package, importPath, projectRoot string) (
 	fset := pkg.Fset
 	for _, file := range pkg.Syntax {
 		for _, imp := range file.Imports {
-			path := strings.Trim(imp.Path.Value, `"`)
+			path, err := strconv.Unquote(imp.Path.Value)
+			if err != nil {
+				continue
+			}
 			if path == importPath {
 				pos := fset.Position(imp.Pos())
 				return RelPathFromRoot(projectRoot, pos.Filename), pos.Line

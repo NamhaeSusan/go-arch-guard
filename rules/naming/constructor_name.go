@@ -148,20 +148,17 @@ func isInfraSublayerPackage(pkg *packages.Package, module string, layout core.La
 	if rel == "" || rel == "." {
 		return false
 	}
-	parts := strings.Split(rel, "/")
-	internalRoot := layout.InternalRoot
-	if internalRoot == "" {
-		internalRoot = "internal"
+	root := strings.Trim(layout.InternalRoot, "/")
+	if root == "" {
+		root = "internal"
 	}
-	for i := 0; i < len(parts); i++ {
-		if parts[i] != internalRoot {
-			continue
-		}
-		afterInternal := parts[i+1:]
-		for _, sublayer := range infraSublayers {
-			if matchesInfraSublayer(afterInternal, layout.DomainDir, sublayer) {
-				return true
-			}
+	after, ok := strings.CutPrefix(rel, root+"/")
+	if !ok {
+		return false
+	}
+	for _, layer := range infraSublayers {
+		if matchesInfraSublayer(strings.Split(after, "/"), layout.DomainDir, layer) {
+			return true
 		}
 	}
 	return false

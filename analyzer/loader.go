@@ -4,21 +4,45 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 
 	"golang.org/x/tools/go/packages"
 )
+
+// LoadOptions configures the build whose production packages are analyzed.
+type LoadOptions struct {
+	// BuildFlags are passed to the Go build system, for example
+	// []string{"-tags=integration"}. Explicit flags override inherited flags
+	// of the same name. GOFLAGS and other Go environment variables are also
+	// inherited normally.
+	BuildFlags []string
+	// DisableBuildFlagInheritance disables inheritance of -tags, -race,
+	// -msan, and -asan recorded in the calling binary's build information.
+	// It does not disable normal Go environment variable inheritance.
+	DisableBuildFlagInheritance bool
+}
 
 // Load parses Go packages matching the given patterns under dir. Relative
 // directory patterns such as "internal/..." are resolved under dir, patterns
 // beginning with "./" are passed through, module-path patterns such as
 // "github.com/acme/project/..." are passed through, and absolute filesystem
 // patterns are passed through unchanged.
+// Build tags and enabled race/memory/address sanitizer flags recorded in the
+// calling binary's build information are inherited. Use LoadWithOptions to
+// override flags or disable this inheritance.
 // When some packages contain errors (e.g. type-check failures), they are
 // skipped and the successfully loaded packages are returned alongside a
 // non-nil error describing what was skipped. Callers that want partial
 // analysis should check len(pkgs) rather than treating err as fatal.
 func Load(dir string, patterns ...string) ([]*packages.Package, error) {
+	return LoadWithOptions(dir, LoadOptions{}, patterns...)
+}
+
+// LoadWithOptions is Load with explicit build flags. It retains Load's
+// partial-analysis behavior: callers using it as a CI guard must reject any
+// returned error and packages with IllTyped or Errors set.
+func LoadWithOptions(dir string, opts LoadOptions, patterns ...string) ([]*packages.Package, error) {
 	absDir, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, fmt.Errorf("resolve dir: %w", err)
@@ -56,7 +80,8 @@ func Load(dir string, patterns ...string) ([]*packages.Package, error) {
 		Mode: packages.NeedName | packages.NeedImports | packages.NeedFiles |
 			packages.NeedSyntax | packages.NeedModule |
 			packages.NeedTypes | packages.NeedTypesInfo | packages.NeedDeps,
-		Dir: absDir,
+		Dir:        absDir,
+		BuildFlags: loadBuildFlags(opts),
 	}
 	pkgs, err := packages.Load(cfg, prefixed...)
 	if err != nil {
@@ -105,6 +130,40 @@ func Load(dir string, patterns ...string) ([]*packages.Package, error) {
 			len(loadErrs), summarizeLoadErrs(loadErrs))
 	}
 	return result, nil
+}
+
+func loadBuildFlags(opts LoadOptions) []string {
+	if !opts.DisableBuildFlagInheritance {
+		if info, ok := debug.ReadBuildInfo(); ok {
+			return mergeBuildFlags(info.Settings, opts.BuildFlags)
+		}
+	}
+	return append([]string(nil), opts.BuildFlags...)
+}
+
+func mergeBuildFlags(settings []debug.BuildSetting, explicit []string) []string {
+	overridden := make(map[string]bool)
+	for _, flag := range explicit {
+		name, _, _ := strings.Cut(flag, "=")
+		overridden[name] = true
+	}
+	var flags []string
+	for _, setting := range settings {
+		if overridden[setting.Key] {
+			continue
+		}
+		switch setting.Key {
+		case "-tags":
+			if setting.Value != "" {
+				flags = append(flags, setting.Key+"="+setting.Value)
+			}
+		case "-race", "-msan", "-asan":
+			if setting.Value == "true" {
+				flags = append(flags, setting.Key+"=true")
+			}
+		}
+	}
+	return append(flags, explicit...)
 }
 
 // looksLikeModulePath reports whether p has a dot in its first path segment,

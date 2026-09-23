@@ -84,14 +84,26 @@ For finer control over individual checks, compose a `core.RuleSet` manually:
 func TestArchitecture(t *testing.T) {
     pkgs, err := analyzer.Load(".", "internal/...", "cmd/...")
     if err != nil {
-        t.Log(err)
+        t.Fatal(err)
     }
-    if len(pkgs) == 0 {
-        t.Fatalf("no packages loaded: %v", err)
+    production := 0
+    for _, pkg := range pkgs {
+        if pkg.IllTyped || len(pkg.Errors) != 0 {
+            t.Fatalf("incomplete analysis of %s: %v", pkg.PkgPath, pkg.Errors)
+        }
+        if len(pkg.GoFiles) > 0 {
+            production++
+        }
+    }
+    if production == 0 {
+        t.Fatal("no production packages loaded")
     }
 
     arch := presets.DDD()
     ctx := core.NewContext(pkgs, "", "", arch, nil)
+    if ctx.Module() == "" || ctx.Root() == "" {
+        t.Fatal("missing module metadata")
+    }
     ruleset := core.NewRuleSet(
         dependency.NewIsolation(),
         dependency.NewLayerDirection(),
@@ -515,7 +527,7 @@ type orderService struct{}      // unexported
 
 ### `naming.snake-case-file`
 
-All Go filenames must be snake_case.
+All loaded Go filenames must be snake_case. Every dot-separated segment is checked, so `service.pb.go` is valid while `service.BadName.go` is rejected.
 
 ```
 OrderService.go   violation
@@ -965,7 +977,7 @@ Patterns are project-relative paths with forward slashes. `...` matches the root
 ### Meta Violations
 
 The runner emits a small set of `meta.*` violations to surface environmental issues
-without blocking builds by default. They are deduped by `(Rule, Message)` pair so distinct
+with warnings for environmental conditions and errors for incomplete rule execution. They are deduped by `(Rule, Message)` pair so distinct
 diagnostics survive even when multiple rules emit the same ID.
 
 | ID | Severity | When |
@@ -974,7 +986,7 @@ diagnostics survive even when multiple rules emit the same ID.
 | `meta.layout-not-supported` | Warning | a layout-dependent rule is run against a project without a recognized package root (`<root>/<InternalRoot>/`) |
 | `meta.rule-disabled-by-config` | Warning | a rule (or one of its sub-checks) is registered in the ruleset but Architecture config disables it — e.g. `Structure.RequireAlias=false` for `structural.alias`, `Layout.DomainDir=""` for `dependency.isolation`, empty `tx.Config` for `tx.boundary` |
 | `meta.rule-panic` | Error | a rule's `Check` panicked; the panic is captured and other rules continue to run |
-| `meta.unknown-violation-id` | per rule | a rule emits a violation ID it didn't declare in `Spec().Violations` |
+| `meta.unknown-violation-id` | Error | a rule emits a violation ID it didn't declare in `Spec().Violations` |
 
 Promote any of them to a hard failure with `core.WithSeverityOverride(...)`, or filter them out with `RuleSet.Without(...)`.
 
@@ -998,7 +1010,8 @@ Features: health-status tree coloring, imports/reverse dependencies/coupling met
 
 | Function | Description |
 |----------|-------------|
-| `analyzer.Load(dir, patterns...)` | load Go packages for analysis |
+| `analyzer.Load(dir, patterns...)` | load Go packages, inheriting caller build tags/instrumentation |
+| `analyzer.LoadWithOptions(dir, opts, patterns...)` | load with explicit build flags and optional inheritance opt-out |
 | `core.NewContext(pkgs, module, root, arch, exclude)` | build the immutable analysis context |
 | `core.Run(ctx, ruleset, opts...)` | execute a ruleset and return `[]core.Violation`; rule panics become `meta.rule-panic` Error violations |
 | `core.RuleSet` | immutable collection of rules plus violation filters |
@@ -1062,3 +1075,23 @@ fmt.Println(string(data))
 ## License
 
 MIT
+
+
+## Reliable guard execution
+
+`analyzer.Load` inherits the running binary's recorded `-tags`, `-race`, `-msan`,
+and `-asan` flags. Explicit `analyzer.LoadWithOptions(dir, analyzer.LoadOptions{BuildFlags: ...}, patterns...)`
+flags override inherited flags with the same name. Set `DisableBuildFlagInheritance: true`
+to analyze independently of the caller's binary. Other Go environment settings still
+follow `go/packages`; cross-platform coverage requires separate runs.
+
+`ArchitectureTestOptions.BuildFlags` embeds explicit flags in generated tests.
+Generated tests reject load/type errors, missing module metadata, and an empty
+production package set. The lower-level loader retains partial-analysis behavior
+for inspection tools; custom guard authors must check completeness as shown above.
+
+Use `go test -count=1 ./...` when the guard loads packages indirectly: adding a new
+file can otherwise leave a cached successful architecture result.
+
+[Guard correctness and compatibility notes](docs/guard-correctness.md) describe
+alias/generic handling, consistent exclusions, and stricter rule validation.

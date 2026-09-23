@@ -37,6 +37,10 @@ func (r *Container) Check(ctx *core.Context) []core.Violation {
 
 	var violations []core.Violation
 	for _, pkg := range ctx.Pkgs() {
+		pkg = includedPackage(ctx, pkg)
+		if pkg == nil {
+			continue
+		}
 		violations = append(violations, r.checkPackage(pkg)...)
 	}
 	return violations

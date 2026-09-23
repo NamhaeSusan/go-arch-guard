@@ -79,14 +79,26 @@ report.AssertNoViolations(t, violations)
 func TestArchitecture(t *testing.T) {
     pkgs, err := analyzer.Load(".", "internal/...", "cmd/...")
     if err != nil {
-        t.Log(err)
+        t.Fatal(err)
     }
-    if len(pkgs) == 0 {
-        t.Fatalf("no packages loaded: %v", err)
+    production := 0
+    for _, pkg := range pkgs {
+        if pkg.IllTyped || len(pkg.Errors) != 0 {
+            t.Fatalf("incomplete analysis of %s: %v", pkg.PkgPath, pkg.Errors)
+        }
+        if len(pkg.GoFiles) > 0 {
+            production++
+        }
+    }
+    if production == 0 {
+        t.Fatal("no production packages loaded")
     }
 
     arch := presets.DDD()
     ctx := core.NewContext(pkgs, "", "", arch, nil)
+    if ctx.Module() == "" || ctx.Root() == "" {
+        t.Fatal("missing module metadata")
+    }
     ruleset := core.NewRuleSet(
         dependency.NewIsolation(),
         dependency.NewLayerDirection(),
@@ -480,7 +492,7 @@ type orderService struct{}      // unexported
 
 ### `naming.snake-case-file`
 
-모든 Go 파일명은 snake_case여야 합니다.
+로드된 Go 파일명의 점으로 나눈 각 부분이 snake_case여야 합니다. `service.pb.go`는 허용하고 `service.BadName.go`는 거부합니다.
 
 ```
 OrderService.go   위반
@@ -917,7 +929,7 @@ Exclude 패턴은 정규화 후 매칭됩니다: `/internal/foo`, `internal/foo`
 
 ### Meta Violations
 
-런타임이 환경/설정 이슈를 알리는 `meta.*` violation 집합. 빌드를 자동 차단하지 않으며 `(Rule, Message)` pair로 dedup되어 서로 다른 메시지는 모두 보존됩니다.
+런타임이 환경/설정 이슈를 알리는 `meta.*` violation 집합. 환경 조건은 Warning, 규칙 실행 오류는 Error로 처리하며 `(Rule, Message)` pair로 dedup되어 서로 다른 메시지는 모두 보존됩니다.
 
 | ID | Severity | 발생 시점 |
 |---|---|---|
@@ -925,7 +937,7 @@ Exclude 패턴은 정규화 후 매칭됩니다: `/internal/foo`, `internal/foo`
 | `meta.layout-not-supported` | Warning | 레이아웃 의존 룰을 `<root>/<InternalRoot>/` 디렉토리 없는 프로젝트에 실행 |
 | `meta.rule-disabled-by-config` | Warning | 룰(또는 sub-check)이 RuleSet에 등록됐으나 Architecture 설정으로 인해 동작 안 함 — 예: `structural.alias`인데 `Structure.RequireAlias=false`, `dependency.isolation`인데 `Layout.DomainDir=""`, `tx.boundary`인데 `tx.Config`가 비어있음 |
 | `meta.rule-panic` | Error | 룰의 `Check`가 panic; panic은 캡처되고 다른 룰은 계속 실행됨 |
-| `meta.unknown-violation-id` | per rule | 룰이 `Spec().Violations`에 선언하지 않은 violation ID emit |
+| `meta.unknown-violation-id` | Error | 룰이 `Spec().Violations`에 선언하지 않은 violation ID emit |
 
 `core.WithSeverityOverride(...)`로 강제 실패시키거나 `RuleSet.Without(...)`로 필터링 가능.
 
@@ -947,7 +959,8 @@ go run github.com/NamhaeSusan/go-arch-guard/cmd/tui --preset hexagonal .
 
 | 함수 | 설명 |
 |------|------|
-| `analyzer.Load(dir, patterns...)` | 분석용 Go 패키지 로드 |
+| `analyzer.Load(dir, patterns...)` | 호출 바이너리의 tags/instrumentation을 상속해 패키지 로드 |
+| `analyzer.LoadWithOptions(dir, opts, patterns...)` | 명시적 BuildFlags 및 상속 opt-out으로 로드 |
 | `core.NewContext(pkgs, module, root, arch, exclude)` | 불변 분석 컨텍스트 생성 |
 | `core.Run(ctx, ruleset, opts...)` | ruleset 실행 후 `[]core.Violation` 반환; rule panic은 `meta.rule-panic` Error violation으로 변환 |
 | `core.RuleSet` | rule과 violation 필터를 담는 불변 컬렉션 |
@@ -1022,3 +1035,23 @@ fmt.Println(string(data))
 ## 라이선스
 
 MIT
+
+
+## 가드 실행의 완전성
+
+`analyzer.Load`는 실행 중인 바이너리에 기록된 `-tags`, `-race`, `-msan`, `-asan`을
+상속합니다. `analyzer.LoadWithOptions(dir, analyzer.LoadOptions{BuildFlags: ...}, patterns...)`의
+명시적 플래그는 같은 이름의 상속 플래그보다 우선합니다.
+`DisableBuildFlagInheritance: true`로 상속을 끌 수 있습니다. 다른 Go 환경은
+go/packages 설정을 따르며, 다른 OS/아키텍처의 코드는 별도 환경에서 검사해야 합니다.
+
+`ArchitectureTestOptions.BuildFlags`로 생성 테스트에 플래그를 고정할 수 있습니다.
+생성 테스트는 로딩/타입 오류, 누락된 모듈 정보, production 패키지가 없는 분석을
+실패 처리합니다. 저수준 loader는 도구용 부분 분석을 계속 지원하므로 직접 작성한
+가드에서도 위 예제처럼 분석 완전성을 확인해야 합니다.
+
+간접 로딩하는 패키지의 새 파일이 테스트 캐시에 가려지지 않도록
+`go test -count=1 ./...`를 사용합니다.
+
+[규칙 보강 및 호환성 안내](docs/guard-correctness.md)에 alias/generic, 제외 경로,
+규칙 설정 검증의 변경을 정리했습니다.

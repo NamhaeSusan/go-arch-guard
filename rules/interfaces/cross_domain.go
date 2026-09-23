@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"go/types"
 	"sort"
 	"strings"
 
@@ -49,6 +50,10 @@ func (r *CrossDomainAnonymous) Check(ctx *core.Context) []core.Violation {
 
 	var violations []core.Violation
 	for _, pkg := range pkgs {
+		pkg = includedPackage(ctx, pkg)
+		if pkg == nil {
+			continue
+		}
 		violations = append(violations, r.checkPackage(pkg, arch)...)
 	}
 	return violations
@@ -122,7 +127,7 @@ func (r *CrossDomainAnonymous) checkAnonymousInterface(iface *ast.InterfaceType,
 			continue
 		}
 		hasMethodDecl = true
-		collectCrossDomainRefs(funcType, file, currentDomain, arch, crossDomains)
+		collectCrossDomainRefs(funcType, file, currentDomain, arch, crossDomains, pkg.TypesInfo)
 	}
 	if !hasMethodDecl || len(crossDomains) == 0 {
 		return nil
@@ -146,9 +151,9 @@ func (r *CrossDomainAnonymous) checkAnonymousInterface(iface *ast.InterfaceType,
 	}}
 }
 
-func collectCrossDomainRefs(funcType *ast.FuncType, file *ast.File, currentDomain string, arch core.Architecture, out map[string]bool) {
+func collectCrossDomainRefs(funcType *ast.FuncType, file *ast.File, currentDomain string, arch core.Architecture, out map[string]bool, info ...*types.Info) {
 	visit := func(expr ast.Expr) {
-		walkTypeExprForDomainRefs(expr, file, currentDomain, arch, out)
+		walkTypeExprForDomainRefs(expr, file, currentDomain, arch, out, info...)
 	}
 	if funcType.Params != nil {
 		for _, f := range funcType.Params.List {
@@ -162,7 +167,7 @@ func collectCrossDomainRefs(funcType *ast.FuncType, file *ast.File, currentDomai
 	}
 }
 
-func walkTypeExprForDomainRefs(expr ast.Expr, file *ast.File, currentDomain string, arch core.Architecture, out map[string]bool) {
+func walkTypeExprForDomainRefs(expr ast.Expr, file *ast.File, currentDomain string, arch core.Architecture, out map[string]bool, info ...*types.Info) {
 	ast.Inspect(expr, func(n ast.Node) bool {
 		sel, ok := n.(*ast.SelectorExpr)
 		if !ok {
@@ -172,7 +177,7 @@ func walkTypeExprForDomainRefs(expr ast.Expr, file *ast.File, currentDomain stri
 		if !ok {
 			return true
 		}
-		importPath := analysisutil.ResolveIdentImportPath(file, ident.Name)
+		importPath := analysisutil.ResolveIdentImportPath(file, ident.Name, info...)
 		if importPath == "" {
 			return true
 		}
