@@ -1095,3 +1095,17 @@ file can otherwise leave a cached successful architecture result.
 
 [Guard correctness and compatibility notes](docs/guard-correctness.md) describe
 alias/generic handling, consistent exclusions, and stricter rule validation.
+
+### Strict generated-mock policy
+
+`testpolicy.NewNoHandMock(testpolicy.WithStrictMocks())` rejects handwritten
+receiver methods in all module test files, including test-only packages and
+function receiver types. Only mockery-generated files are exempt. Unlike the
+default naming heuristic, strict mode intentionally also rejects genuine
+receiver-based helpers: explicitly allow a real helper with an exact
+`WithAllowedTestReceivers("architecture_test.go:packageDependencies")` entry.
+Do not allowlist test doubles. Pure functions and data-only test types are allowed.
+
+The strict scan respects file exclusions and skips nested modules, vendor,
+hidden directories, and testdata. Generated comments are not proof of provenance:
+CI must regenerate mocks and reject diffs and untracked generated files.

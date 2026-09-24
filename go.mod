@@ -1,6 +1,6 @@
 module github.com/NamhaeSusan/go-arch-guard
 
-go 1.26.1
+go 1.27.1
 
 require golang.org/x/tools v0.43.0
 
