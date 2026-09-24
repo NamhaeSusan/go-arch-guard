@@ -14,11 +14,13 @@ import (
 
 type NoHandMock struct {
 	severity core.Severity
+	strict   bool
+	allowed  []string
 }
 
 func NewNoHandMock(opts ...Option) *NoHandMock {
 	cfg := newConfig(opts, core.Warning)
-	return &NoHandMock{severity: cfg.severity}
+	return &NoHandMock{severity: cfg.severity, strict: cfg.strict, allowed: cfg.allowed}
 }
 
 func (r *NoHandMock) Spec() core.RuleSpec {
@@ -30,6 +32,9 @@ func (r *NoHandMock) Spec() core.RuleSpec {
 }
 
 func (r *NoHandMock) Check(ctx *core.Context) []core.Violation {
+	if r.strict {
+		return r.checkStrict(ctx)
+	}
 	var violations []core.Violation
 	seenPkgDirs := make(map[string]bool)
 	for _, pkg := range ctx.Pkgs() {
@@ -59,8 +64,11 @@ func (r *NoHandMock) Check(ctx *core.Context) []core.Violation {
 			if ctx.IsExcluded(rel) {
 				continue
 			}
-			file, err := parser.ParseFile(fset, path, nil, 0)
+			file, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
 			if err != nil {
+				continue
+			}
+			if isMockeryGenerated(file) {
 				continue
 			}
 			prefix := file.Name.Name + "."
