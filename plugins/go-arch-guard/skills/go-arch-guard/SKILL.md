@@ -447,3 +447,22 @@ Repository 포트 interface(기본값: 이름이 `Repository`/`Repo`로 끝나�
 2. `core.NewContext(..., exclude)`로 마이그레이션 중 경로 제외
 3. 점진적으로 위반 수정, exclude 제거
 4. 전환기에는 `core.WithSeverityOverride(..., core.Warning)` 사용
+
+
+## 분석 완전성과 빌드 플래그
+
+생성 테스트는 패키지 로딩/타입 오류, 모듈 metadata 누락, production 패키지 부재를
+실패 처리한다. 직접 만든 가드도 동일하게 검사해야 한다. loader의 부분 결과를
+성공한 아키텍처 검사로 간주하지 않는다. 간접 분석 대상 변경을 매번 검사하도록
+`go test -count=1 ./...`를 사용한다.
+
+`analyzer.Load`는 실행 바이너리에 기록된 tags 및 race/msan/asan 플래그를 상속한다.
+`analyzer.LoadWithOptions(dir, analyzer.LoadOptions{BuildFlags: []string{"-tags=custom"}}, patterns...)`로
+명시적으로 지정할 수 있으며 같은 이름의 플래그는 상속 값보다 우선한다.
+`DisableBuildFlagInheritance: true`는 상속을 끈다.
+`scaffold.ArchitectureTestOptions.BuildFlags`로 생성 테스트에 명시적 값을 넣는다.
+
+미선언 violation ID는 Error이며 잘못된 severity도 실패로 처리한다.
+단어가 점으로 나뉜 파일명은 각 부분을 검사하고, 도메인은 composition/transport로
+역방향 의존하지 않는다. generic/alias와 임베딩된 interface도 일반 타입과 같은
+규칙을 적용한다. 패키지/파일 제외는 인터페이스 및 tx 규칙에도 적용한다.

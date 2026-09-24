@@ -53,6 +53,10 @@ func (r *TooManyMethods) Check(ctx *core.Context) []core.Violation {
 	cap := r.maxMethods()
 	var violations []core.Violation
 	for _, pkg := range pkgs {
+		pkg = includedPackage(ctx, pkg)
+		if pkg == nil {
+			continue
+		}
 		if isExcludedInterfacePatternPkg(arch, pkg) {
 			continue
 		}
@@ -68,6 +72,11 @@ func (r *TooManyMethods) Check(ctx *core.Context) []core.Violation {
 		for _, name := range names {
 			iface := ifaces[name]
 			count := iface.Methods.NumFields()
+			if pkg.Types != nil {
+				if typed := lookupInterface(pkg.Types.Scope(), name); typed != nil {
+					count = typed.Complete().NumMethods()
+				}
+			}
 			if count <= cap {
 				continue
 			}

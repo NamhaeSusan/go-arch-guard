@@ -32,7 +32,8 @@ import (
 //   - Effective severity precedence (highest wins):
 //     1. WithSeverityOverride(violationID, ...)
 //     2. RuleSpec.Violations[i].DefaultSeverity for matching ID
-//     3. Warning, when the violation ID starts with "meta." (environmental
+//     3. Error for meta.rule-panic and meta.unknown-violation-id; otherwise
+//     Warning, when the violation ID starts with "meta." (environmental
 //     meta.* violations should never block builds by accident)
 //     4. RuleSpec.DefaultSeverity
 //     5. Error
@@ -48,6 +49,11 @@ func Run(ctx *Context, rules RuleSet, opts ...RunOption) []Violation {
 	}
 
 	o := newRunOpts(opts...)
+	for id, severity := range o.severityOverrides {
+		if severity != Error && severity != Warning {
+			panic(fmt.Sprintf("core.Run: invalid severity %d for %q", severity, id))
+		}
+	}
 	known := knownViolationIDs(rules)
 	checkUnknown := func(label string, ids []string) {
 		var unknown []string
@@ -96,13 +102,13 @@ func Run(ctx *Context, rules RuleSet, opts ...RunOption) []Violation {
 			}
 			declared, ok := violationDefaults[v.Rule]
 			if !ok {
-				// meta.rule-panic means a rule failed internally, so the
+				// A panic or undeclared ID means a rule failed internally, so the
 				// analysis result is incomplete and should block by default.
 				// Other meta.* IDs are environmental warnings (e.g.
 				// meta.no-matching-packages) and should not accidentally
 				// inherit an Error default from the emitting rule.
 				switch {
-				case v.Rule == "meta.rule-panic":
+				case v.Rule == "meta.rule-panic" || v.Rule == "meta.unknown-violation-id":
 					declared = Error
 				case strings.HasPrefix(v.Rule, "meta."):
 					declared = Warning
@@ -148,6 +154,14 @@ func validateRuleSet(rs RuleSet) error {
 	seenRule := make(map[string]bool)
 	for _, r := range rs.Rules() {
 		spec := r.Spec()
+		if spec.DefaultSeverity != Error && spec.DefaultSeverity != Warning {
+			errs = append(errs, fmt.Sprintf("rule %q has invalid severity %d", spec.ID, spec.DefaultSeverity))
+		}
+		for _, v := range spec.Violations {
+			if v.DefaultSeverity != Error && v.DefaultSeverity != Warning {
+				errs = append(errs, fmt.Sprintf("violation %q has invalid severity %d", v.ID, v.DefaultSeverity))
+			}
+		}
 		if spec.ID == "" {
 			continue
 		}

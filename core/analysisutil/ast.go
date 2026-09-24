@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -67,9 +68,15 @@ func WalkFuncDecls(file *ast.File, visit func(*ast.FuncDecl)) {
 
 // InspectTypeSpecs walks the top-level type decls in file and returns one
 // entry per interface declaration or per type alias whose RHS is
-// `<ident>.<Name>`. Other type decls are skipped. Callers usually want to
+// `<ident>.<Name>` (including generic instantiations). Optional type info
+// resolves actual imported package names and aliased interfaces. Other type
+// decls are skipped. Callers usually want to
 // detect interfaces or detect re-exports of types from other packages.
-func InspectTypeSpecs(file *ast.File, fset *token.FileSet) []TypeSpecInfo {
+func InspectTypeSpecs(file *ast.File, fset *token.FileSet, typeInfos ...*types.Info) []TypeSpecInfo {
+	var typed *types.Info
+	if len(typeInfos) > 0 {
+		typed = typeInfos[0]
+	}
 	var result []TypeSpecInfo
 	WalkTypeSpecs(file, fset, func(ts *ast.TypeSpec, pos token.Position) {
 		info := TypeSpecInfo{
@@ -80,9 +87,14 @@ func InspectTypeSpecs(file *ast.File, fset *token.FileSet) []TypeSpecInfo {
 			info.IsInterface = true
 		}
 		if ts.Assign != 0 {
-			if sel, ok := ts.Type.(*ast.SelectorExpr); ok {
+			if typed != nil {
+				if t := typed.TypeOf(ts.Type); t != nil {
+					_, info.IsInterface = types.Unalias(t).Underlying().(*types.Interface)
+				}
+			}
+			if sel, ok := unwrapExpr(ts.Type).(*ast.SelectorExpr); ok {
 				if ident, ok := sel.X.(*ast.Ident); ok {
-					info.AliasFrom = ResolveIdentImportPath(file, ident.Name)
+					info.AliasFrom = ResolveIdentImportPath(file, ident.Name, typed)
 				}
 			}
 		}
@@ -157,9 +169,21 @@ func PascalToSnake(name string) string {
 	return string(result)
 }
 
-func ResolveIdentImportPath(file *ast.File, identName string) string {
+func ResolveIdentImportPath(file *ast.File, identName string, typeInfos ...*types.Info) string {
+	if len(typeInfos) > 0 && typeInfos[0] != nil {
+		for id, obj := range typeInfos[0].Uses {
+			if id.Name == identName && id.Pos() >= file.Pos() && id.End() <= file.End() {
+				if pn, ok := obj.(*types.PkgName); ok {
+					return pn.Imported().Path()
+				}
+			}
+		}
+	}
 	for _, imp := range file.Imports {
-		impPath := strings.Trim(imp.Path.Value, `"`)
+		impPath, err := strconv.Unquote(imp.Path.Value)
+		if err != nil {
+			continue
+		}
 		alias := ""
 		if imp.Name != nil {
 			alias = imp.Name.Name
@@ -189,6 +213,7 @@ func WalkFuncSignatureTypes(info *types.Info, file *ast.File, visit func(*ast.Fu
 
 func StripWrappers(t types.Type) types.Type {
 	for {
+		t = types.Unalias(t)
 		switch x := t.(type) {
 		case *types.Pointer:
 			t = x.Elem()
@@ -207,7 +232,7 @@ func StripWrappers(t types.Type) types.Type {
 }
 
 func NamedQualifiedName(t types.Type) string {
-	named, ok := t.(*types.Named)
+	named, ok := types.Unalias(t).(*types.Named)
 	if !ok {
 		return ""
 	}
@@ -222,7 +247,7 @@ func ResolveCalleeID(info *types.Info, call *ast.CallExpr) string {
 	if info == nil || call == nil {
 		return ""
 	}
-	switch fun := call.Fun.(type) {
+	switch fun := unwrapExpr(call.Fun).(type) {
 	case *ast.SelectorExpr:
 		if sel, ok := info.Selections[fun]; ok && sel != nil {
 			if fn, ok := sel.Obj().(*types.Func); ok {
@@ -279,4 +304,72 @@ func walkFieldListTypes(info *types.Info, fd *ast.FuncDecl, fields *ast.FieldLis
 		}
 		visit(fd, field, t)
 	}
+}
+
+// unwrapExpr preserves the called symbol across parentheses and explicit type arguments.
+func unwrapExpr(expr ast.Expr) ast.Expr {
+	for {
+		switch e := expr.(type) {
+		case *ast.ParenExpr:
+			expr = e.X
+		case *ast.IndexExpr:
+			expr = e.X
+		case *ast.IndexListExpr:
+			expr = e.X
+		default:
+			return expr
+		}
+	}
+}
+
+// WalkSignatureNamedTypes visits named types anywhere in a signature type,
+// including aliases, map keys, callback signatures, and generic arguments.
+// Named underlying representations are not expanded: an opaque wrapper is a
+// distinct API type. A visited set terminates recursive interface signatures.
+func WalkSignatureNamedTypes(t types.Type, visit func(string)) {
+	seen := map[types.Type]bool{}
+	var walk func(types.Type)
+	walk = func(t types.Type) {
+		if t == nil || seen[t] {
+			return
+		}
+		seen[t] = true
+		t = types.Unalias(t)
+		switch x := t.(type) {
+		case *types.Named:
+			if id := NamedQualifiedName(x); id != "" {
+				visit(id)
+			}
+			for i := 0; i < x.TypeArgs().Len(); i++ {
+				walk(x.TypeArgs().At(i))
+			}
+		case *types.Pointer:
+			walk(x.Elem())
+		case *types.Slice:
+			walk(x.Elem())
+		case *types.Array:
+			walk(x.Elem())
+		case *types.Map:
+			walk(x.Key())
+			walk(x.Elem())
+		case *types.Chan:
+			walk(x.Elem())
+		case *types.Signature:
+			walk(x.Params())
+			walk(x.Results())
+		case *types.Tuple:
+			for i := 0; i < x.Len(); i++ {
+				walk(x.At(i).Type())
+			}
+		case *types.Struct:
+			for i := 0; i < x.NumFields(); i++ {
+				walk(x.Field(i).Type())
+			}
+		case *types.Interface:
+			for i := 0; i < x.NumMethods(); i++ {
+				walk(x.Method(i).Type())
+			}
+		}
+	}
+	walk(t)
 }

@@ -97,3 +97,14 @@ fix is clear (move the adapter into `internal/orchestration/`) and the
 convention — cross-domain abstractions owned by the orchestration package —
 is firm in every preset that enables it. Teams that use a different
 orchestration convention can downgrade or exclude it.
+
+
+## Guard correctness contracts
+
+- Generated guards fail on incomplete package loading, type errors, missing module metadata, and empty production input. Loader partial results remain available to inspection tools.
+- Load inherits recorded caller tags/instrumentation; LoadWithOptions allows explicit BuildFlags and DisableBuildFlagInheritance. Scaffold BuildFlags are emitted explicitly.
+- Rule IDs and severity settings are validated. Undeclared violation IDs are Error diagnostics; invalid severities never make reports pass.
+- Symbol analysis must handle parenthesized/generic calls and type aliases, including transaction signature wrappers. Use go/types for package identifiers and interface method sets.
+- Rules honor package/file exclusions, including interfaces and transaction rules. Nested package roots use segment-aware classification.
+- Filename checking examines all dot-separated segments. Mock declarations and receiver methods are matched across the package's test files.
+- See docs/guard-correctness.md for compatibility and regression coverage.

@@ -59,8 +59,15 @@ func (r *SnakeCaseFiles) Check(ctx *core.Context) []core.Violation {
 func isSnakeCase(filename string) bool {
 	name := strings.TrimSuffix(filename, ".go")
 	name = strings.TrimSuffix(name, "_test")
-	if idx := strings.IndexByte(name, '.'); idx > 0 {
-		name = name[:idx]
+	// Generated suffixes such as .pb.go are valid, but every segment must
+	// obey the same naming policy.
+	if strings.Contains(name, ".") {
+		for _, part := range strings.Split(name, ".") {
+			if part == "" || !isSnakeCase(part) {
+				return false
+			}
+		}
+		return true
 	}
 	if name == "" {
 		return false

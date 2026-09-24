@@ -111,6 +111,9 @@ func (r *Boundary) checkStartCalls(ctx *core.Context, allowed []string) []core.V
 			return
 		}
 		for _, file := range pkg.Syntax {
+			if analysisutil.IsTestFile(file, pkg.Fset) || ctx.IsExcluded(analysisutil.RelPathFromRoot(ctx.Root(), pkg.Fset.Position(file.Pos()).Filename)) {
+				continue
+			}
 			ast.Inspect(file, func(n ast.Node) bool {
 				call, ok := n.(*ast.CallExpr)
 				if !ok {
@@ -147,6 +150,9 @@ func (r *Boundary) checkSignatureTypes(ctx *core.Context, allowed []string) []co
 			return
 		}
 		for _, file := range pkg.Syntax {
+			if analysisutil.IsTestFile(file, pkg.Fset) || ctx.IsExcluded(analysisutil.RelPathFromRoot(ctx.Root(), pkg.Fset.Position(file.Pos()).Filename)) {
+				continue
+			}
 			analysisutil.WalkFuncSignatureTypes(pkg.TypesInfo, file, func(_ *ast.FuncDecl, field *ast.Field, typ types.Type) {
 				r.checkSignatureField(ctx, pkg, field, typ, wanted, allowed, &violations)
 			})
@@ -156,18 +162,17 @@ func (r *Boundary) checkSignatureTypes(ctx *core.Context, allowed []string) []co
 }
 
 func (r *Boundary) checkSignatureField(ctx *core.Context, pkg *packages.Package, field *ast.Field, typ types.Type, wanted map[string]bool, allowed []string, out *[]core.Violation) {
-	id := analysisutil.NamedQualifiedName(analysisutil.StripWrappers(typ))
-	if id == "" || !wanted[id] {
-		return
-	}
-	pos := pkg.Fset.Position(field.Pos())
-	*out = append(*out, r.violation(
-		typeInSignatureID,
-		analysisutil.RelPathFromRoot(ctx.Root(), pos.Filename),
-		pos.Line,
-		fmt.Sprintf("tx type %q must not appear in function signature outside allowed layers: %v", id, allowed),
-		fmt.Sprintf("keep %q confined to allowed layers: %v", id, allowed),
-	))
+	seen := map[string]bool{}
+	analysisutil.WalkSignatureNamedTypes(typ, func(id string) {
+		if !wanted[id] || seen[id] {
+			return
+		}
+		seen[id] = true
+		pos := pkg.Fset.Position(field.Pos())
+		*out = append(*out, r.violation(typeInSignatureID, analysisutil.RelPathFromRoot(ctx.Root(), pos.Filename), pos.Line,
+			fmt.Sprintf("tx type %q must not appear in function signature outside allowed layers: %v", id, allowed),
+			fmt.Sprintf("keep %q confined to allowed layers: %v", id, allowed)))
+	})
 }
 
 func (r *Boundary) walkInternalPackages(ctx *core.Context, visit func(*packages.Package, string)) {

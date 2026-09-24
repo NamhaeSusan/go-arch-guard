@@ -48,6 +48,10 @@ func (r *Pattern) Check(ctx *core.Context) []core.Violation {
 
 	var violations []core.Violation
 	for _, pkg := range pkgs {
+		pkg = includedPackage(ctx, pkg)
+		if pkg == nil {
+			continue
+		}
 		if isExcludedInterfacePatternPkg(arch, pkg) {
 			continue
 		}
@@ -137,10 +141,8 @@ func (r *Pattern) checkExportedImpl(pkg *packages.Package) []core.Violation {
 
 	scope := pkg.Types.Scope()
 	typedIfaces := make(map[string]*types.Interface)
-	for _, name := range scope.Names() {
-		if !ast.IsExported(name) {
-			continue
-		}
+	for _, ts := range collectExportedTypeSpecs(pkg) {
+		name := ts.Name.Name
 		if iface := lookupInterface(scope, name); iface != nil && iface.NumMethods() > 0 {
 			typedIfaces[name] = iface
 		}
@@ -248,7 +250,19 @@ func (r *Pattern) checkConstructorReturnsInterface(pkg *packages.Package, ifaces
 			}
 
 			firstRet := fd.Type.Results.List[0].Type
-			if ident, ok := firstRet.(*ast.Ident); ok && ifaces[ident.Name] != nil {
+			var returnType types.Type
+			if pkg.TypesInfo != nil {
+				returnType = pkg.TypesInfo.TypeOf(firstRet)
+			}
+			if returnType != nil {
+				resolved := types.Unalias(returnType)
+				_, typeParameter := resolved.(*types.TypeParam)
+				if _, ok := resolved.Underlying().(*types.Interface); ok && !typeParameter {
+					return
+				}
+			} else if ident, ok := firstRet.(*ast.Ident); ok && ifaces[ident.Name] != nil {
+				// Custom contexts may only provide syntax. Preserve the local
+				// interface fallback when no resolved type is available.
 				return
 			}
 
@@ -343,3 +357,26 @@ func packageFile(pkg *packages.Package) string {
 }
 
 var _ core.Rule = (*Pattern)(nil)
+
+// includedPackage keeps the typed package graph intact while restricting rule
+// declarations and evidence to files selected by the caller.
+func includedPackage(ctx *core.Context, pkg *packages.Package) *packages.Package {
+	if pkg == nil || ctx.IsExcluded(analysisutil.ProjectRelativePackagePath(pkg.PkgPath, ctx.Module())) {
+		return nil
+	}
+	copyPkg := *pkg
+	copyPkg.Syntax = nil
+	copyPkg.GoFiles = nil
+	for _, file := range pkg.Syntax {
+		path := pkg.Fset.Position(file.Pos()).Filename
+		if ctx.IsExcluded(analysisutil.RelativePathForPackage(pkg, path)) {
+			continue
+		}
+		copyPkg.Syntax = append(copyPkg.Syntax, file)
+		copyPkg.GoFiles = append(copyPkg.GoFiles, path)
+	}
+	if len(copyPkg.Syntax) == 0 {
+		return nil
+	}
+	return &copyPkg
+}

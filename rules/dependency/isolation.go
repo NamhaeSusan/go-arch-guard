@@ -24,6 +24,7 @@ func (r *Isolation) Spec() core.RuleSpec {
 		DefaultSeverity: r.severity,
 		Violations: violationSpecs(r.severity,
 			"dependency.cross-domain",
+			"dependency.domain-imports-composition",
 			"dependency.cmd-deep-import",
 			"dependency.orchestration-deep-import",
 			"dependency.pkg-imports-domain",
@@ -118,6 +119,12 @@ func (r *Isolation) checkCmdPackage(pkg *packages.Package, arch core.Architectur
 }
 
 func (r *Isolation) checkInternalImport(pkg *packages.Package, src, imp classified, impPath string, arch core.Architecture, projectRoot, internalPrefix string) []core.Violation {
+	if isDomainKind(src.Kind) && (imp.Kind == kindApp || imp.Kind == kindTransport) {
+		file, line := analysisutil.FindImportPosition(pkg, impPath, projectRoot)
+		return []core.Violation{r.violation(file, line, "dependency.domain-imports-composition",
+			fmt.Sprintf("domain %q must not import composition or transport package %q", src.Domain, impPath),
+			"keep composition and transport outside domain packages")}
+	}
 	if imp.Kind == kindShared && src.Kind != kindShared {
 		return nil
 	}

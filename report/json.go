@@ -86,7 +86,7 @@ func BuildJSONReport(violations []core.Violation) JSONReport {
 			DefaultSeverity:   strings.ToLower(v.DefaultSeverity.String()),
 		})
 		report.Summary.Total++
-		if v.EffectiveSeverity == core.Error {
+		if v.EffectiveSeverity != core.Warning {
 			report.Summary.Errors++
 		} else {
 			report.Summary.Warnings++
